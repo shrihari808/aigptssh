@@ -167,31 +167,6 @@ def count_tokens(text, model_name="gpt-4o-mini"):
     return len(tokens)
 
 async def memory_chain(query,m_chat):
-    # s_id=str(session_id)
-    # connection = psycopg2.connect(psql_url)
-
-    # # Create a cursor
-    # cursor = connection.cursor()
-
-    # # View the table
-    # table_name = 'message_store'
-    # cursor.execute("SELECT message FROM message_store WHERE session_id = %s", (s_id,))
-    # rows = cursor.fetchall()
-
-    # # for row in rows:
-    # #     print(row)
-
-    # # Close the cursor and connection
-    # cursor.close()
-    # connection.close()
-
-
-    # #chat=rows[:4]
-    # chat=[row[0]['data']['content'] for row in rows[-4:]]
-
-    #print(type(chat))
-    # print(chat[0][0]['data']['content'])
-    # return chat
     contextualize_q_system_prompt = """Given a chat history and the user question \
     which might reference context in the chat history, formulate a standalone question if needed include time/date part also based on user previous question.\
     which can be understood without the chat history. Do NOT answer the question,
@@ -608,96 +583,107 @@ async def web_rag_mix(
     if valid == 0:
         matched_docs, docs, memory_query, t_day, his, links = '', '', '', '', '', []
     else:
+        # **APPROACH 1 & 2 FIX**: Use the original query for retrieval and the memory_query for generation.
+        original_query = query
         memory_query = await memory_chain(query, m_chat)
+        
+        # **DIAGNOSTIC LOGGING**
+        print(f"DEBUG: Original User Query: '{original_query}'")
+        print(f"DEBUG: Reformulated Memory Query: '{memory_query}'")
+
         date, user_q, t_day = await llm_get_date(memory_query)
         
-        articles, df = await get_brave_results(memory_query)
+        # **FIX**: Use the 'original_query' for the vector search to ensure a direct match.
+        pinecone_results_with_scores = vs.similarity_search_with_score(original_query, k=15)
         
-        if articles and df is not None and not df.empty:
-            insert_post1(df)
-            try:
-                documents_to_add = [
-                    Document(
-                        page_content=f"{a.get('title', '')} {a.get('description', '')}",
-                        metadata={
+        from api.news_rag.scoring_service import scoring_service
+        # **FIX**: Pass the 'original_query' to the sufficiency check.
+        sufficiency_score = scoring_service.assess_context_sufficiency(original_query, pinecone_results_with_scores)
+        
+        web_passages = []
+        if sufficiency_score < 0.7: # Threshold can be adjusted
+            print(f"DEBUG: Sufficiency score {sufficiency_score:.2f} is below threshold. Triggering Brave search.")
+            articles, df = await get_brave_results(memory_query)
+            
+            if articles and df is not None and not df.empty:
+                insert_post1(df)
+                from api.news_rag.brave_news import BraveNews
+                brave_api_key = os.getenv('BRAVE_API_KEY')
+                searcher = BraveNews(brave_api_key)
+                scrape_tasks = [searcher._fetch_and_parse_url_async(a.get('source_url')) for a in articles if a.get('source_url')]
+                full_contents = await asyncio.gather(*scrape_tasks)
+
+                try:
+                    documents_to_add = []
+                    for i, a in enumerate(articles):
+                        full_content = full_contents[i] if i < len(full_contents) else ""
+                        # **FIX**: Use the full scraped content for ingestion
+                        page_content = f"Title: {a.get('title', '')}\nSnippet: {a.get('description', '')}\nFull Content: {full_content}"
+                        
+                        documents_to_add.append(Document(
+                            page_content=page_content,
+                            metadata={
+                                "title": a.get('title', ''),
+                                "link": a.get('source_url', ''),
+                                "snippet": a.get('description', ''),
+                                "publication_date": a.get('source_date', ''),
+                                "date": a.get('date_published', ''),
+                                "source": "brave_search"
+                            }
+                        ))
+
+                    ids_to_add = [
+                        f"brave_{hash(a.get('source_url', f'doc_{i}'))}"
+                        for i, a in enumerate(articles)
+                    ]
+                    vs.add_documents(documents=documents_to_add, ids=ids_to_add)
+                    print(f"DEBUG: Successfully upserted {len(documents_to_add)} documents to {PINECONE_INDEX_NAME}")
+                except Exception as e:
+                    print(f"WARNING: Failed to upsert documents to Pinecone: {e}")
+                
+                web_passages = [
+                    {
+                        "text": f"{a.get('title', '')} {a.get('description', '')}",
+                        "metadata": {
                             "title": a.get('title', ''),
                             "link": a.get('source_url', ''),
                             "snippet": a.get('description', ''),
-                            "publication_date": a.get('source_date', ''),   # FIXED
-                            "date": a.get('date_published', ''),            # FIXED
+                            "publication_date": a.get('source_date', ''),
+                            "date": a.get('date_published', ''),
                             "source": "brave_search"
                         }
-                    )
+                    }
                     for a in articles
                 ]
-                ids_to_add = [
-                    f"brave_{hash(a.get('source_url', f'doc_{i}'))}"
-                    for i, a in enumerate(articles)
-                ]
-                vs.add_documents(documents=documents_to_add, ids=ids_to_add)
-                print(f"DEBUG: Successfully upserted {len(documents_to_add)} documents to {PINECONE_INDEX_NAME}")
-            except Exception as e:
-                print(f"WARNING: Failed to upsert documents to Pinecone: {e}")
-            
-            web_passages = [
-                {
-                    "text": f"{a.get('title', '')} {a.get('description', '')}",
-                    "metadata": {
-                        "title": a.get('title', ''),
-                        "link": a.get('source_url', ''),
-                        "snippet": a.get('description', ''),
-                        "publication_date": a.get('source_date', ''),   # FIXED
-                        "date": a.get('date_published', ''),            # FIXED
-                        "source": "brave_search"
-                    }
-                }
-                for a in articles
-            ]
-            docs = [p["text"] for p in web_passages]
-            links = [p["metadata"]["link"] for p in web_passages]
         else:
-            docs, df, links, web_passages = [], None, [], []
+            print(f"DEBUG: Sufficiency score {sufficiency_score:.2f} is sufficient. Skipping Brave search.")
 
-        try:
-            pinecone_passages = []
-            search_kwargs = {"k": 15}
-            if date != 'None':
-                search_kwargs['filter'] = {"date": {"$gte": int(date)}}
-            
-            results = vs.similarity_search_with_score(memory_query, **search_kwargs)
-            if not results and date != 'None':
-                results = vs.similarity_search_with_score(memory_query, k=15)
-            
-            pinecone_passages = [
-                {"text": doc.page_content, "metadata": doc.metadata}
-                for doc, score in results
-            ]
-            
-            # Deduplicate by link
-            all_passages_map = {}
-            for p in web_passages + pinecone_passages:
-                link = p["metadata"].get("link") or f"nolink_{hash(p['text'])}"
-                if link not in all_passages_map:
-                    all_passages_map[link] = p
-            all_passages = list(all_passages_map.values())
+        
+        pinecone_passages = [
+            {"text": doc.page_content, "metadata": {**doc.metadata, "score": score}}
+            for doc, score in pinecone_results_with_scores
+        ]
+        
+        all_passages_map = {}
+        for p in web_passages + pinecone_passages:
+            link = p["metadata"].get("link") or f"nolink_{hash(p['text'])}"
+            if link not in all_passages_map:
+                all_passages_map[link] = p
+        all_passages = list(all_passages_map.values())
 
-            if all_passages:
-                from api.news_rag.scoring_service import scoring_service
-                reranked_passages = await scoring_service.score_and_rerank_passages(
-                    question=memory_query, 
-                    passages=all_passages
-                )
-                matched_docs = scoring_service.create_enhanced_context(reranked_passages)
-            else:
-                matched_docs = "\n\n".join(docs) if docs else ""
-            
-        except Exception as e:
-            print(f"WARNING: Scoring service failed, falling back to simple content: {e}")
-            matched_docs = "\n\n".join(docs) if docs else ""
+        if all_passages:
+            reranked_passages = await scoring_service.score_and_rerank_passages(
+                question=memory_query, 
+                passages=all_passages
+            )
+            matched_docs = scoring_service.create_enhanced_context(reranked_passages)
+            links = [p["metadata"]["link"] for p in reranked_passages if "link" in p.get("metadata", {})]
+        else:
+            matched_docs = ""
+            links = []
 
         his = h_chat
 
-        # ✅ ORIGINAL SYSTEM PROMPT KEPT EXACTLY
         res_prompt = """
         News Articles : {bing}
         chat history : {history}
@@ -746,7 +732,7 @@ async def web_rag_mix(
         R_prompt = PromptTemplate(template=res_prompt, input_variables=["bing","input","date","history"])
         ans_chain = R_prompt | llm_stream
 
-    async def generate_chat_res(matched_docs, docs, query, t_day, history):
+    async def generate_chat_res(matched_docs, query, t_day, history):
         if valid == 0:
             error_message = (
                 "The search query you're trying to use does not appear to be related to the Indian financial markets..."
@@ -771,22 +757,16 @@ async def web_rag_mix(
                         await asyncio.sleep(0.01)
 
             # --- Manual token counting ---
-            # Count prompt tokens (context + query)
             prompt_text = f"{matched_docs}\n{history}\n{query}\n{t_day}"
             prompt_tokens = count_tokens(prompt_text)
-
-            # Count completion tokens
             completion_tokens = count_tokens(final_response)
-
             total_tokens = prompt_tokens + completion_tokens
 
             await insert_credit_usage(user_id, plan_id, total_tokens / 1000)
             print(f"SUCCESS: Token usage captured: {total_tokens}")
 
-            # Store links in DB
             await store_into_db(session_id, prompt_history_id, {"links": links})
 
-            # Save conversation history
             if final_response:
                 history_db = PostgresChatMessageHistory(str(session_id), psql_url)
                 history_db.add_user_message(memory_query)
@@ -798,7 +778,9 @@ async def web_rag_mix(
             print(f"ERROR: An error occurred during streaming: {e}")
             yield b"An error occurred while generating the response."
 
-    return StreamingResponse(generate_chat_res(matched_docs, docs, memory_query, t_day, his), media_type="text/event-stream")
+    return StreamingResponse(generate_chat_res(matched_docs, memory_query, t_day, his), media_type="text/event-stream")
+
+
 
 
 @red_rag.post("/reddit_rag")

@@ -54,41 +54,64 @@ class NewsRagScoringService:
             print(f"WARNING: Could not initialize CrossEncoder model: {e}")
             self.cross_encoder_model = None
 
-    def assess_context_sufficiency(self, context: str, query: str, num_docs: int = 0) -> float:
+    def assess_context_sufficiency(self, query: str, retrieved_docs: list) -> float:
         """
-        Assess if the existing context is sufficient to answer the query.
-        Returns a score between 0 and 1, where higher is more sufficient.
+        Assess if the retrieved documents are sufficient to answer the query
+        based on relevance scores and diversity.
+
+        Args:
+            query (str): The user's query.
+            retrieved_docs (list): A list of tuples, where each tuple contains a Document object
+                                and its relevance score.
         """
-        if not context or len(context.strip()) < MIN_CONTEXT_LENGTH:
-            print(f"DEBUG: Context too short ({len(context)} chars), insufficient")
+        if not retrieved_docs or len(retrieved_docs) < MIN_RELEVANT_DOCS:
+            print(f"DEBUG: Too few documents ({len(retrieved_docs)}), insufficient.")
             return 0.0
-        
-        if num_docs < MIN_RELEVANT_DOCS:
-            print(f"DEBUG: Too few relevant documents ({num_docs}), insufficient")
-            return 0.2
-        
-        # Basic keyword matching
-        query_words = set(query.lower().split())
-        context_words = set(context.lower().split())
-        keyword_overlap = len(query_words.intersection(context_words)) / len(query_words) if query_words else 0
-        
-        # Check for recency indicators in query
+
+        # 1. Analyze Relevance Scores
+        # **FIX**: Convert distance scores to similarity scores (1 - distance)
+        # A lower distance score from the DB means higher relevance.
+        similarity_scores = [1 - score for doc, score in retrieved_docs]
+        average_relevance = sum(similarity_scores) / len(similarity_scores) if similarity_scores else 0
+
+        # Check how many documents are above a relevance threshold
+        HIGH_RELEVANCE_THRESHOLD = 0.8 # Adjusted for similarity scores
+        highly_relevant_docs = sum(1 for score in similarity_scores if score > HIGH_RELEVANCE_THRESHOLD)
+
+        # 2. Check for Recency (more robustly)
         recency_keywords = ['latest', 'recent', 'today', 'current', 'new']
-        query_lower = query.lower()
-        wants_recent = any(keyword in query_lower for keyword in recency_keywords)
-        
-        # If user wants recent info, be more strict
-        base_score = keyword_overlap * 0.6
+        wants_recent = any(keyword in query.lower() for keyword in recency_keywords)
+
         if wants_recent:
-            base_score *= 0.7  # Reduce confidence for recency-sensitive queries
+            # Check the actual dates of the documents
+            from datetime import datetime, timedelta
+            dates = [doc.metadata.get("publication_date") for doc, score in retrieved_docs if doc.metadata.get("publication_date")]
+            if not dates:
+                # If no dates are found and user wants recent info, it's insufficient
+                return 0.1
+
+            # Check if at least one document is from the last 7 days
+            is_recent_found = any(
+                (datetime.now() - datetime.fromisoformat(date.replace("Z", ""))).days <= 7
+                for date in dates
+            )
+            if not is_recent_found:
+                print("DEBUG: User wants recent news, but no recent documents were found.")
+                return 0.2 # Low score if recency is desired but not found
+
+        # 3. Calculate Final Score
+        # Base score on average relevance and number of highly relevant docs
+        relevance_component = average_relevance * 0.7
+        confidence_component = min(0.3, (highly_relevant_docs / 5) * 0.3) # Bonus for having more high-quality docs
+
+        final_score = relevance_component + confidence_component
         
-        # Context length bonus
-        length_bonus = min(0.3, len(context) / 2000)  # Max bonus for long context
-        
-        final_score = min(1.0, base_score + length_bonus)
-        print(f"DEBUG: Context sufficiency score: {final_score:.3f} (keywords: {keyword_overlap:.2f}, length: {len(context)}, docs: {num_docs})")
-        
+        print(f"DEBUG: Context sufficiency score: {final_score:.3f} (Avg Relevance: {average_relevance:.2f}, High-Relevance Docs: {highly_relevant_docs})")
+
         return final_score
+
+
+
 
     def _calculate_sentiment_score(self, text: str, query: str) -> float:
         """Context-aware sentiment scoring that considers query intent."""
