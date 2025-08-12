@@ -43,15 +43,35 @@ async def close_db_pool():
         print("INFO: Database connection pool closed.")
 
 # --- Add Lifecycle Event Handlers for DB Pool using lifespan ---
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
     Manages the application's lifespan events.
     Initializes the database pool on startup and closes it on shutdown.
     """
-    await init_db_pool()
-    yield
-    await close_db_pool()
+    print("INFO: Application startup...")
+    db_url = os.getenv('DATABASE_URL')
+    if db_url:
+        print("INFO: Initializing database connection pool...")
+        # Attach the pool to the app's state
+        app.state.db_pool = await asyncpg.create_pool(
+            dsn=db_url,
+            min_size=1,
+            max_size=10
+        )
+        print("INFO: Database connection pool initialized successfully.")
+    else:
+        app.state.db_pool = None
+        print("ERROR: DATABASE_URL not set. Database pool not initialized.")
+
+    yield # The application is now running
+
+    print("INFO: Application shutdown...")
+    if app.state.db_pool:
+        print("INFO: Closing database connection pool...")
+        await app.state.db_pool.close()
+        print("INFO: Database connection pool closed.")
 
 # Initialize the FastAPI application with the lifespan manager
 app = FastAPI(

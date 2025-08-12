@@ -40,7 +40,7 @@ DB_POOL = None
 encoding = tiktoken.get_encoding("cl100k_base")
 
 # Brave Search Parameters
-MAX_SCRAPED_SOURCES = 30
+MAX_SCRAPED_SOURCES = 10
 MAX_PAGES = 1
 MAX_ITEMS_PER_DOMAIN = 1
 
