@@ -448,11 +448,12 @@ yt_rag=APIRouter()
 
 OPENAI_API_KEY=os.getenv('OPENAI_API_KEY')
 async def authenticate_ai_key(x_api_key: str = Header(...)):
-    if x_api_key != OPENAI_API_KEY:
-        raise HTTPException(
-            status_code=HTTP_403_FORBIDDEN,
-            detail="Invalid or missing API Key",
-        )
+    pass
+    # if x_api_key != OPENAI_API_KEY:
+    #     raise HTTPException(
+    #         status_code=HTTP_403_FORBIDDEN,
+    #         detail="Invalid or missing API Key",
+    #     )
 
 
 
@@ -462,8 +463,7 @@ async def cmots_only(
     session_id: int = Query(...), 
     prompt_history_id: int = Query(...), 
     user_id: int = Query(...), 
-    plan_id: int = Query(...),
-    ai_key_auth: str = Depends(authenticate_ai_key)
+    plan_id: int = Query(...)
 ):
     query = request.query
     valid, v_tokens,m_chat,h_chat=await query_validate(query, session_id)
@@ -574,8 +574,7 @@ async def web_rag_mix(
     session_id: int = Query(...), 
     prompt_history_id: int = Query(...), 
     user_id: int = Query(...), 
-    plan_id: int = Query(...),
-    ai_key_auth: str = Depends(authenticate_ai_key)
+    plan_id: int = Query(...)
 ):
     query = request.query 
     valid, v_tokens, m_chat, h_chat = await query_validate(query, session_id)
@@ -789,8 +788,7 @@ async def red_rag_bing(
     session_id: int = Query(...), 
     prompt_history_id: int = Query(...), 
     user_id: int = Query(...), 
-    plan_id: int = Query(...),
-    ai_key_auth: str = Depends(authenticate_ai_key)
+    plan_id: int = Query(...)
 ):
     query = request.query 
     valid,v_tokens,m_chat,h_chat=await query_validate(query,session_id)
@@ -862,8 +860,7 @@ async def yt_rag_bing(request: InRequest,
     session_id: int = Query(...), 
     prompt_history_id: int = Query(...), 
     user_id: int = Query(...), 
-    plan_id: int = Query(...),
-    ai_key_auth: str = Depends(authenticate_ai_key)
+    plan_id: int = Query(...)
 ):
     query = request.query 
     valid,v_tokens,m_chat,h_chat=await query_validate(query,session_id)
