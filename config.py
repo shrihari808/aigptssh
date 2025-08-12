@@ -34,6 +34,8 @@ OPENAI_API_TYPE = os.getenv("OPENAI_API_TYPE")
 OPENAI_CHAT_MODEL = os.getenv("OPENAI_CHAT_MODEL", "gpt-4o")
 OPENAI_EMBEDDING_MODEL = "text-embedding-ada-002"
 
+DB_POOL = None
+
 # Tokenizer
 encoding = tiktoken.get_encoding("cl100k_base")
 

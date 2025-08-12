@@ -261,29 +261,52 @@ async def get_brave_results(query: str):
         print(f"Error in get_brave_results: {str(e)}")
         return None, None
 
-def insert_post1(df: pd.DataFrame):
-    """Synchronous function to insert DataFrame into PostgreSQL."""
-    db_url = psql_url
-    conn = None
-    cur = None
-    try:
-        conn = psycopg2.connect(db_url)
-        cur = conn.cursor()
-        for index, row in df.iterrows():
-            cur.execute("SELECT 1 FROM source_data WHERE source_url = %s", (row['source_url'],))
-            if cur.fetchone() is None:
-                insert_query = sql.SQL("""
-                    INSERT INTO source_data (source_url, image_url, heading, title, description, source_date)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                """)
-                cur.execute(insert_query, (row['source_url'], row.get('image_url'), row['heading'], row['title'], row['description'], row['source_date']))
-        conn.commit()
-        print("DEBUG: Sources inserted into source_data table")
-    except Exception as e:
-        print(f"Error inserting into PostgreSQL (sync): {e}")
-    finally:
-        if cur: cur.close()
-        if conn: conn.close()
+import pandas as pd
+from config import DB_POOL # Import the initialized DB_POOL
+
+async def insert_post1(df: pd.DataFrame):
+    """
+    Asynchronously inserts a DataFrame into the source_data table using a connection pool.
+    This is the non-blocking version of insert_post1.
+    """
+    # Check if the pool is initialized, if not, it's a critical startup error.
+    if DB_POOL is None:
+        print("CRITICAL ERROR: Database pool is not initialized. Cannot insert data.")
+        return
+
+    # Acquire a connection from the pool. This is very fast and doesn't create a new connection each time.
+    async with DB_POOL.acquire() as conn:
+        # Use a transaction to ensure all rows are inserted successfully or none are.
+        async with conn.transaction():
+            for index, row in df.iterrows():
+                try:
+                    # Check if the source_url already exists.
+                    # fetchval is an efficient way to get a single value.
+                    exists = await conn.fetchval(
+                        "SELECT 1 FROM source_data WHERE source_url = $1",
+                        row['source_url']
+                    )
+
+                    if not exists:
+                        # Use parameterized queries ($1, $2, etc.) to prevent SQL injection.
+                        await conn.execute("""
+                            INSERT INTO source_data (source_url, image_url, heading, title, description, source_date)
+                            VALUES ($1, $2, $3, $4, $5, $6)
+                        """,
+                        row['source_url'],
+                        row.get('image_url'), # Use .get() for optional columns
+                        row['heading'],
+                        row['title'],
+                        row['description'],
+                        row['source_date']
+                        )
+                except Exception as e:
+                    # Log any errors that occur for a specific row without stopping the entire batch.
+                    print(f"Error inserting row for URL {row['source_url']}: {e}")
+    
+    print(f"DEBUG: Asynchronous insert for {len(df)} rows completed.")
+
+
 
 def initialize_pinecone():
     """Initializes and returns a Pinecone client and index name."""
