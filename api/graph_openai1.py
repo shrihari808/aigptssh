@@ -88,7 +88,7 @@ def find_metric(metric, threshold=95):
 
 
 
-def get_year_ratio(stock_name, years, metric):
+async def get_year_ratio(stock_name, years, metric):
     # print(years)
     code = int(find_stock_code(stock_name))
     print(code)
@@ -108,7 +108,8 @@ def get_year_ratio(stock_name, years, metric):
     # data = {"description": description}
 
     # Make a GET request with headers and payload
-    response = requests.get(url, headers=headers)
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url, headers=headers)
 
     # Check if the request was successful (status code 200)
     if response.status_code == 200:
@@ -158,7 +159,7 @@ def get_year_ratio(stock_name, years, metric):
         print(response.text)
 
 
-def years_result(stock_name, years, metric):
+async def years_result(stock_name, years, metric):
     # print(year)
     code = int(find_stock_code(stock_name))
     # metric1 = get_metric(metric)
@@ -173,7 +174,8 @@ def years_result(stock_name, years, metric):
     # data = {"description": description}
 
     # Make a GET request with headers and payload
-    response = requests.get(url, headers=headers)
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url, headers=headers)
 
     # Check if the request was successful (status code 200)
     if response.status_code == 200:
@@ -225,7 +227,7 @@ def years_result(stock_name, years, metric):
     return output_dict
 
 
-def get_cashflow1(stock_name, years, metric):
+async def get_cashflow1(stock_name, years, metric):
     code = int(find_stock_code(stock_name))
     metric1 = find_metric(metric)
     
@@ -233,7 +235,8 @@ def get_cashflow1(stock_name, years, metric):
     headers = {"Authorization": f"Bearer {token}"}
 
     try:
-        response = requests.get(url, headers=headers)
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers)
         response.raise_for_status()  # Check if the request was successful
     except requests.RequestException as e:
         print(f"Request failed: {e}")
@@ -283,7 +286,7 @@ def get_cashflow1(stock_name, years, metric):
     return output_dict
 
 
-def get_cashflow(stock_name, years, metric):
+async def get_cashflow(stock_name, years, metric):
     code = int(find_stock_code(stock_name))
     metric1 = find_metric(metric)
     
@@ -292,7 +295,8 @@ def get_cashflow(stock_name, years, metric):
     headers = {"Authorization": f"Bearer {token}"}
 
     try:
-        response = requests.get(url, headers=headers)
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers)
         response.raise_for_status()  # Check if the request was successful
     except requests.RequestException as e:
         print(f"Request failed: {e}")

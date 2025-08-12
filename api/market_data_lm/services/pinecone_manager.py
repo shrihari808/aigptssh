@@ -21,7 +21,7 @@ class PineconeManager:
         self.index_name = index_name
         self.pinecone_index = None
 
-    def connect_to_index(self):
+    async def connect_to_index(self):
         """
         Connects to the specified Pinecone index.
         If the index does not exist, it will be created automatically.
@@ -42,7 +42,7 @@ class PineconeManager:
                     )
                 )
                 print(f"INFO:     Waiting for '{self.index_name}' to initialize...")
-                time.sleep(10)
+                await asyncio.sleep(10)
                 print(f"INFO:     Index '{self.index_name}' created successfully.")
             else:
                 print(f"INFO:     Found existing Pinecone index '{self.index_name}'.")

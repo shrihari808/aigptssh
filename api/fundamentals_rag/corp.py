@@ -104,7 +104,7 @@ def find_stock_code_(stock_name):
         return None
 
 
-def get_nse_annocements(stock_name):
+async def get_nse_annocements(stock_name):
     url = f"http://airrchipapis.cmots.com/api/{stock_name}Announcement"
     #token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6ImFpcnJjaGlwIiwicm9sZSI6IkFkbWluIiwibmJmIjoxNzA4OTM5ODM2LCJleHAiOjE3MTY3MTU4MzYsImlhdCI6MTcwODkzOTgzNiwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo1MDE5MSIsImF1ZCI6Imh0dHA6Ly9sb2NhbGhvc3Q6NTAxOTEifQ.kpUxCvvDw_6bVYHinm0hXa-2bZ21BSWlthSeZMl4mp0"  # Replace with your actual authorization token
     # description = "93.0"  # Replace with the actual description
@@ -116,7 +116,8 @@ def get_nse_annocements(stock_name):
     # data = {"description": description}
 
     # Make a GET request with headers and payload
-    response = requests.get(url, headers=headers)
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url, headers=headers)
 
     # Check if the request was successful (status code 200)
     if response.status_code == 200:
@@ -203,7 +204,7 @@ class nse_bse_annocements(BaseTool):
 ###############################################
 
 
-def get_today_results():
+async def get_today_results():
     url = f"http://airrchipapis.cmots.com/api/Today-Results"
     #token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6ImFpcnJjaGlwIiwicm9sZSI6IkFkbWluIiwibmJmIjoxNzA4OTM5ODM2LCJleHAiOjE3MTY3MTU4MzYsImlhdCI6MTcwODkzOTgzNiwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo1MDE5MSIsImF1ZCI6Imh0dHA6Ly9sb2NhbGhvc3Q6NTAxOTEifQ.kpUxCvvDw_6bVYHinm0hXa-2bZ21BSWlthSeZMl4mp0"  # Replace with your actual authorization token
     # description = "93.0"  # Replace with the actual description
@@ -215,7 +216,8 @@ def get_today_results():
     # data = {"description": description}
 
     # Make a GET request with headers and payload
-    response = requests.get(url, headers=headers)
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url, headers=headers)
 
     # Check if the request was successful (status code 200)
     if response.status_code == 200:
@@ -299,7 +301,7 @@ class today_results(BaseTool):
 
 #####################################
 
-def get_dilist():
+async def get_dilist():
     url = f"http://airrchipapis.cmots.com/api/DeListed"
     #token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6ImFpcnJjaGlwIiwicm9sZSI6IkFkbWluIiwibmJmIjoxNzA4OTM5ODM2LCJleHAiOjE3MTY3MTU4MzYsImlhdCI6MTcwODkzOTgzNiwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo1MDE5MSIsImF1ZCI6Imh0dHA6Ly9sb2NhbGhvc3Q6NTAxOTEifQ.kpUxCvvDw_6bVYHinm0hXa-2bZ21BSWlthSeZMl4mp0"  # Replace with your actual authorization token
     # description = "93.0"  # Replace with the actual description
@@ -311,7 +313,8 @@ def get_dilist():
     # data = {"description": description}
 
     # Make a GET request with headers and payload
-    response = requests.get(url, headers=headers)
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url, headers=headers)
 
     # Check if the request was successful (status code 200)
     if response.status_code == 200:
@@ -388,7 +391,7 @@ class delisted_companies(BaseTool):
 
 #############################################
 
-def get_agm_egm(type,stock_name):
+async def get_agm_egm(type,stock_name):
     code=int(find_stock_code(stock_name))
     print(code)
     if code is None:
@@ -406,7 +409,8 @@ def get_agm_egm(type,stock_name):
     # data = {"description": description}
 
     # Make a GET request with headers and payload
-    response = requests.get(url, headers=headers)
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url, headers=headers)
 
     # Check if the request was successful (status code 200)
     if response.status_code == 200:
@@ -493,7 +497,7 @@ class agm_egm(BaseTool):
 
 #upcoming meetings
 
-def get_next_meetings(type):
+async def get_next_meetings(type):
     if type==1:
         set='bookcloser'
     elif type==2:
@@ -519,7 +523,8 @@ def get_next_meetings(type):
     # data = {"description": description}
 
     # Make a GET request with headers and payload
-    response = requests.get(url, headers=headers)
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url, headers=headers)
 
     # Check if the request was successful (status code 200)
     if response.status_code == 200:
@@ -676,13 +681,14 @@ class upcoming_corporate_Actions(BaseTool):
 
 #corp tools
 
-def get_rights(url):
+async def get_rights(url):
     # Set up the headers with the authorization token
     
     headers = {"Authorization": f"Bearer {token}"}
 
     # Make a GET request with headers
-    response = requests.get(url, headers=headers)
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url, headers=headers)
 
     # Check if the request was successful (status code 200)
     if response.status_code == 200:
@@ -744,12 +750,13 @@ async def get_rights_a(url):
         except (KeyError, IndexError, ValueError) as e:
             return {"error": f"Data processing failed: {str(e)}"}
 
-def get_merge(url):
+async def get_merge(url):
     # Set up the headers with the authorization token
     headers = {"Authorization": f"Bearer {token}"}
 
     # Make a GET request with headers
-    response = requests.get(url, headers=headers)
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url, headers=headers)
 
     # Check if the request was successful (status code 200)
     if response.status_code == 200:
@@ -829,11 +836,12 @@ async def get_merge_a(url):
             return {"error": f"An error occurred: {str(e)}"}
 
 
-def get_bonus(url):
+async def get_bonus(url):
     headers = {"Authorization": f"Bearer {token}"}
 
     # Make a GET request with headers
-    response = requests.get(url, headers=headers)
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url, headers=headers)
 
     # Check if the request was successful (status code 200)
     if response.status_code == 200:
@@ -897,12 +905,13 @@ async def get_bonus_a(url):
             return {"error": f"An error occurred: {str(e)}"}
         
 
-def get_splits(url):
+async def get_splits(url):
     # Set up the headers with the authorization token
     headers = {"Authorization": f"Bearer {token}"}
 
     # Make a GET request with headers
-    response = requests.get(url, headers=headers)
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url, headers=headers)
 
     # Check if the request was successful (status code 200)
     if response.status_code == 200:
@@ -971,13 +980,14 @@ async def get_splits_a(url):
             return {"error": f"An error occurred: {str(e)}"}
 
 
-def get_bb(url):
+async def get_bb(url):
     # Set up the headers with the authorization token
     
     headers = {"Authorization": f"Bearer {token}"}
 
     # Make a GET request with headers
-    response = requests.get(url, headers=headers)
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url, headers=headers)
 
     # Check if the request was successful (status code 200)
     if response.status_code == 200:
@@ -1044,12 +1054,13 @@ async def get_bb_a(url):
         except Exception as e:
             return {"error": f"An error occurred: {str(e)}"}
 
-def get_book_closure(url):
+async def get_book_closure(url):
     # Set up the headers with the authorization token
     headers = {"Authorization": f"Bearer {token}"}
 
     # Make a GET request with headers
-    response = requests.get(url, headers=headers)
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url, headers=headers)
 
     # Check if the request was successful (status code 200)
     if response.status_code == 200:
@@ -1114,11 +1125,12 @@ async def get_book_closure_a(url):
             return {"error": f"An error occurred: {str(e)}"}
 
 
-def get_board_meetings(url):
+async def get_board_meetings(url):
     headers = {"Authorization": f"Bearer {token}"}
 
     # Make a GET request with headers
-    response = requests.get(url, headers=headers)
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url, headers=headers)
 
     # Check if the request was successful (status code 200)
     if response.status_code == 200:
