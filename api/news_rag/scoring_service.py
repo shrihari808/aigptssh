@@ -56,59 +56,150 @@ class NewsRagScoringService:
 
     def assess_context_sufficiency(self, query: str, retrieved_docs: list) -> float:
         """
-        Assess if the retrieved documents are sufficient to answer the query
-        based on relevance scores and diversity.
-
+        FIXED: Assess if retrieved documents are sufficient to answer the query
+        with proper similarity score interpretation and realistic thresholds.
+        
         Args:
             query (str): The user's query.
-            retrieved_docs (list): A list of tuples, where each tuple contains a Document object
-                                and its relevance score.
+            retrieved_docs (list): List of tuples (Document, distance_score)
+            
+        Returns:
+            float: Sufficiency score between 0 and 1
         """
         if not retrieved_docs or len(retrieved_docs) < MIN_RELEVANT_DOCS:
             print(f"DEBUG: Too few documents ({len(retrieved_docs)}), insufficient.")
             return 0.0
 
-        # 1. Analyze Relevance Scores
-        # **FIX**: Convert distance scores to similarity scores (1 - distance)
-        # A lower distance score from the DB means higher relevance.
+        # FIXED: Convert Pinecone cosine distance to similarity scores
+        # Pinecone cosine distance: 0 = identical, 2 = opposite
+        # For cosine distance: similarity = 1 - distance
         similarity_scores = [1 - score for doc, score in retrieved_docs]
-        average_relevance = sum(similarity_scores) / len(similarity_scores) if similarity_scores else 0
-
-        # Check how many documents are above a relevance threshold
-        HIGH_RELEVANCE_THRESHOLD = 0.8 # Adjusted for similarity scores
-        highly_relevant_docs = sum(1 for score in similarity_scores if score > HIGH_RELEVANCE_THRESHOLD)
-
-        # 2. Check for Recency (more robustly)
-        recency_keywords = ['latest', 'recent', 'today', 'current', 'new']
-        wants_recent = any(keyword in query.lower() for keyword in recency_keywords)
-
-        if wants_recent:
-            # Check the actual dates of the documents
-            from datetime import datetime, timedelta
-            dates = [doc.metadata.get("publication_date") for doc, score in retrieved_docs if doc.metadata.get("publication_date")]
-            if not dates:
-                # If no dates are found and user wants recent info, it's insufficient
-                return 0.1
-
-            # Check if at least one document is from the last 7 days
-            is_recent_found = any(
-                (datetime.now() - datetime.fromisoformat(date.replace("Z", ""))).days <= 7
-                for date in dates
-            )
-            if not is_recent_found:
-                print("DEBUG: User wants recent news, but no recent documents were found.")
-                return 0.2 # Low score if recency is desired but not found
-
-        # 3. Calculate Final Score
-        # Base score on average relevance and number of highly relevant docs
-        relevance_component = average_relevance * 0.7
-        confidence_component = min(0.3, (highly_relevant_docs / 5) * 0.3) # Bonus for having more high-quality docs
-
-        final_score = relevance_component + confidence_component
+        average_relevance = sum(similarity_scores) / len(similarity_scores)
         
-        print(f"DEBUG: Context sufficiency score: {final_score:.3f} (Avg Relevance: {average_relevance:.2f}, High-Relevance Docs: {highly_relevant_docs})")
+        # FIXED: Use realistic threshold for text similarity
+        # For cosine similarity, 0.3-0.4 is often a good threshold
+        HIGH_RELEVANCE_THRESHOLD = 0.35  # Much more realistic than 0.8
+        highly_relevant_docs = sum(1 for score in similarity_scores if score > HIGH_RELEVANCE_THRESHOLD)
+        
+        print(f"DEBUG: Raw distance scores: {[f'{score:.3f}' for _, score in retrieved_docs[:5]]}")
+        print(f"DEBUG: Converted similarities: {[f'{score:.3f}' for score in similarity_scores[:5]]}")
+        print(f"DEBUG: Average relevance: {average_relevance:.3f}")
+        print(f"DEBUG: Docs above {HIGH_RELEVANCE_THRESHOLD} threshold: {highly_relevant_docs}")
 
+        # Check for recency requirements
+        recency_keywords = ['latest', 'recent', 'today', 'current', 'new', 'breaking']
+        wants_recent = any(keyword in query.lower() for keyword in recency_keywords)
+        
+        recency_penalty = 0.0
+        if wants_recent:
+            print("DEBUG: Query requests recent information")
+            recent_docs_found = 0
+            
+            for doc, score in retrieved_docs[:5]:  # Check top 5 most relevant
+                pub_date = doc.metadata.get("publication_date") or doc.metadata.get("date")
+                if not pub_date:
+                    continue
+                    
+                try:
+                    # Handle different date formats
+                    if str(pub_date).isdigit() and len(str(pub_date)) == 8:
+                        # YYYYMMDD format
+                        doc_date = datetime.strptime(str(pub_date), '%Y%m%d')
+                    else:
+                        # ISO format
+                        pub_date_str = str(pub_date).replace('Z', '').replace('+00:00', '')
+                        if 'T' in pub_date_str:
+                            doc_date = datetime.fromisoformat(pub_date_str)
+                        else:
+                            continue
+                    
+                    days_old = (datetime.now() - doc_date).days
+                    print(f"DEBUG: Document age: {days_old} days")
+                    
+                    if days_old <= 7:  # Within last week
+                        recent_docs_found += 1
+                        
+                except Exception as e:
+                    print(f"DEBUG: Date parsing error for '{pub_date}': {e}")
+                    continue
+            
+            print(f"DEBUG: Recent documents found: {recent_docs_found}")
+            
+            # Apply penalty if no recent docs found when requested
+            if recent_docs_found == 0:
+                recency_penalty = 0.3
+                print("DEBUG: Applying recency penalty: user wants recent info but none found")
+        
+        # FIXED: Adjust scoring components and weights
+        relevance_component = min(0.7, average_relevance * 0.7)  # Cap at 0.7
+        
+        # Confidence based on number of highly relevant docs
+        max_confidence_docs = 5  # Expect at most 5 highly relevant docs
+        confidence_component = min(0.3, (highly_relevant_docs / max_confidence_docs) * 0.3)
+        
+        # Calculate base score
+        base_score = relevance_component + confidence_component
+        
+        # Apply recency penalty
+        final_score = max(0.0, base_score - recency_penalty)
+        
+        print(f"DEBUG: Scoring breakdown:")
+        print(f"  - Relevance component: {relevance_component:.3f}")
+        print(f"  - Confidence component: {confidence_component:.3f}")
+        print(f"  - Recency penalty: {recency_penalty:.3f}")
+        print(f"  - Final sufficiency score: {final_score:.3f}")
+        
         return final_score
+
+    # ALSO UPDATE: Adjust the threshold in your web_rag function
+    # Change this line in web_rag_mix():
+    # if sufficiency_score < 0.7:  # OLD threshold
+    # to:
+    # if sufficiency_score < 0.4:  # NEW, more realistic threshold
+
+    # Additional debugging function for your web_rag endpoint
+    def debug_pinecone_similarity_search(vs, query, k=15):
+        """
+        Debug helper to understand your Pinecone similarity search results
+        """
+        print(f"\n=== DEBUGGING PINECONE SEARCH ===")
+        print(f"Query: '{query}'")
+        
+        results = vs.similarity_search_with_score(query, k=k)
+        
+        print(f"Retrieved {len(results)} documents")
+        
+        for i, (doc, score) in enumerate(results[:5]):
+            print(f"\nResult {i+1}:")
+            print(f"  Distance score: {score:.4f}")
+            print(f"  Similarity: {(1-score):.4f}")
+            print(f"  Title: {doc.metadata.get('title', 'No title')[:80]}...")
+            print(f"  Source: {doc.metadata.get('source', 'Unknown')}")
+            print(f"  Date: {doc.metadata.get('publication_date', 'No date')}")
+            print(f"  Content preview: {doc.page_content[:100]}...")
+        
+        return results
+
+        # Integration example for your web_rag function:
+        """
+        # Replace the existing sufficiency check in web_rag_mix() with:
+
+        # Debug the search results first (remove in production)
+        if DEBUG_MODE:  # Add this flag to your config
+            pinecone_results_with_scores = debug_pinecone_similarity_search(vs, original_query, 15)
+        else:
+            pinecone_results_with_scores = vs.similarity_search_with_score(original_query, k=15)
+
+        # Use the fixed sufficiency assessment
+        sufficiency_score = scoring_service.assess_context_sufficiency(original_query, pinecone_results_with_scores)
+
+        # Use lower, more realistic threshold
+        if sufficiency_score < 0.4:  # Changed from 0.7
+            print(f"DEBUG: Sufficiency score {sufficiency_score:.2f} is below threshold. Triggering Brave search.")
+            # ... rest of Brave search logic
+        else:
+            print(f"DEBUG: Sufficiency score {sufficiency_score:.2f} is sufficient. Using existing data.")
+        """
 
 
 

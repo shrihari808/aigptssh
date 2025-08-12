@@ -7,13 +7,7 @@ from dotenv import load_dotenv
 # This is placed at the very top to ensure variables are loaded before any other code runs.
 # It explicitly finds the .env file in the project root directory (one level up from 'app_service').
 try:
-    env_path = Path(__file__).resolve().parent.parent / '.env'
-    if env_path.exists():
-        load_dotenv(dotenv_path=env_path, override=True)
-        print("INFO: config.py loaded .env file successfully.")
-    else:
-        print("WARNING: .env file not found at the expected path, attempting default load.")
-        load_dotenv(override=True)
+    load_dotenv(override=True)
 except Exception as e:
     print(f"ERROR: Could not load .env file in config.py: {e}")
 
@@ -58,7 +52,7 @@ MAX_RERANKED_CONTEXT_ITEMS = 10
 PINECONE_MAX_WAIT_TIME = 30
 PINECONE_CHECK_INTERVAL = 1
 
-CONTEXT_SUFFICIENCY_THRESHOLD = 0.3
+CONTEXT_SUFFICIENCY_THRESHOLD = 0.45
 MIN_CONTEXT_LENGTH = 200
 MIN_RELEVANT_DOCS = 3
 W_RELEVANCE = float(os.getenv("W_RELEVANCE", 0.5450))

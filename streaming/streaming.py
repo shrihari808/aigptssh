@@ -58,7 +58,7 @@ from langchain.retrievers import ContextualCompressionRetriever
 from fastapi import FastAPI, HTTPException,Depends, Header,Query
 from psycopg2 import sql
 from contextlib import contextmanager
-from config import chroma_server_client,llm_date,llm_stream,vs,GPT4o_mini, PINECONE_INDEX_NAME
+from config import chroma_server_client,llm_date,llm_stream,vs,GPT4o_mini, PINECONE_INDEX_NAME, CONTEXT_SUFFICIENCY_THRESHOLD
 from langchain_chroma import Chroma
 import time
 from starlette.status import HTTP_403_FORBIDDEN
@@ -595,12 +595,43 @@ async def web_rag_mix(
         # **FIX**: Use the 'original_query' for the vector search to ensure a direct match.
         pinecone_results_with_scores = vs.similarity_search_with_score(original_query, k=15)
         
+        print(f"\n=== DEBUG: SIMILARITY SEARCH RESULTS ===")
+        print(f"Query: '{original_query}'")
+        print(f"Retrieved {len(pinecone_results_with_scores)} documents")
+
+        # Show top 5 results
+        for i, (doc, distance_score) in enumerate(pinecone_results_with_scores[:5]):
+            similarity = 1 - distance_score
+            print(f"\nDoc {i+1}:")
+            print(f"  Distance: {distance_score:.4f} | Similarity: {similarity:.4f}")
+            print(f"  Title: {doc.metadata.get('title', 'No title')[:80]}...")
+            print(f"  Date: {doc.metadata.get('publication_date', doc.metadata.get('date', 'No date'))}")
+            print(f"  Content: {doc.page_content[:100]}...")
+
+        # Check if query is similar to existing content
+        best_similarity = 1 - pinecone_results_with_scores[0][1] if pinecone_results_with_scores else 0
+        print(f"\nBest match similarity: {best_similarity:.4f}")
+
+        # Analyze score distribution
+        distances = [score for _, score in pinecone_results_with_scores]
+        similarities = [1 - d for d in distances]
+        print(f"Similarity range: {min(similarities):.3f} to {max(similarities):.3f}")
+        print(f"Average similarity: {sum(similarities)/len(similarities):.3f}")
+
+        above_30 = sum(1 for s in similarities if s > 0.3)
+        above_40 = sum(1 for s in similarities if s > 0.4)
+        above_50 = sum(1 for s in similarities if s > 0.5)
+        print(f"Docs with similarity > 0.3: {above_30}")
+        print(f"Docs with similarity > 0.4: {above_40}")  
+        print(f"Docs with similarity > 0.5: {above_50}")
+        print(f"=== END DEBUG ===\n")
+
         from api.news_rag.scoring_service import scoring_service
         # **FIX**: Pass the 'original_query' to the sufficiency check.
         sufficiency_score = scoring_service.assess_context_sufficiency(original_query, pinecone_results_with_scores)
         
         web_passages = []
-        if sufficiency_score < 0.7: # Threshold can be adjusted
+        if sufficiency_score < CONTEXT_SUFFICIENCY_THRESHOLD: # Threshold can be adjusted
             print(f"DEBUG: Sufficiency score {sufficiency_score:.2f} is below threshold. Triggering Brave search.")
             articles, df = await get_brave_results(memory_query)
             
