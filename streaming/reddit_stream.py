@@ -32,7 +32,7 @@ from langchain.docstore.document import Document
 import psycopg2
 import pandas as pd
 from psycopg2 import sql
-
+from config import DB_POOL # Import the DB_POOL
 
 
 
@@ -145,65 +145,6 @@ def process_search_red1(search_results):
     
 
 
-def insert_red1(db):
-# Assuming you have a DataFrame named df
-    df = db
-
-    # Database connection details
-    db_url = psql_url
-
-    try:
-        # Connect to the database
-        conn = psycopg2.connect(db_url)
-        cur = conn.cursor()
-        
-        # Iterate through each row in the DataFrame
-        for index, row in df.iterrows():
-            # Extract values from the row
-            #print(row)
-            source_url = row['source_url']
-            image_url = None,
-            heading = None,
-            title = row['title'],
-            description = row['description'],
-            source_date=row['source_date']
-            
-            # # Check if the row already exists
-            cur.execute("SELECT COUNT(1) FROM source_data WHERE source_url = %s", (source_url,))
-            exists = cur.fetchone()[0]
-            
-            if exists:
-                #print(f"Row with source_url {source_url} already exists, skipping...")
-                continue
-            
-            #Prepare SQL query to insert data into the table
-            insert_query = sql.SQL("""
-                INSERT INTO source_data (source_url, image_url, heading, title, description,source_date)
-                VALUES (%s, %s, %s, %s, %s,%s)
-            """)
-            # insert_query = sql.SQL("""
-            #     INSERT INTO source_data (source_url, image_url, heading, title, description, source_date)
-            #     VALUES (%s, %s, %s, %s, %s, %s)
-            #     ON CONFLICT (source_url) DO NOTHING
-            # """)
-            
-            # Execute the query with the extracted values
-            cur.execute(insert_query, (source_url, image_url, heading, title, description,source_date))
-        
-        # Commit the transaction
-        conn.commit()
-       # print("Data inserted successfully into PostgreSQL")
-
-    except Exception as e:
-        print(f"Error: {e}")
-
-    finally:
-        # Close the cursor and connection
-        if cur is not None:
-            cur.close()
-        if conn is not None:
-            conn.close()
-
 import httpx
 async def fetch_search_red(query):
     bing_api_key = os.getenv('BING_API_KEY')
@@ -270,37 +211,37 @@ async def process_search_red(search_results):
 
 async def insert_red(db):
     df = db
-    psql_url=os.getenv('DATABASE_URL')  # Replace with your actual DB URL
+    if not DB_POOL:
+        print("ERROR: Database pool not initialized.")
+        return
 
     try:
-        conn = await asyncpg.connect(dsn=psql_url)
+        async with DB_POOL.acquire() as conn:
+            for index, row in df.iterrows():
+                source_url = row['source_url']
+                image_url = None
+                heading = None
+                title = row['title']
+                description = row['description']
+                source_date = row['source_date']
 
-        for index, row in df.iterrows():
-            source_url = row['source_url']
-            image_url = None
-            heading = None
-            title = row['title']
-            description = row['description']
-            source_date = row['source_date']
-
-            # Check if the row already exists
-            exists = await conn.fetchval(
-                "SELECT COUNT(1) FROM source_data WHERE source_url = $1", source_url
-            )
-            if exists:
-                continue
-
-            # Prepare and execute the SQL query
-            insert_query = """
-                INSERT INTO source_data (source_url, image_url, heading, title, description, source_date)
-                VALUES ($1, $2, $3, $4, $5, $6)
-            """
-            await conn.execute(insert_query, source_url, image_url, heading, title, description, source_date)
+                # Check if the row already exists
+                exists = await conn.fetchval(
+                    "SELECT 1 FROM source_data WHERE source_url = $1", source_url
+                )
+                if not exists:
+                    # Prepare and execute the SQL query
+                    insert_query = """
+                        INSERT INTO source_data (source_url, image_url, heading, title, description, source_date)
+                        VALUES ($1, $2, $3, $4, $5, $6)
+                    """
+                    await conn.execute(insert_query, source_url, image_url, heading, title, description, source_date)
 
     except Exception as e:
-        print(f"Error: {e}")
-    finally:
-        await conn.close()
+        print(f"Error in insert_red: {e}")
+
+
+
 
 # def memory_chain(query,session_id):
 #     connection = psycopg2.connect(f"postgresql://postgresql:1234@{pg_ip}/frruitmicro")

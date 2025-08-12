@@ -3178,25 +3178,19 @@ import json
 db_url = os.getenv('DATABASE_URL')
 
 async def get_co_codes_by_name(names, yrc=202409):
+    """
+    Asynchronously retrieves company codes and their total stake percentage from the database
+    for a given list of names and a specific year/quarter code (yrc).
+    This function now uses the global DB_POOL for efficient connection management.
+    """
+    if not DB_POOL:
+        print("ERROR: Database connection pool is not initialized.")
+        return []
 
-    # query = """
-    # SELECT co_code, "PercentageStakeHolding"
-    # FROM public."shareHoldingPatternMoreThan1"
-    # WHERE "name" = $1
-    #   AND "yrc" > $2
-    # ORDER BY co_code ASC;
-    # """
-    # query="""
-    #     SELECT co_code, SUM("PercentageStakeHolding") AS total_stake
-    #     FROM public."shareHoldingPatternMoreThan1"
-    #     WHERE "name" = $1
-    #     AND "yrc" = $2
-    #     GROUP BY co_code
-    #     ORDER BY co_code ASC;
-    #     """
-    #placeholders = ', '.join(['%s'] * len(names))
+    # Create placeholders for the list of names in the SQL query
     placeholders = ', '.join(f"${i+1}" for i in range(len(names)))
-    #print(placeholders)
+    
+    # Construct the SQL query to get the total stake for each company
     query = f"""
     SELECT co_code, SUM("PercentageStakeHolding") AS total_stake
     FROM public."shareHoldingPatternMoreThan1"
@@ -3206,31 +3200,25 @@ async def get_co_codes_by_name(names, yrc=202409):
     ORDER BY co_code ASC;
     """
 
-    # Combine the names and yrc into parameters for the query
+    # Combine the names and yrc into a single list of parameters for the query
     params = names + [yrc]
-    #print(params)
+    
     try:
-        # Establish connection to the database
-        connection = await asyncpg.connect(db_url)
-        #results = await connection.fetch(query, *params)
-        #results = await connection.fetch(query, name, yrc)
+        # Acquire a connection from the pool
+        async with DB_POOL.acquire() as connection:
+            # Execute the query with the prepared parameters
+            results = await connection.fetch(query, *params)
 
-
-        results = await connection.fetch(query, *params)
-
-        # Check if any results were found
-        if results:
-            return [(record['co_code'], record['total_stake']) for record in results]
-        # if results:
-        #     return [(record['co_code'], record['PercentageStakeHolding']) for record in results]
-        else:
-            return []  # No matching records found
+            # Process and return the results if any are found
+            if results:
+                return [(record['co_code'], record['total_stake']) for record in results]
+            else:
+                return []  # Return an empty list if no matching records are found
     except asyncpg.PostgresError as e:
-        print(f"Database error: {e}")
+        # Log any database errors that occur
+        print(f"Database error in get_co_codes_by_name: {e}")
         return []
-    finally:
-        if connection:
-            await connection.close()
+
 
 async def get_company_info_from_csv(co_codes):
     """

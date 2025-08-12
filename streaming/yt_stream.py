@@ -38,7 +38,7 @@ import time
 from pytube import YouTube
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound, NoTranscriptAvailable
 from dotenv import load_dotenv
-from config import GPT4o_mini
+from config import GPT4o_mini, DB_POOL
 load_dotenv(override=True)
 
 #llm=GPT4o_mini
@@ -254,48 +254,46 @@ async def turl(video_url):
                 return None
 
 async def insert_into_database(source_url, image_url, title, description, s_date, youtube_summary):
+    if not DB_POOL:
+        print("ERROR: Database pool not initialized.")
+        return
     try:
-        db_url = psql_url
-        conn = await asyncpg.connect(db_url)
+        async with DB_POOL.acquire() as conn:
+            data = (source_url, image_url, title, description, s_date, youtube_summary)
 
-        data = (source_url, image_url, title, description, s_date, youtube_summary)
-
-        check_query = """
-            SELECT 1 FROM source_data WHERE source_url = $1
-        """
-        exists = await conn.fetchrow(check_query, source_url)
-
-        if not exists:
-            insert_query = """
-                INSERT INTO source_data (source_url, image_url, title, description, source_date, youtube_summary)
-                VALUES ($1, $2, $3, $4, $5, $6)
+            check_query = """
+                SELECT 1 FROM source_data WHERE source_url = $1
             """
-            await conn.execute(insert_query, *data)
-            print("Data inserted successfully into PostgreSQL")
-        else:
-            print("Source URL already exists. Skipping insertion.")
+            exists = await conn.fetchrow(check_query, source_url)
 
-        await conn.close()
+            if not exists:
+                insert_query = """
+                    INSERT INTO source_data (source_url, image_url, title, description, source_date, youtube_summary)
+                    VALUES ($1, $2, $3, $4, $5, $6)
+                """
+                await conn.execute(insert_query, *data)
+                print("Data inserted successfully into PostgreSQL")
+            else:
+                print("Source URL already exists. Skipping insertion.")
 
     except (Exception, asyncpg.Error) as error:
         print("Error while inserting data into PostgreSQL:", error)
 
 async def get_summary_from_database(source_url):
+    if not DB_POOL:
+        print("ERROR: Database pool not initialized.")
+        return None
     try:
-        db_url = psql_url
-        conn = await asyncpg.connect(db_url)
+        async with DB_POOL.acquire() as conn:
+            select_query = """
+                SELECT youtube_summary FROM source_data WHERE source_url = $1
+            """
+            result = await conn.fetchrow(select_query, source_url)
 
-        select_query = """
-            SELECT youtube_summary FROM source_data WHERE source_url = $1
-        """
-        result = await conn.fetchrow(select_query, source_url)
-
-        await conn.close()
-
-        if result:
-            return result['youtube_summary']
-        else:
-            return None
+            if result:
+                return result['youtube_summary']
+            else:
+                return None
 
     except (Exception, asyncpg.Error) as error:
         print("Error while fetching data from PostgreSQL:", error)
@@ -339,17 +337,6 @@ async def extract_youtube_video_data(session, url):
         description_tag = soup.find("meta", {"name": "description"})
         description = description_tag["content"] if description_tag else "No Description Available"
         
-        # video_id_match = re.search(r"v=([^\&\?\/]+)", url)
-        # video_id = video_id_match.group(1) if video_id_match else ""
-        # print(video_id)
-        
-        # summary = await get_summary_from_database(url)
-        # print(summary)
-        # if not summary:
-        #     transcript = await get_video_transcript(video_id) if video_id else ""
-        #     print(transcript)
-        #     summary = transcript
-        #print(summary)
         date = await get_video_statistics(video_id) if video_id else {}
         t_image = await turl(url)
 
@@ -486,6 +473,22 @@ def generate_final_summary(query, summaries):
         "Prompt_Tokens": cb.prompt_tokens,
         "Completion_Tokens": cb.completion_tokens,
     }
+
+async def yt_chat(query,session_id):
+    try:
+        start_time = time.time()
+        links = get_yt_data_async(query)
+        data = await get_data(links)
+        res = generate_final_summary(query, data)
+        end_time = time.time()
+        execution_time = end_time - start_time
+        print(res)
+        print(f"Execution Time: {execution_time} seconds")
+
+        return res
+    except Exception as e:
+        print(f"Error processing async task: {e}")
+        return {}
 
 
 # async def async_process(query,session_id):

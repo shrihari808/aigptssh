@@ -30,7 +30,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
-from config import GPT4o_mini
+from config import GPT4o_mini, DB_POOL
 load_dotenv()
 
 llm=GPT4o_mini
@@ -134,48 +134,46 @@ async def turl(video_url):
         return None
 
 async def insert_into_database(source_url, image_url, title, description, s_date, youtube_summary):
+    if not DB_POOL:
+        print("ERROR: Database pool not initialized.")
+        return
     try:
-        db_url = psql_url
-        conn = await asyncpg.connect(db_url)
+        async with DB_POOL.acquire() as conn:
+            data = (source_url, image_url, title, description, s_date, youtube_summary)
 
-        data = (source_url, image_url, title, description, s_date, youtube_summary)
-
-        check_query = """
-            SELECT 1 FROM source_data WHERE source_url = $1
-        """
-        exists = await conn.fetchrow(check_query, source_url)
-
-        if not exists:
-            insert_query = """
-                INSERT INTO source_data (source_url, image_url, title, description, source_date, youtube_summary)
-                VALUES ($1, $2, $3, $4, $5, $6)
+            check_query = """
+                SELECT 1 FROM source_data WHERE source_url = $1
             """
-            await conn.execute(insert_query, *data)
-            print("Data inserted successfully into PostgreSQL")
-        else:
-            print("Source URL already exists. Skipping insertion.")
+            exists = await conn.fetchrow(check_query, source_url)
 
-        await conn.close()
+            if not exists:
+                insert_query = """
+                    INSERT INTO source_data (source_url, image_url, title, description, source_date, youtube_summary)
+                    VALUES ($1, $2, $3, $4, $5, $6)
+                """
+                await conn.execute(insert_query, *data)
+                print("Data inserted successfully into PostgreSQL")
+            else:
+                print("Source URL already exists. Skipping insertion.")
 
     except (Exception, asyncpg.Error) as error:
         print("Error while inserting data into PostgreSQL:", error)
 
 async def get_summary_from_database(source_url):
+    if not DB_POOL:
+        print("ERROR: Database pool not initialized.")
+        return None
     try:
-        db_url = psql_url
-        conn = await asyncpg.connect(db_url)
+        async with DB_POOL.acquire() as conn:
+            select_query = """
+                SELECT youtube_summary FROM source_data WHERE source_url = $1
+            """
+            result = await conn.fetchrow(select_query, source_url)
 
-        select_query = """
-            SELECT youtube_summary FROM source_data WHERE source_url = $1
-        """
-        result = await conn.fetchrow(select_query, source_url)
-
-        await conn.close()
-
-        if result:
-            return result['youtube_summary']
-        else:
-            return None
+            if result:
+                return result['youtube_summary']
+            else:
+                return None
 
     except (Exception, asyncpg.Error) as error:
         print("Error while fetching data from PostgreSQL:", error)
@@ -366,4 +364,3 @@ async def yt_chat(query,session_id):
     except Exception as e:
         print(f"Error processing async task: {e}")
         return {}
-

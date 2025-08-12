@@ -19,7 +19,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Any
 import re
-import psycopg2
+import asyncpg # Changed from psycopg2
 from langchain.retrievers import (
     MergerRetriever,
 )
@@ -58,7 +58,8 @@ from langchain.retrievers import ContextualCompressionRetriever
 from fastapi import FastAPI, HTTPException,Depends, Header,Query
 from psycopg2 import sql
 from contextlib import contextmanager
-from config import chroma_server_client,llm_date,llm_stream,vs,GPT4o_mini, PINECONE_INDEX_NAME, CONTEXT_SUFFICIENCY_THRESHOLD
+# --- MODIFIED: Import DB_POOL ---
+from config import chroma_server_client,llm_date,llm_stream,vs,GPT4o_mini, PINECONE_INDEX_NAME, CONTEXT_SUFFICIENCY_THRESHOLD, DB_POOL
 from langchain_chroma import Chroma
 import time
 from starlette.status import HTTP_403_FORBIDDEN
@@ -84,44 +85,6 @@ pine_api=os.getenv('PINECONE_API_KEY')
 groq_api_key=os.getenv('GROQ_API_KEY')
 psql_url=os.getenv('DATABASE_URL')
 node_key=os.getenv('node_key')
-
-# from langchain.globals import set_debug
-
-# set_debug(True)
-
-
-
-# index_name = "news"
-# demo_namespace='newsrag'
-# index_name = "newsrag11052024"
-# demo_namespace='news'
-# embeddings = OpenAIEmbeddings()
-
-# vectorstore = PineconeVectorStore(index_name=index_name, embedding=embeddings)
-
-
-
-# pc = PineconeClient(
-#  api_key=pine_api
-# )
-
-
-# index = pc.Index(index_name)
-
-# #demo_namespace='newsrag'
-# docsearch1 = Pinecone(
-#     index, embeddings, "text", namespace=demo_namespace
-# )
-
-
-#llm1 = ChatOpenAI(temperature=0.5, model="gpt-4o-mini",stream_usage=True,streaming=True)
-#gpt-3.5-turbo-1106,gpt-3.5-turbo-16k
-#llm1=ChatOpenAI(temperature=0.5, model="gpt-4o-2024-05-13")
-# #gpt-3.5-turbo-instruct,gpt-4-turbo,gpt-4o-2024-05-13
-#llm1 = ChatGoogleGenerativeAI(model="gemini-1.0-pro")
-
-
-
 
 async def llm_get_date(user_query):
     today = datetime.now().strftime("%Y-%m-%d")
@@ -187,7 +150,7 @@ async def memory_chain(query,m_chat):
 
     return res
 
-async def query_validate(query,session_id):
+async def query_validate(query, session_id):
     res_prompt = """
     You are a highly skilled indian stock market investor and financial advisor. Your task is to validate whether a given question is related to the stock market or finance or elections or economics or general private listed companies. Additionally, if the new question is a follow-up then only use chat history to determine its validity.
     If question is asking about latest news about any company or current news or just company or trending news of any company consider it as valid question.
@@ -197,123 +160,46 @@ async def query_validate(query,session_id):
     "valid": Return 1 if the question is valid, otherwise return 0.
     """
 
-
-    R_prompt = PromptTemplate(template=res_prompt, input_variables=["list_qs","q"])
-    # llm_chain_res= LLMChain(prompt=R_prompt, llm=GPT4o_mini)
+    R_prompt = PromptTemplate(template=res_prompt, input_variables=["list_qs", "q"])
     chain = R_prompt | GPT4o_mini | JsonOutputParser()
 
+    messages = []
+    m_chat = []
+    h_chat = []
 
-    db_url=psql_url
-    conn = psycopg2.connect(db_url)
+    if DB_POOL:
+        async with DB_POOL.acquire() as conn:
+            s_id = str(session_id)
+            rows = await conn.fetch("SELECT message FROM message_store WHERE session_id = $1", s_id)
+            messages = [row['message'] for row in rows]
+    
+    chat = [row['data']['content'] for row in messages[-2:]]
+    m_chat = [row['data']['content'] for row in messages[-4:]]
+    h_chat = [row['data']['content'] for row in messages[-6:]]
 
-    # Create a cursor object
-    cur = conn.cursor()
-
-    # Execute the SQL query with the session_id as a string
-    s_id=str(session_id)
-    cur.execute("SELECT message FROM message_store WHERE session_id = %s", (s_id,))
-    messages = cur.fetchall()
-    chat=[row[0]['data']['content'] for row in messages[-2:]]
-    m_chat=[row[0]['data']['content'] for row in messages[-4:]]
-    h_chat=[row[0]['data']['content'] for row in messages[-6:]]
-    cur.close()
-    conn.close()
-    #print(query)
     with get_openai_callback() as cb:
         input_data = {
             "list_qs": chat,
-            "q":query
+            "q": query
         }
-        #res=llm_chain_res.predict(query=q)
-        res=await chain.ainvoke(input_data)
-    return res['valid'],cb.total_tokens,m_chat,h_chat
+        res = await chain.ainvoke(input_data)
+    
+    return res['valid'], cb.total_tokens, m_chat, h_chat
 
-
-
-# def set_ret():
-#     embeddings = OpenAIEmbeddings()
-#     index_name = "newsrag11052024"
-#     demo_namespace='news'
-
-#     index = pc.Index(index_name)
-
-#     #demo_namespace='newsrag'
-#     docsearch_cmots = Pinecone(
-#         index, embeddings, "text", namespace=demo_namespace
-#     )
-
-#     index_name1 = "bing-news"
-#     demo_namespace1='bing'
-
-#     index1 = pc.Index(index_name1)
-#     embeddings = OpenAIEmbeddings()
-
-#     #demo_namespace='newsrag'
-#     docsearch_bing = Pinecone(
-#         index1, embeddings, "text",namespace=demo_namespace1
-#     )
-
-#     return docsearch_bing,docsearch_cmots
-
-@contextmanager
-def get_db_connection(db_url):
-    conn = psycopg2.connect(db_url)
-    try:
-        yield conn
-        conn.commit()
-    except Exception as e:
-        conn.rollback()
-        print(f"Error: {e}")
-        raise
-    finally:
-        conn.close()
-
-@contextmanager
-def get_db_cursor(conn):
-    cur = conn.cursor()
-    try:
-        yield cur
-    finally:
-        cur.close()
-
-
-def store_into_db_no(pid,ph_id,result_json):
-    #db_url = f"postgresql://postgresql:1234@{pg_ip}/frruitmicro"
-    db_url=psql_url
-    with get_db_connection(db_url) as conn:
-        with get_db_cursor(conn) as cur:
-            # Update all existing entries to set isactive to false
- 
-            result_json_str = json.dumps(result_json)
-            #print(result_json_str)
-
-            cur.execute("""
-                INSERT INTO "streamingData" (prompt_id, prompt_history_id, source_data)
-                VALUES (%s, %s, %s)
-            """, (pid, ph_id, result_json_str))
-
-            # Commit the transaction
-            conn.commit()
-            #print(f"Data inserted successfully with prompt_id: {pid}")
 
 async def store_into_db(pid, ph_id, result_json):
-    # Database connection URL
-    db_url = psql_url
+    """Asynchronously stores data into the streamingData table using the connection pool."""
+    if not DB_POOL:
+        print("ERROR: Database pool not available for store_into_db.")
+        return
 
-    # Convert result_json to a JSON string
     result_json_str = json.dumps(result_json)
-
-    # Establish an async connection to the database
-    conn = await asyncpg.connect(db_url)
-    try:
-        # Insert into the streamingData table
+    async with DB_POOL.acquire() as conn:
         await conn.execute("""
             INSERT INTO "streamingData" (prompt_id, prompt_history_id, source_data)
             VALUES ($1, $2, $3)
         """, pid, ph_id, result_json_str)
-    finally:
-        # Close the connection
-        await conn.close()
+
 
 def get_user_credits(user_id):
     url = f"https://api.frruit.co/api/users/getUserCredits?user_id={user_id}"
@@ -331,77 +217,18 @@ def get_user_credits(user_id):
         print(f"Error: {response.status_code}")
 
 
-def store_into_userplan(user_id, count):
-    #db_url = f"postgresql://postgresql:1234@{pg_ip}/frruitmicro"
-    db_url=psql_url
-    current_time = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + '+00:00'
-    with get_db_connection(db_url) as conn:
-        with get_db_cursor(conn) as cur:
-            # Check if user_id exists and is active
-            cur.execute("""
-                SELECT credits_used FROM "user_plans"
-                WHERE user_id = %s AND \"isActive\" = true
-            """, (user_id,))
-            result = cur.fetchone()
-
-            if result:
-                # If user exists and is active, update credits_used
-                current_credits = result[0]
-                new_credits = current_credits + count
-                cur.execute("""
-                    UPDATE "user_plans"
-                    SET credits_used = %s, "updatedAt" = %s
-                    WHERE user_id = %s AND \"isActive\" = true
-                """, (new_credits, current_time, user_id))
-                #print(f"Credits updated successfully for user_id: {user_id}")
-            else:
-                # Insert new record if user_id does not exist or is inactive
-                cur.execute("""
-                    INSERT INTO "user_plans" (user_id, credits_used, "is_active")
-                    VALUES (%s, %s, true)
-                """, (user_id, count))
-                #print(f"Data inserted successfully for user_id: {user_id}")
-
-            # Commit the transaction
-            conn.commit()
-
-
-def insert_credit_usage_no(user_id, plan_id, credit_used):
-    db_url=psql_url
-    with get_db_connection(db_url) as conn:
-        with get_db_cursor(conn) as cur:
-            # Get the current time in the desired format
-            current_time = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + '+00:00'
-
-            # Insert into the credit_usage table
-            cur.execute("""
-                INSERT INTO credit_usage (user_id, plan_id, credit_used, "createdAt", "updatedAt")
-                VALUES (%s, %s, %s, %s, %s)
-            """, (user_id, plan_id, credit_used, current_time, current_time))
-
-            # Commit the transaction
-            conn.commit()
-            #print(f"Data inserted successfully for user_id: {user_id}, plan_id: {plan_id}")
-
-import asyncpg
 async def insert_credit_usage(user_id, plan_id, credit_used):
-    # Database connection URL
-    db_url = psql_url
+    """Asynchronously inserts credit usage data using the connection pool."""
+    if not DB_POOL:
+        print("ERROR: Database pool not available for insert_credit_usage.")
+        return
 
-    # Get the current time in the desired format
     current_time = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + '+00:00'
-
-    # Create a connection pool for efficient resource management
-    conn = await asyncpg.connect(db_url)
-    try:
-        # Insert into the credit_usage table
+    async with DB_POOL.acquire() as conn:
         await conn.execute("""
             INSERT INTO credit_usage (user_id, plan_id, credit_used, "createdAt", "updatedAt")
             VALUES ($1, $2, $3, $4, $5)
         """, user_id, plan_id, credit_used, current_time, current_time)
-    finally:
-        # Close the connection
-        await conn.close()
 
 
 def get_session_history(session_id: str) -> BaseChatMessageHistory:
@@ -595,37 +422,6 @@ async def web_rag_mix(
         # **FIX**: Use the 'original_query' for the vector search to ensure a direct match.
         pinecone_results_with_scores = vs.similarity_search_with_score(original_query, k=15)
         
-        # print(f"\n=== DEBUG: SIMILARITY SEARCH RESULTS ===")
-        # print(f"Query: '{original_query}'")
-        # print(f"Retrieved {len(pinecone_results_with_scores)} documents")
-
-        # # Show top 5 results
-        # for i, (doc, distance_score) in enumerate(pinecone_results_with_scores[:5]):
-        #     similarity = 1 - distance_score
-        #     print(f"\nDoc {i+1}:")
-        #     print(f"  Distance: {distance_score:.4f} | Similarity: {similarity:.4f}")
-        #     print(f"  Title: {doc.metadata.get('title', 'No title')[:80]}...")
-        #     print(f"  Date: {doc.metadata.get('publication_date', doc.metadata.get('date', 'No date'))}")
-        #     print(f"  Content: {doc.page_content[:100]}...")
-
-        # # Check if query is similar to existing content
-        # best_similarity = 1 - pinecone_results_with_scores[0][1] if pinecone_results_with_scores else 0
-        # print(f"\nBest match similarity: {best_similarity:.4f}")
-
-        # # Analyze score distribution
-        # distances = [score for _, score in pinecone_results_with_scores]
-        # similarities = [1 - d for d in distances]
-        # print(f"Similarity range: {min(similarities):.3f} to {max(similarities):.3f}")
-        # print(f"Average similarity: {sum(similarities)/len(similarities):.3f}")
-
-        # above_30 = sum(1 for s in similarities if s > 0.3)
-        # above_40 = sum(1 for s in similarities if s > 0.4)
-        # above_50 = sum(1 for s in similarities if s > 0.5)
-        # print(f"Docs with similarity > 0.3: {above_30}")
-        # print(f"Docs with similarity > 0.4: {above_40}")  
-        # print(f"Docs with similarity > 0.5: {above_50}")
-        # print(f"=== END DEBUG ===\n")
-
         from api.news_rag.scoring_service import scoring_service
         # **FIX**: Pass the 'original_query' to the sufficiency check.
         sufficiency_score = scoring_service.assess_context_sufficiency(original_query, pinecone_results_with_scores)
