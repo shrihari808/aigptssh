@@ -35,7 +35,8 @@ from config import (
     MAX_EMBEDDING_TOKENS,
     MAX_PAGES,
     MAX_SCRAPED_SOURCES,
-    encoding
+    encoding,
+    embeddings
 )
 
 load_dotenv()
@@ -287,7 +288,7 @@ def insert_post1(df: pd.DataFrame):
 def initialize_pinecone():
     """Initializes and returns a Pinecone client and index name."""
     pc = PineconeClient(api_key=os.getenv("PINECONE_API_KEY"))
-    index_name = "bing-news"
+    index_name = "market-data-index"
     if index_name not in pc.list_indexes().names():
         pc.create_index(
             name=index_name, dimension=1536, metric="cosine",
@@ -295,12 +296,34 @@ def initialize_pinecone():
         )
     return pc, index_name
 
+def initialize_and_upsert_sync(documents, ids, index_name):
+    """A single synchronous function to handle all blocking Pinecone logic."""
+    pc = PineconeClient(api_key=os.getenv("PINECONE_API_KEY"))
+    if index_name not in pc.list_indexes().names():
+        print(f"Index '{index_name}' not found. Creating it now...")
+        pc.create_index(
+            name=index_name, dimension=1536, metric="cosine",
+            spec=ServerlessSpec(cloud="aws", region="us-east-1")
+        )
+        print("Index created. Waiting for initialization...")
+        # NOTE: A sleep here is still blocking, but it's now in a background thread
+        # where it won't freeze the main app.
+        import time
+        time.sleep(10)
+
+    embeddings = embeddings
+    PineconeVectorStore.from_documents(
+        documents=documents, embedding=embeddings, index_name=index_name,
+        namespace="__default__", ids=ids
+    )
+    print("Upsert complete.")
+
+
 async def data_into_pinecone(df):
-    """Asynchronously prepares and upserts data into Pinecone."""
-    pc, index_name = initialize_pinecone()
-    embeddings = OpenAIEmbeddings()
+    """Asynchronously prepares data and calls the blocking upsert function in a thread."""
     documents = []
     ids = []
+    # (Your existing loop to prepare documents and ids goes here)
     for _, row in df.iterrows():
         combined_text = f"Title: {row['title']}\nDescription: {row['description']}"
         doc_id = re.sub(r'[^a-zA-Z0-9]', '', row["source_url"])
@@ -309,12 +332,13 @@ async def data_into_pinecone(df):
             metadata={"url": row["source_url"], "date": row["date_published"], "title": row["title"]}
         ))
         ids.append(doc_id)
-    
+
     if documents:
-        # Note: from_documents is a synchronous call, but we call it from an async function.
-        # For true async upsert, you would use Pinecone's async client directly.
-        PineconeVectorStore.from_documents(
-            documents=documents, embedding=embeddings, index_name=index_name,
-            namespace="bing", ids=ids
+        # Run the entire synchronous process in a background thread
+        await asyncio.to_thread(
+            initialize_and_upsert_sync,
+            documents,
+            ids,
+            "market-data-index"
         )
     return "Inserted!"
