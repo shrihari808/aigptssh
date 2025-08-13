@@ -49,6 +49,7 @@ from langchain_chroma import Chroma
 from api.news_rag.brave_news import get_brave_results
 from streaming.reddit_stream import fetch_search_red, process_search_red
 from streaming.yt_stream import get_data, get_yt_data_async
+from api.news_rag.scoring_service import scoring_service
 
 from dotenv import load_dotenv
 load_dotenv(override=True)
@@ -74,6 +75,36 @@ async def get_db_pool(request: Request) -> asyncpg.Pool:
         print("CRITICAL ERROR: Database pool is not available on app state.")
         raise HTTPException(status_code=503, detail="Database connection is not available.")
     return request.app.state.db_pool
+
+async def quick_scrape_and_process(query: str, db_pool: asyncpg.Pool, num_urls: int = 3):
+    """
+    Tier 1 Helper: Correctly performs a limited search for a few URLs.
+    """
+    print(f"DEBUG: Tier 1 - Starting quick scrape for {num_urls} URLs.")
+    try:
+        # FIX: Pass the limits to get_brave_results for a truly quick search
+        articles, df = await get_brave_results(query, max_pages=1, max_sources=num_urls)
+        if not articles:
+            return []
+        
+        if df is not None and not df.empty:
+            asyncio.create_task(insert_post1(df, db_pool))
+
+        passages = [{
+            "text": f"Title: {a.get('title', '')}\nDescription: {a.get('description', '')}",
+            "metadata": {
+                "title": a.get('title'),
+                "link": a.get('source_url'),
+                "publication_date": a.get('source_date'),
+                "snippet": a.get('description')
+            }
+        } for a in articles]
+        
+        print(f"DEBUG: Tier 1 - Quick scrape completed with {len(passages)} passages.")
+        return passages
+    except Exception as e:
+        print(f"ERROR in quick_scrape_and_process: {e}")
+        return []
 
 # --- Optimized Chat History Functions ---
 
@@ -467,222 +498,129 @@ async def web_rag_mix(
     plan_id: int = Query(...),
     db_pool: asyncpg.Pool = Depends(get_db_pool)
 ):
-    """Optimized web RAG endpoint with combined LLM processing."""
-    
+    """
+    Final implementation of the tiered response system that streams a preliminary
+    summary first, followed by a comprehensive final answer.
+    """
     query = request.query.strip()
-    start_time = time.time()
-    
-    # Get today's date
     today = datetime.now().strftime("%Y-%m-%d")
-    
-    # Parallel execution: Get chat history while doing other prep
-    chat_history_task = asyncio.create_task(
-        get_chat_history_optimized(str(session_id), db_pool, limit=3)
-    )
-    
-    # Wait for chat history and do combined preprocessing
-    chat_history = await chat_history_task
-    
-    print(f"DEBUG: Chat history retrieved: {len(chat_history)} messages")
-    
-    # Single combined LLM call for all preprocessing
+
+    chat_history = await get_chat_history_optimized(str(session_id), db_pool, limit=3)
     preprocessing_result = await combined_preprocessing(query, chat_history, today)
     
-    preprocessing_time = time.time() - start_time
-    print(f"DEBUG: Preprocessing completed in {preprocessing_time:.2f}s")
-    
-    # Extract results
-    valid = preprocessing_result.get("valid", 0)
+    if preprocessing_result.get("valid", 0) == 0:
+        async def invalid_query_stream():
+            yield "The search query is not related to Indian financial markets...".encode("utf-8")
+        return StreamingResponse(invalid_query_stream(), media_type="text/event-stream")
+
     reformulated_query = preprocessing_result.get("reformulated_query", query)
-    extracted_date = preprocessing_result.get("extracted_date", "None")
-    is_followup = preprocessing_result.get("is_followup", False)
-    preprocessing_tokens = preprocessing_result.get("tokens_used", 0)
-    
-    matched_docs = ""
-    links = []
-    
-    if valid != 0:
-        print(f"DEBUG: Processing valid query - Follow-up: {is_followup}")
-        print(f"DEBUG: Original: '{query}'")
-        print(f"DEBUG: Reformulated: '{reformulated_query}'")
-        print(f"DEBUG: Date: {extracted_date}")
+
+    async def tiered_stream_generator():
+        # --- Define LLM Chains for Preliminary and Final Answers ---
         
-        # Use reformulated query for search
-        search_query = reformulated_query
+        # Prompt for the quick initial summary
+        preliminary_prompt_template = """
+        You are a financial news assistant. Based on the following initial articles, provide a brief, high-level summary (2-3 key bullet points) to answer the user's question. State that this is a preliminary summary and more details are being gathered.
+
+        Initial Articles: {context}
+        User Question: {input}
         
-        # Get Pinecone results
-        pinecone_start = time.time()
-        pinecone_results_with_scores = vs.similarity_search_with_score(search_query, k=15)
-        pinecone_time = time.time() - pinecone_start
-        print(f"DEBUG: Pinecone search completed in {pinecone_time:.2f}s")
+        Preliminary Summary:
+        """
+        preliminary_prompt = PromptTemplate(template=preliminary_prompt_template, input_variables=["context", "input"])
+        preliminary_chain = preliminary_prompt | llm_stream
+
+        # Prompt for the final, detailed answer
+        final_prompt_template = """
+        You are a financial markets super-assistant. You have gathered comprehensive information. Now, provide a detailed, well-structured final answer to the user's question using all available context. Use markdown formatting, cite sources with links, and be thorough.
+
+        Comprehensive Context: {context}
+        Chat History: {history}
+        Today's Date: {date}
         
-        # Check sufficiency and potentially trigger Brave search
-        from api.news_rag.scoring_service import scoring_service
-        sufficiency_score = scoring_service.assess_context_sufficiency(search_query, pinecone_results_with_scores)
+        User Question: {input}
         
-        web_passages = []
-        if sufficiency_score < CONTEXT_SUFFICIENCY_THRESHOLD:
-            print(f"DEBUG: Sufficiency {sufficiency_score:.2f} below threshold. Triggering Brave search.")
-            brave_start = time.time()
-            articles, df = await get_brave_results(search_query)
-            brave_time = time.time() - brave_start
-            print(f"DEBUG: Brave search completed in {brave_time:.2f}s")
-            
-            if articles and df is not None and not df.empty:
-                await insert_post1(df, db_pool)
-                # Convert articles to passages format
-                web_passages = [
-                    {
-                        "text": f"Title: {article.get('title', '')}\nDescription: {article.get('description', '')}",
-                        "metadata": {
-                            "title": article.get('title', ''),
-                            "link": article.get('source_url', ''),
-                            "publication_date": article.get('source_date', ''),
-                            "snippet": article.get('description', '')
-                        }
-                    }
-                    for article in articles
-                ]
+        Final Detailed Answer:
+        """
+        final_prompt = PromptTemplate(template=final_prompt_template, input_variables=["context", "history", "input", "date"])
+        final_chain = final_prompt | llm_stream
+
+        # --- Tier 1: Quick Data Retrieval ---
+        initial_results = await vs.asimilarity_search_with_score(reformulated_query, k=10)
+        sufficiency_score = scoring_service.assess_context_sufficiency(reformulated_query, initial_results)
+        
+        initial_passages = []
+        if sufficiency_score >= CONTEXT_SUFFICIENCY_THRESHOLD:
+            initial_passages = [{"text": doc.page_content, "metadata": {**doc.metadata, "link": doc.metadata.get("source_url") or doc.metadata.get("url")}} for doc, score in initial_results]
         else:
-            print(f"DEBUG: Sufficiency {sufficiency_score:.2f} sufficient. Using existing data.")
+            initial_passages = await quick_scrape_and_process(reformulated_query, db_pool, num_urls=3)
         
-        # Combine and rank all passages
-        pinecone_passages = [
-            {
-                "text": doc.page_content,
-                "metadata": {**doc.metadata, "score": score}
-            }
-            for doc, score in pinecone_results_with_scores
-        ]
-        
-        all_passages_map = {}
-        for p in web_passages + pinecone_passages:
-            link = p["metadata"].get("link") or f"nolink_{hash(p['text'])}"
-            if link not in all_passages_map:
-                all_passages_map[link] = p
-        
-        all_passages = list(all_passages_map.values())
-        
-        if all_passages:
-            ranking_start = time.time()
-            reranked_passages = await scoring_service.score_and_rerank_passages(
-                question=search_query, 
-                passages=all_passages
-            )
-            ranking_time = time.time() - ranking_start
-            print(f"DEBUG: Passage ranking completed in {ranking_time:.2f}s")
+        # --- Tier 2: Stream Preliminary Answer & Start Full Search ---
+        preliminary_response_streamed = False
+        if initial_passages:
+            yield "### Preliminary Summary\n".encode("utf-8")
             
-            matched_docs = scoring_service.create_enhanced_context(reranked_passages)
-            links = [
-                p["metadata"].get("link") 
-                for p in reranked_passages[:10] 
-                if p.get("metadata", {}).get("link")
-            ]
-        else:
-            matched_docs, links = "", []
+            preliminary_reranked = await scoring_service.score_and_rerank_passages(question=reformulated_query, passages=initial_passages)
+            preliminary_context = scoring_service.create_enhanced_context(preliminary_reranked)
 
-    total_prep_time = time.time() - start_time
-    print(f"DEBUG: Total preprocessing time: {total_prep_time:.2f}s")
-
-    # Streaming response
-    res_prompt = """
-    News Articles: {bing}
-    Chat history: {history}
-    Today date: {date}
-    
-    Use the date provided in the metadata to answer the user query if the user is asking in specific time periods.
-    Give priority to latest date provided in metadata while answering user query.
-    
-    I am a financial markets super-assistant trained to function like Perplexity.ai — with enhanced domain intelligence and deep search comprehension.
-    I am connected to a real-time web search + scraping engine that extracts live content from verified financial websites, regulatory portals, media publishers, and government sources.
-    I serve as an intelligent financial answer engine, capable of understanding and resolving even the most **complex multi-part queries**, returning **accurate, structured, and sourced answers**.
-
-    PRIMARY MISSION:
-    Deliver **bang-on**, complete, real-time financial answers about:
-    - Companies (ownership, results, ratios, filings, news, insiders)
-    - Stocks (live prices, historicals, volumes, charts, trends)  
-    - People (CEOs, founders, investors, economists, politicians)
-    - Mutual Funds & ETFs (returns, risk, AUM, portfolio, comparisons)
-    - Regulators & Agencies (SEBI, RBI, IRDAI, MCA, MoF, CBIC, etc.)
-    - Government (policies, circulars, appointments, reforms, speeches)
-    - Macro Indicators (GDP, repo rate, inflation, tax policy, liquidity)
-    - Sectoral Data (FMCG, BFSI, Infra, IT, Auto, Pharma, Realty, etc.)
-    - Financial Concepts (with real-world context and current examples)
-
-    INTELLIGENT BEHAVIOR GUIDELINES:
-    1. **Bang-On Precision**: Always provide factual, up-to-date data from verified sources. Never hallucinate.
-    2. **Break Down Complex Queries**: Decompose long or layered queries. Use intelligent reasoning to structure the answer.
-    3. **Research Assistant Tone**: Neutral, professional, data-first. No assumptions, no opinions. Cite all key facts.
-    4. **Source-Based**: Every metric or statement must include a credible source.
-    5. **Fresh + Archived Data**: Always prioritize today's/latest info. For long-term trends, explicitly state the timeframe.
-    6. **Answer Structuring**: Start with a concise summary. Use bullet points, tables, and subheadings.
-
-    STRICT LIMITATIONS:
-    - Never make up data
-    - No financial advice, tips, or trading guidance
-    - No generic phrases like "As an AI, I…"
-    - No filler or irrelevant content — answer only the query's intent
-    - Answer should be in proper markdown formatting
-
-    The user has asked the following question: {input}
-    """
-    
-    R_prompt = PromptTemplate(
-        template=res_prompt, 
-        input_variables=["bing", "input", "date", "history"]
-    )
-    ans_chain = R_prompt | llm_stream
-
-    async def generate_chat_res(matched_docs, query, today, history):
-        if valid == 0:
-            error_message = "The search query is not related to Indian financial markets, companies, economics, or finance. Please ask questions about stocks, companies, market trends, financial news, or economic developments."
-            yield error_message.encode("utf-8")
-            return
-
-        final_response = ""
-        response_tokens = 0
-        
-        try:
-            # Calculate prompt tokens
-            prompt_text = f"{matched_docs}\n{history}\n{query}\n{today}"
-            prompt_tokens = count_tokens(prompt_text)
-            
-            # Stream the response
-            async for event in ans_chain.astream_events(
-                {"bing": matched_docs, "history": history, "input": query, "date": today}, 
-                version="v1"
-            ):
+            async for event in preliminary_chain.astream_events({"context": preliminary_context, "input": reformulated_query}, version="v1"):
                 if event["event"] == "on_chat_model_stream":
                     content = event["data"]["chunk"].content
                     if content:
-                        final_response += content
+                        preliminary_response_streamed = True
                         yield content.encode("utf-8")
-                        await asyncio.sleep(0.01)
+        
+        # Start the full background search
+        full_search_task = asyncio.create_task(get_brave_results(reformulated_query))
 
-            # Calculate total tokens and store usage
-            completion_tokens = count_tokens(final_response)
-            total_tokens = preprocessing_tokens + prompt_tokens + completion_tokens
-            
-            await insert_credit_usage(user_id, plan_id, total_tokens / 1000, db_pool)
-            await store_into_db(session_id, prompt_history_id, {"links": links}, db_pool)
+        # --- Tier 3: Stream Comprehensive Final Answer ---
+        yield "\n\n---\n### Detailed Analysis\n".encode("utf-8")
 
-            # Store conversation in history
-            if final_response:
-                history_db = PostgresChatMessageHistory(str(session_id), psql_url)
-                history_db.add_user_message(reformulated_query if is_followup else query)
-                history_db.add_ai_message(final_response)
+        articles, df = await full_search_task
+        final_passages = list(initial_passages)
+        
+        if articles:
+            existing_links = {p['metadata'].get('link') for p in final_passages}
+            new_passages = [
+                {"text": f"Title: {a.get('title', '')}\nDescription: {a.get('description', '')}", 
+                 "metadata": {"title": a.get('title'), "link": a.get('source_url'), "publication_date": a.get('source_date'), "snippet": a.get('description')}}
+                for a in articles if a.get('source_url') not in existing_links
+            ]
+            final_passages.extend(new_passages)
+            if df is not None and not df.empty:
+                asyncio.create_task(insert_post1(df, db_pool))
 
-            total_time = time.time() - start_time
-            print(f"DEBUG: Total request completed in {total_time:.2f}s")
+        if not final_passages:
+            yield "Could not find sufficient information to provide a detailed analysis.".encode("utf-8")
+            return
 
+        final_reranked = await scoring_service.score_and_rerank_passages(question=reformulated_query, passages=final_passages)
+        final_context = scoring_service.create_enhanced_context(final_reranked)
+        final_links = [p["metadata"].get("link") for p in final_reranked[:10] if p.get("metadata", {}).get("link")]
+
+        final_response = ""
+        try:
+            with get_openai_callback() as cb:
+                async for event in final_chain.astream_events({"context": final_context, "history": chat_history, "input": reformulated_query, "date": today}, version="v1"):
+                    if event["event"] == "on_chat_model_stream":
+                        content = event["data"]["chunk"].content
+                        if content:
+                            final_response += content
+                            yield content.encode("utf-8")
+                
+                # Final database updates
+                total_tokens = cb.total_tokens
+                await insert_credit_usage(user_id, plan_id, total_tokens / 1000, db_pool)
+                await store_into_db(session_id, prompt_history_id, {"links": final_links}, db_pool)
+                if final_response:
+                    history_db = PostgresChatMessageHistory(str(session_id), psql_url)
+                    history_db.add_user_message(reformulated_query)
+                    history_db.add_ai_message(final_response)
         except Exception as e:
-            print(f"ERROR: An error occurred during streaming: {e}")
-            yield b"An error occurred while generating the response."
+            print(f"ERROR: An error occurred during final streaming: {e}")
+            yield b"An error occurred while generating the final response."
 
-    return StreamingResponse(
-        generate_chat_res(matched_docs, reformulated_query, today, chat_history), 
-        media_type="text/event-stream"
-    )
+    return StreamingResponse(tiered_stream_generator(), media_type="text/event-stream")
 
 @cmots_rag.post("/cmots_rag")
 async def cmots_only(

@@ -198,9 +198,10 @@ class BraveNews:
             print(f"ERROR: Brave API call failed for page {page_num}: {str(e)}")
             return {}, False
 
-    async def search_and_scrape(self, query_term: str) -> list[dict]:
+    async def search_and_scrape(self, query_term: str, max_pages: int = MAX_PAGES, max_sources: int = MAX_SCRAPED_SOURCES) -> list[dict]:
         """
         Optimized search and scrape with concurrent processing and better resource management.
+        Now accepts max_pages and max_sources to control search depth.
         """
         start_time = time.time()
         all_extracted_content = []
@@ -209,99 +210,71 @@ class BraveNews:
         # Create optimized session
         async with aiohttp.ClientSession(**self.session_config) as session:
             
-            # Phase 1: Collect all URLs from Brave API (sequential but faster)
-            print(f"DEBUG: Starting Brave API search for: '{query_term}'")
+            # Phase 1: Collect all URLs from Brave API
+            print(f"DEBUG: Starting Brave API search for: '{query_term}' (max_pages={max_pages}, max_sources={max_sources})")
             
-            for current_page in range(1, MAX_PAGES + 1):
-                if len(all_extracted_content) >= MAX_SCRAPED_SOURCES:
-                    print(f"DEBUG: Reached MAX_SCRAPED_SOURCES ({MAX_SCRAPED_SOURCES}). Stopping API calls.")
+            for current_page in range(1, max_pages + 1):
+                if len(all_extracted_content) >= max_sources:
+                    print(f"DEBUG: Reached max_sources ({max_sources}). Stopping API calls.")
                     break
 
                 brave_results, has_more = await self._fetch_brave_page(session, query_term, current_page)
                 
                 if not brave_results:
-                    print(f"DEBUG: No results from Brave API for page {current_page}")
                     break
 
                 page_extracted_content = self._extract_relevant_text(brave_results)
                 if not page_extracted_content:
-                    print(f"DEBUG: No extracted content for page {current_page}")
                     break
 
                 # Add unique URLs only
                 for item in page_extracted_content:
                     link = item.get('link')
-                    if link and link not in links_encountered and len(all_extracted_content) < MAX_SCRAPED_SOURCES:
+                    if link and link not in links_encountered and len(all_extracted_content) < max_sources:
                         all_extracted_content.append(item)
                         links_encountered.add(link)
                 
-                if len(all_extracted_content) >= MAX_SCRAPED_SOURCES or not has_more:
+                if len(all_extracted_content) >= max_sources or not has_more:
                     break
                     
-                # Reduced sleep time for better performance
                 await asyncio.sleep(0.5)
 
             api_time = time.time() - start_time
             print(f"DEBUG: Brave API phase completed in {api_time:.2f}s, collected {len(all_extracted_content)} URLs")
 
-            # Phase 2: Concurrent web scraping with batching
+            # Phase 2: Concurrent web scraping
             scrape_start = time.time()
             links_to_scrape = [item['link'] for item in all_extracted_content if item.get('link')]
             
             if not links_to_scrape:
-                print("WARNING: No links to scrape")
                 return []
 
-            print(f"DEBUG: Starting concurrent scraping of {len(links_to_scrape)} URLs")
-            
-            # Batch processing to avoid overwhelming servers
-            batch_size = 10  # Process 10 URLs concurrently
             scraped_content_map = {}
+            batch_size = 10
             
             for i in range(0, len(links_to_scrape), batch_size):
                 batch_links = links_to_scrape[i:i + batch_size]
-                print(f"DEBUG: Processing batch {i//batch_size + 1}/{(len(links_to_scrape)-1)//batch_size + 1}")
-                
-                # Create tasks for current batch
-                batch_tasks = [
-                    self._fetch_and_parse_url_async(session, url) 
-                    for url in batch_links
-                ]
-                
-                # Execute batch concurrently
+                batch_tasks = [self._fetch_and_parse_url_async(session, url) for url in batch_links]
                 batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
                 
-                # Process batch results
-                for url, content in batch_results:
-                    if not isinstance(content, Exception):
+                for result in batch_results:
+                    if not isinstance(result, Exception) and isinstance(result, tuple) and len(result) == 2:
+                        url, content = result
                         scraped_content_map[url] = content
                 
-                # Small delay between batches to be respectful to servers
                 if i + batch_size < len(links_to_scrape):
                     await asyncio.sleep(0.2)
 
             scrape_time = time.time() - scrape_start
-            successful_scrapes = len([c for c in scraped_content_map.values() if c])
-            print(f"DEBUG: Scraping phase completed in {scrape_time:.2f}s, {successful_scrapes}/{len(links_to_scrape)} successful")
+            print(f"DEBUG: Scraping phase completed in {scrape_time:.2f}s")
 
         # Phase 3: Process and prepare final items
         processed_items = []
         for item in all_extracted_content:
             link = item.get('link')
             full_webpage_content = scraped_content_map.get(link, "")
-
-            # Create optimized text for embedding
-            text_parts = []
-            if item['title']:
-                text_parts.append(f"Title: {item['title']}")
-            if item['snippet']:
-                text_parts.append(f"Snippet: {item['snippet']}")
-            if full_webpage_content:
-                text_parts.append(f"Content: {full_webpage_content}")
+            text_to_embed = f"Title: {item['title']}\nSnippet: {item['snippet']}\nContent: {full_webpage_content}"
             
-            text_to_embed = "\n".join(text_parts)
-            
-            # Optimize token usage
             tokens_to_embed = encoding.encode(text_to_embed)
             if len(tokens_to_embed) > MAX_EMBEDDING_TOKENS:
                 text_to_embed = encoding.decode(tokens_to_embed[:MAX_EMBEDDING_TOKENS]) + "..."
@@ -383,32 +356,25 @@ class BraveNews:
 
 # --- Standalone Functions ---
 
-async def get_brave_results(query: str):
+async def get_brave_results(query: str, max_pages: int = MAX_PAGES, max_sources: int = MAX_SCRAPED_SOURCES):
     """
-    Optimized high-level function to search Brave, scrape results, and return articles and a DataFrame.
+    High-level function to search Brave, controlled by max_pages and max_sources.
     """
     brave_api_key = os.getenv('BRAVE_API_KEY')
     if not brave_api_key:
-        print("ERROR: BRAVE_API_KEY not found in environment variables.")
+        print("ERROR: BRAVE_API_KEY not found.")
         return None, None
     
     searcher = BraveNews(brave_api_key)
     try:
-        start_time = time.time()
-        processed_items = await searcher.search_and_scrape(query)
+        # Pass the limits directly to the search_and_scrape method
+        processed_items = await searcher.search_and_scrape(query, max_pages=max_pages, max_sources=max_sources)
         
         if not processed_items:
-            print(f"DEBUG: No processed items returned from search_and_scrape for query: '{query}'")
             return None, None
         
         df = searcher._process_for_dataframe(processed_items)
-        if df.empty:
-            print(f"DEBUG: DataFrame is empty after processing for query: '{query}'")
-            return None, None
-        
-        articles = df.to_dict('records')
-        total_time = time.time() - start_time
-        print(f"DEBUG: get_brave_results completed in {total_time:.2f}s with {len(articles)} articles")
+        articles = [] if df.empty else df.to_dict('records')
         
         return articles, df
         
