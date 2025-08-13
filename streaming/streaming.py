@@ -106,24 +106,49 @@ async def quick_scrape_and_process(query: str, db_pool: asyncpg.Pool, num_urls: 
         print(f"ERROR in quick_scrape_and_process: {e}")
         return []
 
-async def quick_brave_search_for_snippets(query: str, num_results: int = 3):
+def diversify_results(passages: list[dict], max_per_source: int = 3) -> list[dict]:
     """
-    Performs a quick Brave search to get snippets without scraping the full content.
+    Post-processes a list of passages to ensure source diversity.
+    It prioritizes keeping the highest-scoring passage from each source.
     """
-    print(f"DEBUG: Performing quick Brave search for snippets for query: '{query}'")
-    try:
-        articles, _ = await get_brave_results(query, max_pages=1, max_sources=num_results)
-        if not articles:
-            return []
+    source_counts = {}
+    diversified_list = []
+    
+    # Sort passages by score to process the best ones first
+    passages.sort(key=lambda x: x.get('final_combined_score', 0), reverse=True)
+    
+    for passage in passages:
+        source_link = passage.get("metadata", {}).get("link", "unknown")
+        
+        try:
+            # Normalize the domain to treat www. and non-www. as the same
+            domain = urlparse(source_link).netloc.replace('www.', '') if source_link != "unknown" else "unknown"
+        except:
+            domain = "unknown"
 
-        snippets = [
-            f"Title: {a.get('title', '')}\nSnippet: {a.get('description', '')}\nSource: {a.get('source_url', '')}"
-            for a in articles
-        ]
-        return snippets
-    except Exception as e:
-        print(f"ERROR in quick_brave_search_for_snippets: {e}")
+        # Add the passage if we haven't hit the limit for this source
+        if source_counts.get(domain, 0) < max_per_source:
+            diversified_list.append(passage)
+            source_counts[domain] = source_counts.get(domain, 0) + 1
+            
+    print(f"DEBUG: Diversified passages from {len(passages)} to {len(diversified_list)}")
+    return diversified_list
+
+async def quick_brave_search_for_snippets(articles: list) -> list:
+    """
+    Processes a list of articles to create snippets for the preliminary summary.
+    This function NO LONGER performs its own web search.
+    """
+    print("DEBUG: Generating snippets from existing search results.")
+    if not articles:
         return []
+
+    # Create snippets from the provided articles
+    snippets = [
+        f"Title: {a.get('title', '')}\nSnippet: {a.get('description', '')}\nSource: {a.get('source_url', '')}"
+        for a in articles[:3]  # Use the top 3 for the preliminary summary
+    ]
+    return snippets
 
 # --- Optimized Chat History Functions ---
 
@@ -518,8 +543,7 @@ async def web_rag_mix(
     db_pool: asyncpg.Pool = Depends(get_db_pool)
 ):
     """
-    Final implementation of the tiered response system that streams a preliminary
-    summary first, followed by a comprehensive final answer.
+    A robust, tiered response system that performs a single web search to avoid rate limiting and errors.
     """
     query = request.query.strip()
     today = datetime.now().strftime("%Y-%m-%d")
@@ -535,95 +559,75 @@ async def web_rag_mix(
     reformulated_query = preprocessing_result.get("reformulated_query", query)
 
     async def tiered_stream_generator():
-        # --- Define LLM Chains for Preliminary and Final Answers ---
-
-        # Prompt for the quick initial summary
-        preliminary_prompt_template = """
-        You are a financial news assistant. Based on the following initial articles, provide a brief, high-level summary (2-3 key bullet points) to answer the user's question. State that this is a preliminary summary and more details are being gathered.
-
-        Initial Articles: {context}
-        User Question: {input}
-
-        Preliminary Summary:
-        """
-        preliminary_prompt = PromptTemplate(template=preliminary_prompt_template, input_variables=["context", "input"])
+        preliminary_prompt = PromptTemplate.from_template(
+            "You are a financial news assistant. Based on these initial snippets, provide a brief, 2-3 bullet point summary for the user's question. Mention that a more detailed analysis is being prepared.\n\nSnippets:\n{context}\n\nUser Question: {input}\n\nPreliminary Summary:"
+        )
         preliminary_chain = preliminary_prompt | llm_stream
 
-        # Prompt for the final, detailed answer
-        final_prompt_template = """
-        You are a financial markets super-assistant. You have gathered comprehensive information. Now, provide a detailed, well-structured final answer to the user's question using all available context. Use markdown formatting, cite sources with links, and be thorough.
-
-        Comprehensive Context: {context}
-        Chat History: {history}
-        Today's Date: {date}
-
-        User Question: {input}
-
-        Final Detailed Answer:
-        """
-        final_prompt = PromptTemplate(template=final_prompt_template, input_variables=["context", "history", "input", "date"])
+        final_prompt = PromptTemplate.from_template(
+            "You are a financial markets super-assistant. Provide a detailed, well-structured final answer to the user's question using all available context. Use markdown, cite sources with links, and be thorough.\n\nComprehensive Context:\n{context}\n\nChat History: {history}\n\nUser Question: {input}\n\nFinal Detailed Answer:"
+        )
         final_chain = final_prompt | llm_stream
         
-        # --- Tier 1: Parallel Quick Data Retrieval ---
-        quick_search_task = asyncio.create_task(quick_brave_search_for_snippets(reformulated_query))
+        # --- Tier 1: Perform a Single Web Search and Start Vector Search ---
+        web_search_task = asyncio.create_task(get_brave_results(reformulated_query, max_pages=1, max_sources=10))
         vector_search_task = asyncio.create_task(vs.asimilarity_search_with_score(reformulated_query, k=5))
 
-        # --- Tier 2: Generate and Stream Preliminary Answer ---
-        initial_snippets = await quick_search_task
-        if initial_snippets:
-            yield "### Preliminary Summary\n".encode("utf-8")
-            preliminary_context = "\n\n".join(initial_snippets)
-
-            async for event in preliminary_chain.astream_events({"context": preliminary_context, "input": reformulated_query}, version="v1"):
-                if event["event"] == "on_chat_model_stream":
-                    content = event["data"]["chunk"].content
-                    if content:
-                        yield content.encode("utf-8")
+        # Await ONLY the web search first, as it's needed for the preliminary summary
+        web_articles, df = await web_search_task
         
-        # Start the full background search
-        full_search_task = asyncio.create_task(get_brave_results(reformulated_query))
-
-        # --- Tier 3: Stream Comprehensive Final Answer ---
+        # --- Tier 2: Generate Preliminary Summary Immediately ---
+        if web_articles:
+            yield "### Preliminary Summary\n".encode("utf-8")
+            # Generate snippets from the results of our single search
+            initial_snippets = await quick_brave_search_for_snippets(web_articles)
+            preliminary_context = "\n\n".join(initial_snippets)
+            
+            async for chunk in preliminary_chain.astream({"context": preliminary_context, "input": reformulated_query}):
+                if chunk.content:
+                    yield chunk.content.encode("utf-8")
+        
+        # --- Tier 3: Assemble and Stream Detailed Analysis ---
         yield "\n\n---\n### Detailed Analysis\n".encode("utf-8")
-
-        # Await vector search results and full brave search results
+        
+        # Now, await the vector search results
         initial_vector_results = await vector_search_task
-        articles, df = await full_search_task
 
         final_passages = []
         if initial_vector_results:
             final_passages.extend([{"text": doc.page_content, "metadata": {**doc.metadata, "link": doc.metadata.get("source_url") or doc.metadata.get("url")}} for doc, score in initial_vector_results])
         
-        if articles:
+        # Add the web articles we already fetched
+        if web_articles:
             existing_links = {p['metadata'].get('link') for p in final_passages}
             new_passages = [
                 {"text": f"Title: {a.get('title', '')}\nDescription: {a.get('description', '')}",
                  "metadata": {"title": a.get('title'), "link": a.get('source_url'), "publication_date": a.get('source_date'), "snippet": a.get('description')}}
-                for a in articles if a.get('source_url') not in existing_links
+                for a in web_articles if a.get('source_url') not in existing_links
             ]
             final_passages.extend(new_passages)
-            if df is not None and not df.empty:
-                asyncio.create_task(insert_post1(df, db_pool))
 
         if not final_passages:
             yield "Could not find sufficient information to provide a detailed analysis.".encode("utf-8")
             return
 
-        final_reranked = await scoring_service.score_and_rerank_passages(question=reformulated_query, passages=final_passages)
-        final_context = scoring_service.create_enhanced_context(final_reranked)
-        final_links = [p["metadata"].get("link") for p in final_reranked[:10] if p.get("metadata", {}).get("link")]
+        reranked_passages = await scoring_service.score_and_rerank_passages(question=reformulated_query, passages=final_passages)
+        diversified_passages = diversify_results(reranked_passages, max_per_source=3)
+        final_context = scoring_service.create_enhanced_context(diversified_passages)
+        final_links = [p["metadata"].get("link") for p in diversified_passages[:10] if p.get("metadata", {}).get("link")]
 
         final_response = ""
         try:
             with get_openai_callback() as cb:
-                async for event in final_chain.astream_events({"context": final_context, "history": chat_history, "input": reformulated_query, "date": today}, version="v1"):
-                    if event["event"] == "on_chat_model_stream":
-                        content = event["data"]["chunk"].content
-                        if content:
-                            final_response += content
-                            yield content.encode("utf-8")
+                async for chunk in final_chain.astream({"context": final_context, "history": chat_history, "input": reformulated_query}):
+                    if chunk.content:
+                        content = chunk.content
+                        final_response += content
+                        yield content.encode("utf-8")
 
                 # Final database updates
+                if df is not None and not df.empty:
+                    await insert_post1(df, db_pool)
                 total_tokens = cb.total_tokens
                 await insert_credit_usage(user_id, plan_id, total_tokens / 1000, db_pool)
                 await store_into_db(session_id, prompt_history_id, {"links": final_links}, db_pool)

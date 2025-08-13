@@ -29,6 +29,8 @@ import pandas as pd
 from psycopg2 import sql
 from datetime import datetime
 import time
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+
 
 from dotenv import load_dotenv
 from config import (
@@ -44,6 +46,16 @@ load_dotenv()
 
 pg_ip = os.getenv('PG_IP_ADDRESS')
 psql_url = os.getenv('DATABASE_URL')
+
+BLACKLISTED_DOMAINS = {
+    'linkedin.com',
+    'twitter.com',
+    'x.com',
+    'facebook.com',
+    'instagram.com',
+    'youtube.com',
+    'indmoney.com'
+}
 
 class BraveNews:
     """
@@ -74,17 +86,22 @@ class BraveNews:
 
     async def _fetch_and_parse_url_async(self, session: aiohttp.ClientSession, url: str) -> tuple[str, str]:
         """
-        Optimized fetch and parse with better error handling and performance.
+        Optimized fetch and parse with a domain blacklist and better error handling.
         Returns (url, extracted_text) tuple for easier processing.
         """
+        # --- START OF MODIFICATION ---
         try:
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as response:
-                # Quick status check before reading content
+            # Check against the blacklist before making a request
+            parsed_url = urlparse(url)
+            if parsed_url.netloc.replace('www.', '') in BLACKLISTED_DOMAINS:
+                print(f"DEBUG: Skipping blacklisted domain: {url}")
+                return url, ""
+        # --- END OF MODIFICATION ---
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=7)) as response: # Stricter 7-second timeout
                 if response.status != 200:
                     print(f"WARNING: HTTP {response.status} for URL: {url}")
                     return url, ""
-                
-                # Check content type to avoid processing non-text content
+
                 content_type = response.headers.get('content-type', '').lower()
                 if not any(ct in content_type for ct in ['text/html', 'application/xhtml']):
                     print(f"WARNING: Skipping non-HTML content for URL: {url}")
@@ -92,13 +109,12 @@ class BraveNews:
                 
                 text_content = await response.text()
 
-            # Run trafilatura in thread pool to avoid blocking
             extracted_text = await asyncio.to_thread(
                 trafilatura.extract, 
                 text_content, 
                 include_comments=False, 
                 include_tables=False,
-                favor_precision=True  # Optimize for speed over completeness
+                favor_precision=True
             )
 
             if extracted_text:
@@ -113,9 +129,6 @@ class BraveNews:
                 
         except asyncio.TimeoutError:
             print(f"WARNING: Timeout fetching URL: {url}")
-            return url, ""
-        except aiohttp.ClientError as e:
-            print(f"WARNING: Client error for URL {url}: {str(e)}")
             return url, ""
         except Exception as e:
             print(f"WARNING: Unexpected error for URL {url}: {str(e)}")
@@ -268,22 +281,34 @@ class BraveNews:
             scrape_time = time.time() - scrape_start
             print(f"DEBUG: Scraping phase completed in {scrape_time:.2f}s")
 
-        # Phase 3: Process and prepare final items
+        # Phase 3: Process and prepare final items with chunking
         processed_items = []
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+
         for item in all_extracted_content:
             link = item.get('link')
             full_webpage_content = scraped_content_map.get(link, "")
-            text_to_embed = f"Title: {item['title']}\nSnippet: {item['snippet']}\nContent: {full_webpage_content}"
-            
-            tokens_to_embed = encoding.encode(text_to_embed)
-            if len(tokens_to_embed) > MAX_EMBEDDING_TOKENS:
-                text_to_embed = encoding.decode(tokens_to_embed[:MAX_EMBEDDING_TOKENS]) + "..."
 
-            processed_items.append({
-                "text_to_embed": text_to_embed,
-                "original_item": item,
-                "full_webpage_content": full_webpage_content
-            })
+            if full_webpage_content:
+                # Chunk the content
+                chunks = text_splitter.split_text(full_webpage_content)
+                for chunk in chunks:
+                    text_to_embed = f"Title: {item['title']}\nSnippet: {item['snippet']}\nContent: {chunk}"
+                    
+                    processed_items.append({
+                        "text_to_embed": text_to_embed,
+                        "original_item": item,
+                        "full_webpage_content": chunk 
+                    })
+            else:
+                 # If no content, just use title and snippet
+                text_to_embed = f"Title: {item['title']}\nSnippet: {item['snippet']}"
+                processed_items.append({
+                        "text_to_embed": text_to_embed,
+                        "original_item": item,
+                        "full_webpage_content": ""
+                    })
+
 
         total_time = time.time() - start_time
         print(f"DEBUG: Total processing time: {total_time:.2f}s for {len(processed_items)} items")
