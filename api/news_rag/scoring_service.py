@@ -323,27 +323,49 @@ class NewsRagScoringService:
         return impact_score
 
     def _calculate_relevance_score(self, question: str, text: str) -> float:
-        """Calculate relevance score using CrossEncoder or fallback to keyword matching."""
+        """Calculate relevance score using CrossEncoder with better preprocessing."""
         if not self.cross_encoder_model:
-            # Fallback to simple keyword matching
-            question_words = set(question.lower().split())
-            text_words = set(text.lower().split())
-            overlap = len(question_words.intersection(text_words))
-            return min(1.0, overlap / len(question_words)) if question_words else 0.5
+            # Fallback to enhanced keyword matching
+            return self._enhanced_keyword_matching(question, text)
         
         try:
+            # Truncate text to avoid cross-encoder limits
+            max_text_length = 400
+            if len(text) > max_text_length:
+                text = text[:max_text_length] + "..."
+            
             # Use CrossEncoder for semantic relevance
             cross_encoder_score = self.cross_encoder_model.predict([[question, text]])[0]
-            # Convert to probability using sigmoid
-            relevance_score = 1 / (1 + np.exp(-cross_encoder_score))
-            return relevance_score
+            # Convert to probability using sigmoid with better scaling
+            relevance_score = 1 / (1 + np.exp(-cross_encoder_score * 1.5))  # Scale factor for better range
+            return max(0.1, min(1.0, relevance_score))  # Ensure reasonable bounds
         except Exception as e:
             print(f"WARNING: CrossEncoder scoring failed: {e}")
-            # Fallback to keyword matching
-            question_words = set(question.lower().split())
-            text_words = set(text.lower().split())
-            overlap = len(question_words.intersection(text_words))
-            return min(1.0, overlap / len(question_words)) if question_words else 0.5
+            return self._enhanced_keyword_matching(question, text)
+
+    def _enhanced_keyword_matching(self, question: str, text: str) -> float:
+        """Enhanced fallback keyword matching."""
+        question_words = set(question.lower().split())
+        text_words = set(text.lower().split())
+        
+        # Remove common stop words
+        stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'about', 'latest', 'news'}
+        question_words = question_words - stop_words
+        text_words = text_words - stop_words
+        
+        if not question_words:
+            return 0.5
+        
+        overlap = len(question_words.intersection(text_words))
+        base_score = overlap / len(question_words)
+        
+        # Bonus for exact phrase matches
+        question_text = question.lower()
+        text_lower = text.lower()
+        if question_text in text_lower:
+            base_score += 0.3
+        
+        return min(1.0, base_score)
 
     def _standardize_passage(self, passage: dict) -> dict:
         """Standardizes a passage to ensure it has a 'text' key."""

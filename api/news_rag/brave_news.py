@@ -54,7 +54,11 @@ BLACKLISTED_DOMAINS = {
     'facebook.com',
     'instagram.com',
     'youtube.com',
-    'indmoney.com'
+    'indmoney.com',
+    'business-standard.com',
+    'reuters.com',
+    'en.wikipedia.org',
+    'wikipedia.org'
 }
 
 class BraveNews:
@@ -294,7 +298,7 @@ class BraveNews:
                 # Add unique URLs only
                 for item in page_extracted_content:
                     link = item.get('link')
-                    if link and link not in links_encountered and len(all_extracted_content) < max_sources:
+                    if (link and link not in links_encountered and len(all_extracted_content) < max_sources and is_valid_news_url(link)):
                         all_extracted_content.append(item)
                         links_encountered.add(link)
                 
@@ -333,31 +337,42 @@ class BraveNews:
             print(f"DEBUG: Scraping phase completed in {scrape_time:.2f}s")
 
         # Phase 3: Process and prepare final items with chunking
+        # Phase 3: Process and prepare final items with SMART chunking
         processed_items = []
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
 
         for item in all_extracted_content:
             link = item.get('link')
             full_webpage_content = scraped_content_map.get(link, "")
 
             if full_webpage_content:
-                # Chunk the content
+                # Smart chunking: limit chunks per article to prevent flooding
                 chunks = text_splitter.split_text(full_webpage_content)
-                for chunk in chunks:
-                    text_to_embed = f"Title: {item['title']}\nSnippet: {item['snippet']}\nContent: {chunk}"
+                
+                # Only take first 3 chunks per article to prevent one source dominating
+                max_chunks_per_article = 3
+                selected_chunks = chunks[:max_chunks_per_article]
+                
+                for i, chunk in enumerate(selected_chunks):
+                    # Add chunk position info to help with deduplication
+                    text_to_embed = f"Title: {item['title']}\nSnippet: {item['snippet']}\nContent Part {i+1}: {chunk}"
                     
                     processed_items.append({
                         "text_to_embed": text_to_embed,
                         "original_item": item,
-                        "full_webpage_content": chunk 
+                        "full_webpage_content": chunk,
+                        "chunk_position": i + 1,  # This needs to be passed to the final passage
+                        "source_domain": urlparse(link).netloc.replace('www.', '') if link else "unknown"
                     })
             else:
-                 # If no content, just use title and snippet
+                # If no content, just use title and snippet
                 text_to_embed = f"Title: {item['title']}\nSnippet: {item['snippet']}"
                 processed_items.append({
                         "text_to_embed": text_to_embed,
                         "original_item": item,
-                        "full_webpage_content": ""
+                        "full_webpage_content": "",
+                        "chunk_position": 0,
+                        "source_domain": urlparse(item.get('link', '')).netloc.replace('www.', '') if item.get('link') else "unknown"
                     })
 
 
@@ -431,6 +446,28 @@ class BraveNews:
         return pd.DataFrame()
 
 # --- Standalone Functions ---
+
+def is_valid_news_url(url: str) -> bool:
+    """
+    Check if URL is likely to contain useful financial news content.
+    """
+    if not url:
+        return False
+        
+    # Skip obviously problematic URLs
+    skip_patterns = [
+        '/topic/',      # Business Standard topic pages
+        '/tag/',        # Generic tag pages  
+        'careers',      # Job postings
+        'contact',      # Contact pagess
+    ]
+    
+    url_lower = url.lower()
+    for pattern in skip_patterns:
+        if pattern in url_lower:
+            return False
+    
+    return True
 
 async def get_brave_snippets_only(query: str, max_results: int = 5) -> list[str]:
         """

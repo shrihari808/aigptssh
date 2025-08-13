@@ -32,6 +32,7 @@ from langchain.chains import ConversationalRetrievalChain
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.retrievers import ContextualCompressionRetriever
 from psycopg2 import sql
+from urllib.parse import urlparse
 from contextlib import contextmanager
 import time
 from starlette.status import HTTP_403_FORBIDDEN
@@ -107,10 +108,9 @@ async def quick_scrape_and_process(query: str, db_pool: asyncpg.Pool, num_urls: 
         print(f"ERROR in quick_scrape_and_process: {e}")
         return []
 
-def diversify_results(passages: list[dict], max_per_source: int = 3) -> list[dict]:
+def diversify_results(passages: list[dict], max_per_source: int = 2) -> list[dict]:
     """
-    Post-processes a list of passages to ensure source diversity.
-    It prioritizes keeping the highest-scoring passage from each source.
+    Enhanced diversification that properly extracts domains from passage metadata.
     """
     source_counts = {}
     diversified_list = []
@@ -119,20 +119,44 @@ def diversify_results(passages: list[dict], max_per_source: int = 3) -> list[dic
     passages.sort(key=lambda x: x.get('final_combined_score', 0), reverse=True)
     
     for passage in passages:
-        source_link = passage.get("metadata", {}).get("link", "unknown")
+        # Try multiple ways to get the source URL
+        source_link = None
+        metadata = passage.get("metadata", {})
+        
+        # Check different possible URL fields
+        source_link = (metadata.get("link") or 
+                      metadata.get("source_url") or 
+                      metadata.get("url") or 
+                      "unknown")
         
         try:
-            # Normalize the domain to treat www. and non-www. as the same
-            domain = urlparse(source_link).netloc.replace('www.', '') if source_link != "unknown" else "unknown"
+            if source_link and source_link != "unknown":
+                from urllib.parse import urlparse
+                domain = urlparse(source_link).netloc.replace('www.', '')
+            else:
+                domain = "unknown"
         except:
             domain = "unknown"
 
-        # Add the passage if we haven't hit the limit for this source
-        if source_counts.get(domain, 0) < max_per_source:
+        # Enhanced logic: prefer first chunks from each source
+        chunk_position = passage.get('chunk_position', 0)
+        
+        current_count = source_counts.get(domain, 0)
+        
+        # Prioritize first chunks and limit per source
+        should_include = False
+        if current_count < max_per_source:
+            if current_count == 0:  # Always include first item from each source
+                should_include = True
+            elif chunk_position <= 2:  # Only include early chunks for additional items
+                should_include = True
+        
+        if should_include:
             diversified_list.append(passage)
-            source_counts[domain] = source_counts.get(domain, 0) + 1
+            source_counts[domain] = current_count + 1
             
     print(f"DEBUG: Diversified passages from {len(passages)} to {len(diversified_list)}")
+    print(f"DEBUG: Sources included: {list(source_counts.keys())}")
     return diversified_list
 
 async def quick_brave_search_for_snippets(articles: list) -> list:
@@ -624,12 +648,32 @@ async def web_rag_mix(
         # Add web articles
         if web_articles:
             existing_links = {p['metadata'].get('link') for p in final_passages}
-            new_passages = [
-                {"text": f"Title: {a.get('title', '')}\nDescription: {a.get('description', '')}",
-                 "metadata": {"title": a.get('title'), "link": a.get('source_url'), "publication_date": a.get('source_date'), "snippet": a.get('description')}}
-                for a in web_articles if a.get('source_url') not in existing_links
-            ]
-            final_passages.extend(new_passages)
+            
+            # Group articles by source to track chunks properly
+            source_chunk_counts = {}
+            
+            for a in web_articles:
+                source_url = a.get('source_url')
+                if source_url not in existing_links:
+                    # Track chunks per source
+                    if source_url not in source_chunk_counts:
+                        source_chunk_counts[source_url] = 0
+                    
+                    source_chunk_counts[source_url] += 1
+                    chunk_position = source_chunk_counts[source_url]
+                    
+                    passage = {
+                        "text": f"Title: {a.get('title', '')}\nDescription: {a.get('description', '')}",
+                        "metadata": {
+                            "title": a.get('title'), 
+                            "link": source_url, 
+                            "publication_date": a.get('source_date'), 
+                            "snippet": a.get('description')
+                        },
+                        "chunk_position": chunk_position,  # Add this tracking
+                        "source_domain": urlparse(source_url).netloc.replace('www.', '') if source_url else "unknown"
+                    }
+                    final_passages.append(passage)
 
         if not final_passages:
             yield "Could not find sufficient information for detailed analysis.".encode("utf-8")
