@@ -106,6 +106,25 @@ async def quick_scrape_and_process(query: str, db_pool: asyncpg.Pool, num_urls: 
         print(f"ERROR in quick_scrape_and_process: {e}")
         return []
 
+async def quick_brave_search_for_snippets(query: str, num_results: int = 3):
+    """
+    Performs a quick Brave search to get snippets without scraping the full content.
+    """
+    print(f"DEBUG: Performing quick Brave search for snippets for query: '{query}'")
+    try:
+        articles, _ = await get_brave_results(query, max_pages=1, max_sources=num_results)
+        if not articles:
+            return []
+
+        snippets = [
+            f"Title: {a.get('title', '')}\nSnippet: {a.get('description', '')}\nSource: {a.get('source_url', '')}"
+            for a in articles
+        ]
+        return snippets
+    except Exception as e:
+        print(f"ERROR in quick_brave_search_for_snippets: {e}")
+        return []
+
 # --- Optimized Chat History Functions ---
 
 async def get_chat_history_optimized(session_id: str, db_pool: asyncpg.Pool, limit: int = 3):
@@ -507,7 +526,7 @@ async def web_rag_mix(
 
     chat_history = await get_chat_history_optimized(str(session_id), db_pool, limit=3)
     preprocessing_result = await combined_preprocessing(query, chat_history, today)
-    
+
     if preprocessing_result.get("valid", 0) == 0:
         async def invalid_query_stream():
             yield "The search query is not related to Indian financial markets...".encode("utf-8")
@@ -517,14 +536,14 @@ async def web_rag_mix(
 
     async def tiered_stream_generator():
         # --- Define LLM Chains for Preliminary and Final Answers ---
-        
+
         # Prompt for the quick initial summary
         preliminary_prompt_template = """
         You are a financial news assistant. Based on the following initial articles, provide a brief, high-level summary (2-3 key bullet points) to answer the user's question. State that this is a preliminary summary and more details are being gathered.
 
         Initial Articles: {context}
         User Question: {input}
-        
+
         Preliminary Summary:
         """
         preliminary_prompt = PromptTemplate(template=preliminary_prompt_template, input_variables=["context", "input"])
@@ -537,37 +556,28 @@ async def web_rag_mix(
         Comprehensive Context: {context}
         Chat History: {history}
         Today's Date: {date}
-        
+
         User Question: {input}
-        
+
         Final Detailed Answer:
         """
         final_prompt = PromptTemplate(template=final_prompt_template, input_variables=["context", "history", "input", "date"])
         final_chain = final_prompt | llm_stream
+        
+        # --- Tier 1: Parallel Quick Data Retrieval ---
+        quick_search_task = asyncio.create_task(quick_brave_search_for_snippets(reformulated_query))
+        vector_search_task = asyncio.create_task(vs.asimilarity_search_with_score(reformulated_query, k=5))
 
-        # --- Tier 1: Quick Data Retrieval ---
-        initial_results = await vs.asimilarity_search_with_score(reformulated_query, k=10)
-        sufficiency_score = scoring_service.assess_context_sufficiency(reformulated_query, initial_results)
-        
-        initial_passages = []
-        if sufficiency_score >= CONTEXT_SUFFICIENCY_THRESHOLD:
-            initial_passages = [{"text": doc.page_content, "metadata": {**doc.metadata, "link": doc.metadata.get("source_url") or doc.metadata.get("url")}} for doc, score in initial_results]
-        else:
-            initial_passages = await quick_scrape_and_process(reformulated_query, db_pool, num_urls=3)
-        
-        # --- Tier 2: Stream Preliminary Answer & Start Full Search ---
-        preliminary_response_streamed = False
-        if initial_passages:
+        # --- Tier 2: Generate and Stream Preliminary Answer ---
+        initial_snippets = await quick_search_task
+        if initial_snippets:
             yield "### Preliminary Summary\n".encode("utf-8")
-            
-            preliminary_reranked = await scoring_service.score_and_rerank_passages(question=reformulated_query, passages=initial_passages)
-            preliminary_context = scoring_service.create_enhanced_context(preliminary_reranked)
+            preliminary_context = "\n\n".join(initial_snippets)
 
             async for event in preliminary_chain.astream_events({"context": preliminary_context, "input": reformulated_query}, version="v1"):
                 if event["event"] == "on_chat_model_stream":
                     content = event["data"]["chunk"].content
                     if content:
-                        preliminary_response_streamed = True
                         yield content.encode("utf-8")
         
         # Start the full background search
@@ -576,13 +586,18 @@ async def web_rag_mix(
         # --- Tier 3: Stream Comprehensive Final Answer ---
         yield "\n\n---\n### Detailed Analysis\n".encode("utf-8")
 
+        # Await vector search results and full brave search results
+        initial_vector_results = await vector_search_task
         articles, df = await full_search_task
-        final_passages = list(initial_passages)
+
+        final_passages = []
+        if initial_vector_results:
+            final_passages.extend([{"text": doc.page_content, "metadata": {**doc.metadata, "link": doc.metadata.get("source_url") or doc.metadata.get("url")}} for doc, score in initial_vector_results])
         
         if articles:
             existing_links = {p['metadata'].get('link') for p in final_passages}
             new_passages = [
-                {"text": f"Title: {a.get('title', '')}\nDescription: {a.get('description', '')}", 
+                {"text": f"Title: {a.get('title', '')}\nDescription: {a.get('description', '')}",
                  "metadata": {"title": a.get('title'), "link": a.get('source_url'), "publication_date": a.get('source_date'), "snippet": a.get('description')}}
                 for a in articles if a.get('source_url') not in existing_links
             ]
@@ -607,7 +622,7 @@ async def web_rag_mix(
                         if content:
                             final_response += content
                             yield content.encode("utf-8")
-                
+
                 # Final database updates
                 total_tokens = cb.total_tokens
                 await insert_credit_usage(user_id, plan_id, total_tokens / 1000, db_pool)

@@ -9,7 +9,6 @@ from . import chatbot
 from .market_content import chatwithfiles, youtube_sum
 from . import graph_openai1
 from .fundamentals_rag import fundamental_chat2, corp
-from .market_data_lm import router as market_data_router_module
 
 # --- CORRECTED IMPORT ---
 # Import from the 'streaming' directory, which is at the same level as 'api'
@@ -31,4 +30,3 @@ api_router.include_router(streaming.red_rag, tags=["Streaming RAG"])
 api_router.include_router(streaming.yt_rag, tags=["Streaming RAG"])
 api_router.include_router(fundamental_chat2.fund_rag, tags=["Fundamentals RAG"])
 api_router.include_router(corp.corp_rag, tags=["Fundamentals RAG"])
-api_router.include_router(market_data_router_module.market_data_router) # This router already has tags defined
