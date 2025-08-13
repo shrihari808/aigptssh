@@ -28,6 +28,7 @@ import psycopg2
 import pandas as pd
 from psycopg2 import sql
 from datetime import datetime
+import time
 
 from dotenv import load_dotenv
 from config import (
@@ -46,8 +47,8 @@ psql_url = os.getenv('DATABASE_URL')
 
 class BraveNews:
     """
-    A refactored class to handle Brave Search API interactions, web scraping,
-    and data processing in a structured way.
+    Optimized class to handle Brave Search API interactions with concurrent web scraping,
+    stricter timeouts, and performance improvements.
     """
     
     BRAVE_API_BASE_URL = "https://api.search.brave.com/res/v1/web/search"
@@ -57,34 +58,73 @@ class BraveNews:
             raise ValueError("Brave API key is required for BraveNewsSearcher.")
         self.brave_api_key = brave_api_key
         
-    async def _fetch_and_parse_url_async(self, url: str) -> str:
-        """Fetch content from URL using aiohttp and extract main text using trafilatura."""
-        try:
-            headers = {
+        # Optimized session configuration for better performance
+        self.session_config = {
+            'timeout': aiohttp.ClientTimeout(total=7, connect=3),  # Stricter timeouts
+            'connector': aiohttp.TCPConnector(
+                limit=20,  # Increased concurrent connections
+                limit_per_host=10,
+                ttl_dns_cache=300,
+                use_dns_cache=True,
+            ),
+            'headers': {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
             }
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as response:
-                    response.raise_for_status()
-                    text_content = await response.text()
+        }
 
-            extracted_text = trafilatura.extract(text_content, include_comments=False, include_tables=False)
+    async def _fetch_and_parse_url_async(self, session: aiohttp.ClientSession, url: str) -> tuple[str, str]:
+        """
+        Optimized fetch and parse with better error handling and performance.
+        Returns (url, extracted_text) tuple for easier processing.
+        """
+        try:
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as response:
+                # Quick status check before reading content
+                if response.status != 200:
+                    print(f"WARNING: HTTP {response.status} for URL: {url}")
+                    return url, ""
+                
+                # Check content type to avoid processing non-text content
+                content_type = response.headers.get('content-type', '').lower()
+                if not any(ct in content_type for ct in ['text/html', 'application/xhtml']):
+                    print(f"WARNING: Skipping non-HTML content for URL: {url}")
+                    return url, ""
+                
+                text_content = await response.text()
+
+            # Run trafilatura in thread pool to avoid blocking
+            extracted_text = await asyncio.to_thread(
+                trafilatura.extract, 
+                text_content, 
+                include_comments=False, 
+                include_tables=False,
+                favor_precision=True  # Optimize for speed over completeness
+            )
 
             if extracted_text:
                 tokens = encoding.encode(extracted_text)
                 if len(tokens) > MAX_WEBPAGE_CONTENT_TOKENS:
                     extracted_text = encoding.decode(tokens[:MAX_WEBPAGE_CONTENT_TOKENS]) + "..."
-                print(f"DEBUG: Successfully fetched and parsed URL: {url} ({len(extracted_text)} chars)")
-                return extracted_text
+                print(f"DEBUG: Successfully parsed URL: {url} ({len(extracted_text)} chars)")
+                return url, extracted_text
             else:
                 print(f"WARNING: Could not extract content from URL: {url}")
-                return ""
+                return url, ""
+                
+        except asyncio.TimeoutError:
+            print(f"WARNING: Timeout fetching URL: {url}")
+            return url, ""
+        except aiohttp.ClientError as e:
+            print(f"WARNING: Client error for URL {url}: {str(e)}")
+            return url, ""
         except Exception as e:
-            print(f"WARNING: Failed to fetch/parse URL {url}: {str(e)}")
-            return ""
+            print(f"WARNING: Unexpected error for URL {url}: {str(e)}")
+            return url, ""
 
     def _extract_relevant_text(self, brave_results: dict) -> list[dict]:
-        """Extract relevant text snippets from Brave Search API results."""
+        """
+        Optimized text extraction with better data validation.
+        """
         extracted_data = []
         web_results = brave_results.get('web', {}).get('results', [])
         news_results = brave_results.get('news', {}).get('results', [])
@@ -92,95 +132,176 @@ class BraveNews:
         all_results = web_results + news_results
         
         for item in all_results:
+            # Skip items without essential fields
+            if not item.get("url") or not item.get("title"):
+                continue
+                
             pub_date = item.get("page_age")
             if pub_date:
                 try:
-                    # Ensure it's a valid ISO format date by handling the 'Z'
+                    # Validate and normalize date format
                     datetime.fromisoformat(pub_date.replace('Z', '+00:00'))
                 except (ValueError, TypeError):
                     pub_date = None
 
             extracted_data.append({
-                "title": item.get("title", ""),
-                "snippet": item.get("description", ""),
-                "link": item.get("url", ""),
+                "title": item.get("title", "").strip(),
+                "snippet": item.get("description", "").strip(),
+                "link": item.get("url", "").strip(),
                 "publication_date": pub_date
             })
         
         return extracted_data
 
+    async def _fetch_brave_page(self, session: aiohttp.ClientSession, query_term: str, page_num: int) -> tuple[dict, bool]:
+        """
+        Optimized Brave API call with better error handling.
+        Returns (results_dict, has_more_pages).
+        """
+        offset = (page_num - 1) * 20
+        
+        brave_params = {
+            "q": query_term, 
+            "count": 20, 
+            "country": "in",
+            "result_filter": "web,news", 
+            "freshness": "pm",
+            "offset": offset
+        }
+        brave_headers = {
+            "Accept": "application/json", 
+            "X-Subscription-Token": self.brave_api_key
+        }
+
+        try:
+            async with session.get(
+                self.BRAVE_API_BASE_URL, 
+                headers=brave_headers, 
+                params=brave_params,
+                timeout=aiohttp.ClientTimeout(total=10)  # Stricter timeout for API
+            ) as response:
+                if response.status != 200:
+                    print(f"ERROR: Brave API returned status {response.status}")
+                    return {}, False
+                    
+                brave_results = await response.json()
+                
+                # Check if more results are available
+                has_more = brave_results.get('query', {}).get('more_results_available', False)
+                
+                return brave_results, has_more
+                
+        except asyncio.TimeoutError:
+            print(f"ERROR: Timeout calling Brave API for page {page_num}")
+            return {}, False
+        except Exception as e:
+            print(f"ERROR: Brave API call failed for page {page_num}: {str(e)}")
+            return {}, False
+
     async def search_and_scrape(self, query_term: str) -> list[dict]:
-        """Perform Brave search and scrape content for news articles."""
+        """
+        Optimized search and scrape with concurrent processing and better resource management.
+        """
+        start_time = time.time()
         all_extracted_content = []
-        current_page_num = 1
-        total_results_available = float('inf')
         links_encountered = set()
 
-        while current_page_num <= MAX_PAGES:
-            if len(all_extracted_content) >= MAX_SCRAPED_SOURCES:
-                print(f"DEBUG: Reached MAX_SCRAPED_SOURCES ({MAX_SCRAPED_SOURCES}). Stopping.")
-                break
+        # Create optimized session
+        async with aiohttp.ClientSession(**self.session_config) as session:
+            
+            # Phase 1: Collect all URLs from Brave API (sequential but faster)
+            print(f"DEBUG: Starting Brave API search for: '{query_term}'")
+            
+            for current_page in range(1, MAX_PAGES + 1):
+                if len(all_extracted_content) >= MAX_SCRAPED_SOURCES:
+                    print(f"DEBUG: Reached MAX_SCRAPED_SOURCES ({MAX_SCRAPED_SOURCES}). Stopping API calls.")
+                    break
 
-            offset = (current_page_num - 1) * 20
-            if offset >= total_results_available:
-                break
-
-            print(f"DEBUG: Fetching Brave API results for query '{query_term}', page {current_page_num}")
-            brave_params = {
-                "q": query_term, "count": 20, "country": "in",
-                "result_filter": "web,news", "freshness": "pm"
-            }
-            brave_headers = {
-                "Accept": "application/json", "X-Subscription-Token": self.brave_api_key
-            }
-
-            try:
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(
-                        self.BRAVE_API_BASE_URL, headers=brave_headers, params=brave_params,
-                        timeout=aiohttp.ClientTimeout(total=15)
-                    ) as brave_response:
-                        brave_response.raise_for_status()
-                        brave_results = await brave_response.json()
-
-                if 'query' in brave_results and 'total_results' in brave_results['query']:
-                    total_results_available = brave_results['query']['total_results']
+                brave_results, has_more = await self._fetch_brave_page(session, query_term, current_page)
+                
+                if not brave_results:
+                    print(f"DEBUG: No results from Brave API for page {current_page}")
+                    break
 
                 page_extracted_content = self._extract_relevant_text(brave_results)
                 if not page_extracted_content:
+                    print(f"DEBUG: No extracted content for page {current_page}")
                     break
 
+                # Add unique URLs only
                 for item in page_extracted_content:
                     link = item.get('link')
                     if link and link not in links_encountered and len(all_extracted_content) < MAX_SCRAPED_SOURCES:
                         all_extracted_content.append(item)
                         links_encountered.add(link)
                 
-                if len(all_extracted_content) >= MAX_SCRAPED_SOURCES:
+                if len(all_extracted_content) >= MAX_SCRAPED_SOURCES or not has_more:
                     break
+                    
+                # Reduced sleep time for better performance
+                await asyncio.sleep(0.5)
+
+            api_time = time.time() - start_time
+            print(f"DEBUG: Brave API phase completed in {api_time:.2f}s, collected {len(all_extracted_content)} URLs")
+
+            # Phase 2: Concurrent web scraping with batching
+            scrape_start = time.time()
+            links_to_scrape = [item['link'] for item in all_extracted_content if item.get('link')]
+            
+            if not links_to_scrape:
+                print("WARNING: No links to scrape")
+                return []
+
+            print(f"DEBUG: Starting concurrent scraping of {len(links_to_scrape)} URLs")
+            
+            # Batch processing to avoid overwhelming servers
+            batch_size = 10  # Process 10 URLs concurrently
+            scraped_content_map = {}
+            
+            for i in range(0, len(links_to_scrape), batch_size):
+                batch_links = links_to_scrape[i:i + batch_size]
+                print(f"DEBUG: Processing batch {i//batch_size + 1}/{(len(links_to_scrape)-1)//batch_size + 1}")
                 
-                if brave_results.get('query', {}).get('more_results_available', False):
-                    current_page_num += 1
-                    await asyncio.sleep(1)
-                else:
-                    break
-            except Exception as e:
-                print(f"ERROR: Brave API search failed: {str(e)}")
-                break
+                # Create tasks for current batch
+                batch_tasks = [
+                    self._fetch_and_parse_url_async(session, url) 
+                    for url in batch_links
+                ]
+                
+                # Execute batch concurrently
+                batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+                
+                # Process batch results
+                for url, content in batch_results:
+                    if not isinstance(content, Exception):
+                        scraped_content_map[url] = content
+                
+                # Small delay between batches to be respectful to servers
+                if i + batch_size < len(links_to_scrape):
+                    await asyncio.sleep(0.2)
 
-        links_to_scrape = [item['link'] for item in all_extracted_content if item.get('link')]
-        scrape_tasks = [self._fetch_and_parse_url_async(link) for link in links_to_scrape]
-        scraped_contents = await asyncio.gather(*scrape_tasks, return_exceptions=True)
-        scraped_content_map = {links_to_scrape[i]: content for i, content in enumerate(scraped_contents)}
+            scrape_time = time.time() - scrape_start
+            successful_scrapes = len([c for c in scraped_content_map.values() if c])
+            print(f"DEBUG: Scraping phase completed in {scrape_time:.2f}s, {successful_scrapes}/{len(links_to_scrape)} successful")
 
+        # Phase 3: Process and prepare final items
         processed_items = []
         for item in all_extracted_content:
             link = item.get('link')
-            full_webpage_content = ""
-            if link and link in scraped_content_map and not isinstance(scraped_content_map[link], Exception):
-                full_webpage_content = scraped_content_map[link]
+            full_webpage_content = scraped_content_map.get(link, "")
 
-            text_to_embed = f"Title: {item['title']}\nSnippet: {item['snippet']}\nFull Content: {full_webpage_content}"
+            # Create optimized text for embedding
+            text_parts = []
+            if item['title']:
+                text_parts.append(f"Title: {item['title']}")
+            if item['snippet']:
+                text_parts.append(f"Snippet: {item['snippet']}")
+            if full_webpage_content:
+                text_parts.append(f"Content: {full_webpage_content}")
+            
+            text_to_embed = "\n".join(text_parts)
+            
+            # Optimize token usage
             tokens_to_embed = encoding.encode(text_to_embed)
             if len(tokens_to_embed) > MAX_EMBEDDING_TOKENS:
                 text_to_embed = encoding.decode(tokens_to_embed[:MAX_EMBEDDING_TOKENS]) + "..."
@@ -190,52 +311,81 @@ class BraveNews:
                 "original_item": item,
                 "full_webpage_content": full_webpage_content
             })
+
+        total_time = time.time() - start_time
+        print(f"DEBUG: Total processing time: {total_time:.2f}s for {len(processed_items)} items")
+        
         return processed_items
 
     def _process_for_dataframe(self, processed_items: list[dict]) -> pd.DataFrame:
-        """Convert processed items to DataFrame format for PostgreSQL storage."""
+        """
+        Optimized DataFrame processing with better error handling.
+        """
+        if not processed_items:
+            return pd.DataFrame()
+            
         news_data = []
+        current_time = datetime.now()
+        
         for item in processed_items:
             original = item['original_item']
+            
+            # Optimize heading extraction
             heading = "Unknown Source"
             if 'link' in original and original['link']:
-                parsed_url = urlparse(original['link'])
-                heading = parsed_url.netloc.replace('www.', '').title()
+                try:
+                    parsed_url = urlparse(original['link'])
+                    netloc = parsed_url.netloc.replace('www.', '')
+                    heading = netloc.title() if netloc else "Unknown Source"
+                except Exception:
+                    heading = "Unknown Source"
             
+            # Optimize date processing
             source_date = original.get('publication_date')
             try:
-                date_obj = datetime.fromisoformat(source_date.replace('Z', '+00:00')) if source_date else datetime.now()
+                if source_date:
+                    date_obj = datetime.fromisoformat(source_date.replace('Z', '+00:00'))
+                else:
+                    date_obj = current_time
                 formatted_date = date_obj.isoformat()
                 date_published_int = int(date_obj.strftime('%Y%m%d'))
             except (ValueError, TypeError):
-                date_obj = datetime.now()
+                date_obj = current_time
                 formatted_date = date_obj.isoformat()
                 date_published_int = int(date_obj.strftime('%Y%m%d'))
+
+            # Clean text more efficiently
+            title = str(original.get('title', ''))
+            description = str(original.get('snippet', ''))
+            
+            # Remove non-ASCII characters more efficiently
+            title = re.sub(r'[^\x00-\x7F]+', ' ', title).replace("'", "")
+            description = re.sub(r'[^\x00-\x7F]+', ' ', description).replace("'", "")
 
             news_data.append({
                 'source_url': original.get('link', ''),
                 'image_url': None,
                 'heading': heading,
-                'title': str(original.get('title', '')).replace("'", ""),
-                'description': str(original.get('snippet', '')).replace("'", ""),
+                'title': title,
+                'description': description,
                 'source_date': formatted_date,
                 'date_published': date_published_int
             })
         
         if news_data:
             df = pd.DataFrame(news_data)
-            df['title'] = df['title'].apply(lambda x: re.sub(r'[^\x00-\x7F]+', ' ', x))
-            df['description'] = df['description'].apply(lambda x: re.sub(r'[^\x00-\x7F]+', ' ', x))
-            df.dropna(subset=['source_url'], inplace=True)
+            # Remove rows with empty URLs
+            df = df[df['source_url'].str.strip() != '']
+            df.reset_index(drop=True, inplace=True)
             return df
+        
         return pd.DataFrame()
 
 # --- Standalone Functions ---
 
 async def get_brave_results(query: str):
     """
-    High-level function to search Brave, scrape results, and return articles and a DataFrame.
-    This is the main entry point for other modules.
+    Optimized high-level function to search Brave, scrape results, and return articles and a DataFrame.
     """
     brave_api_key = os.getenv('BRAVE_API_KEY')
     if not brave_api_key:
@@ -244,7 +394,9 @@ async def get_brave_results(query: str):
     
     searcher = BraveNews(brave_api_key)
     try:
+        start_time = time.time()
         processed_items = await searcher.search_and_scrape(query)
+        
         if not processed_items:
             print(f"DEBUG: No processed items returned from search_and_scrape for query: '{query}'")
             return None, None
@@ -254,59 +406,71 @@ async def get_brave_results(query: str):
             print(f"DEBUG: DataFrame is empty after processing for query: '{query}'")
             return None, None
         
-        # The 'articles' should be a list of dictionaries, which is what df.to_dict('records') provides
         articles = df.to_dict('records')
+        total_time = time.time() - start_time
+        print(f"DEBUG: get_brave_results completed in {total_time:.2f}s with {len(articles)} articles")
+        
         return articles, df
+        
     except Exception as e:
-        print(f"Error in get_brave_results: {str(e)}")
+        print(f"ERROR in get_brave_results: {str(e)}")
         return None, None
 
+# --- Database Functions (Optimized for bulk operations) ---
+
 import pandas as pd
-from config import DB_POOL # Import the initialized DB_POOL
+from config import DB_POOL
 
 async def insert_post1(df: pd.DataFrame):
     """
-    Asynchronously inserts a DataFrame into the source_data table using a connection pool.
-    This is the non-blocking version of insert_post1.
+    Optimized bulk insert with better error handling and performance.
     """
-    # Check if the pool is initialized, if not, it's a critical startup error.
     if DB_POOL is None:
         print("CRITICAL ERROR: Database pool is not initialized. Cannot insert data.")
         return
 
-    # Acquire a connection from the pool. This is very fast and doesn't create a new connection each time.
-    async with DB_POOL.acquire() as conn:
-        # Use a transaction to ensure all rows are inserted successfully or none are.
-        async with conn.transaction():
-            for index, row in df.iterrows():
-                try:
-                    # Check if the source_url already exists.
-                    # fetchval is an efficient way to get a single value.
-                    exists = await conn.fetchval(
-                        "SELECT 1 FROM source_data WHERE source_url = $1",
-                        row['source_url']
-                    )
+    if df.empty:
+        print("DEBUG: Empty DataFrame, skipping insert")
+        return
 
-                    if not exists:
-                        # Use parameterized queries ($1, $2, etc.) to prevent SQL injection.
-                        await conn.execute("""
-                            INSERT INTO source_data (source_url, image_url, heading, title, description, source_date)
-                            VALUES ($1, $2, $3, $4, $5, $6)
-                        """,
+    start_time = time.time()
+    
+    async with DB_POOL.acquire() as conn:
+        async with conn.transaction():
+            # Prepare data for bulk operations
+            urls_to_check = [row['source_url'] for _, row in df.iterrows()]
+            
+            # Batch check for existing URLs
+            existing_urls = await conn.fetch(
+                "SELECT source_url FROM source_data WHERE source_url = ANY($1)",
+                urls_to_check
+            )
+            existing_urls_set = {row['source_url'] for row in existing_urls}
+            
+            # Filter out existing URLs
+            new_rows = []
+            for _, row in df.iterrows():
+                if row['source_url'] not in existing_urls_set:
+                    new_rows.append((
                         row['source_url'],
-                        row.get('image_url'), # Use .get() for optional columns
+                        row.get('image_url'),
                         row['heading'],
                         row['title'],
                         row['description'],
                         row['source_date']
-                        )
-                except Exception as e:
-                    # Log any errors that occur for a specific row without stopping the entire batch.
-                    print(f"Error inserting row for URL {row['source_url']}: {e}")
-    
-    print(f"DEBUG: Asynchronous insert for {len(df)} rows completed.")
-
-
+                    ))
+            
+            if new_rows:
+                # Bulk insert new rows
+                await conn.executemany("""
+                    INSERT INTO source_data (source_url, image_url, heading, title, description, source_date)
+                    VALUES ($1, $2, $3, $4, $5, $6)
+                """, new_rows)
+                
+                insert_time = time.time() - start_time
+                print(f"DEBUG: Bulk inserted {len(new_rows)} new rows in {insert_time:.2f}s")
+            else:
+                print("DEBUG: No new rows to insert (all URLs already exist)")
 
 def initialize_pinecone():
     """Initializes and returns a Pinecone client and index name."""
@@ -320,7 +484,7 @@ def initialize_pinecone():
     return pc, index_name
 
 def initialize_and_upsert_sync(documents, ids, index_name):
-    """A single synchronous function to handle all blocking Pinecone logic."""
+    """Optimized synchronous function for Pinecone operations."""
     pc = PineconeClient(api_key=os.getenv("PINECONE_API_KEY"))
     if index_name not in pc.list_indexes().names():
         print(f"Index '{index_name}' not found. Creating it now...")
@@ -329,39 +493,50 @@ def initialize_and_upsert_sync(documents, ids, index_name):
             spec=ServerlessSpec(cloud="aws", region="us-east-1")
         )
         print("Index created. Waiting for initialization...")
-        # NOTE: A sleep here is still blocking, but it's now in a background thread
-        # where it won't freeze the main app.
         import time
         time.sleep(10)
 
-    embeddings = embeddings
+    embeddings_model = embeddings
     PineconeVectorStore.from_documents(
-        documents=documents, embedding=embeddings, index_name=index_name,
+        documents=documents, embedding=embeddings_model, index_name=index_name,
         namespace="__default__", ids=ids
     )
     print("Upsert complete.")
 
-
 async def data_into_pinecone(df):
-    """Asynchronously prepares data and calls the blocking upsert function in a thread."""
+    """Optimized Pinecone data insertion."""
+    if df.empty:
+        print("DEBUG: Empty DataFrame, skipping Pinecone upsert")
+        return "No data to insert"
+        
+    start_time = time.time()
     documents = []
     ids = []
-    # (Your existing loop to prepare documents and ids goes here)
+    
     for _, row in df.iterrows():
         combined_text = f"Title: {row['title']}\nDescription: {row['description']}"
-        doc_id = re.sub(r'[^a-zA-Z0-9]', '', row["source_url"])
+        # More efficient ID generation
+        doc_id = re.sub(r'[^a-zA-Z0-9]', '', str(row["source_url"]))[:100]  # Limit ID length
+        
         documents.append(Document(
             page_content=combined_text,
-            metadata={"url": row["source_url"], "date": row["date_published"], "title": row["title"]}
+            metadata={
+                "url": row["source_url"], 
+                "date": row["date_published"], 
+                "title": row["title"]
+            }
         ))
         ids.append(doc_id)
 
     if documents:
-        # Run the entire synchronous process in a background thread
         await asyncio.to_thread(
             initialize_and_upsert_sync,
             documents,
             ids,
             "market-data-index"
         )
+        
+        upsert_time = time.time() - start_time
+        print(f"DEBUG: Pinecone upsert completed in {upsert_time:.2f}s for {len(documents)} documents")
+    
     return "Inserted!"

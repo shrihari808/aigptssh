@@ -20,7 +20,7 @@ import re
 import asyncpg
 from langchain.retrievers import MergerRetriever
 from langchain.docstore.document import Document
-from datetime import datetime
+from datetime import datetime, timedelta
 from langchain_pinecone import Pinecone
 import google.generativeai as genai
 from langchain import PromptTemplate, LLMChain
@@ -39,16 +39,13 @@ from fastapi.responses import JSONResponse
 import pandas as pd
 
 # --- Local Project Imports ---
-# Import necessary components from other parts of your application
 from config import (
     chroma_server_client, llm_date, llm_stream, vs, GPT4o_mini,
     PINECONE_INDEX_NAME, CONTEXT_SUFFICIENCY_THRESHOLD
 )
 from langchain_chroma import Chroma
 
-# --- Functions imported from other modules that need refactoring for DB access ---
-# Note: Ideally, these functions would be refactored in their original files.
-# They are included here to provide a complete, working example.
+# --- Functions imported from other modules ---
 from api.news_rag.brave_news import get_brave_results
 from streaming.reddit_stream import fetch_search_red, process_search_red
 from streaming.yt_stream import get_data, get_yt_data_async
@@ -72,69 +69,368 @@ yt_rag = APIRouter()
 
 # --- Dependency for Database Pool ---
 async def get_db_pool(request: Request) -> asyncpg.Pool:
-    """
-    FastAPI dependency to get the database pool from the application state.
-    This ensures that the pool is initialized before being used by any route.
-    """
-    # Check if the pool exists on the app state
+    """FastAPI dependency to get the database pool from the application state."""
     if not hasattr(request.app.state, 'db_pool') or not request.app.state.db_pool:
         print("CRITICAL ERROR: Database pool is not available on app state.")
         raise HTTPException(status_code=503, detail="Database connection is not available.")
     return request.app.state.db_pool
 
-# --- Refactored Database Functions ---
-# These functions now accept a `db_pool` argument instead of relying on a global variable.
+# --- Optimized Chat History Functions ---
+
+async def get_chat_history_optimized(session_id: str, db_pool: asyncpg.Pool, limit: int = 3):
+    """
+    Optimized chat history retrieval with reduced context and better caching.
+    Returns only the last 'limit' messages for efficiency.
+    """
+    try:
+        async with db_pool.acquire() as conn:
+            s_id = str(session_id)
+            # Get only the last few messages, ordered by timestamp desc
+            rows = await conn.fetch("""
+                SELECT message FROM message_store 
+                WHERE session_id = $1 
+                ORDER BY id DESC 
+                LIMIT $2
+            """, s_id, limit)
+            
+            if not rows:
+                return []
+            
+            # Parse messages and reverse to get chronological order
+            messages = []
+            for row in reversed(rows):  # Reverse to get chronological order
+                try:
+                    message_data = json.loads(row['message'])
+                    content = message_data.get('data', {}).get('content', '')
+                    if content.strip():  # Only add non-empty messages
+                        messages.append(content.strip())
+                except (json.JSONDecodeError, KeyError) as e:
+                    print(f"Warning: Could not parse message: {e}")
+                    continue
+            
+            return messages
+            
+    except Exception as e:
+        print(f"Error retrieving chat history: {e}")
+        return []
+
+def extract_date_robust(query: str, today: str) -> tuple[str, str]:
+    """
+    Robust date extraction using regex patterns and logical rules.
+    Returns (extracted_date, cleaned_query).
+    """
+    query_lower = query.lower().strip()
+    cleaned_query = query
+    
+    try:
+        today_dt = datetime.strptime(today, "%Y-%m-%d")
+    except ValueError:
+        today_dt = datetime.now()
+    
+    # Pattern matching with extraction
+    date_patterns = [
+        # Relative dates
+        (r'\btoday\b', 0, 'today'),
+        (r'\byesterday\b', -1, 'yesterday'),
+        (r'\btomorrow\b', 1, 'tomorrow'),
+        
+        # Recent/latest patterns
+        (r'\b(recent|latest|current)\b.*\bnews\b', -7, 'recent'),
+        (r'\b(recent|latest|trending)\b', -1, 'trending'),
+        
+        # Specific time periods
+        (r'\blast\s+(\d+)\s+days?\b', lambda m: -int(m.group(1)), 'last_days'),
+        (r'\b(\d+)\s+days?\s+ago\b', lambda m: -int(m.group(1)), 'days_ago'),
+        (r'\blast\s+week\b', -7, 'last_week'),
+        (r'\blast\s+month\b', -30, 'last_month'),
+        
+        # Specific date formats
+        (r'\b(\d{4})-(\d{1,2})-(\d{1,2})\b', 'specific_date', 'iso_date'),
+        (r'\b(\d{1,2})/(\d{1,2})/(\d{4})\b', 'specific_date', 'us_date'),
+        (r'\b(\d{1,2})-(\d{1,2})-(\d{4})\b', 'specific_date', 'dash_date'),
+    ]
+    
+    extracted_date = "None"
+    
+    for pattern, offset_or_handler, pattern_type in date_patterns:
+        match = re.search(pattern, query_lower)
+        if match:
+            if pattern_type in ['specific_date']:
+                # Handle specific date formats
+                if pattern_type == 'iso_date':
+                    year, month, day = int(match.group(1)), int(match.group(2)), int(match.group(3))
+                elif pattern_type in ['us_date', 'dash_date']:
+                    month, day, year = int(match.group(1)), int(match.group(2)), int(match.group(3))
+                
+                try:
+                    specific_date = datetime(year, month, day)
+                    extracted_date = specific_date.strftime("%Y%m%d")
+                except ValueError:
+                    continue  # Invalid date, try next pattern
+            
+            elif callable(offset_or_handler):
+                # Handle dynamic offsets (e.g., "last 5 days")
+                days_offset = offset_or_handler(match)
+                target_date = today_dt + timedelta(days=days_offset)
+                extracted_date = target_date.strftime("%Y%m%d")
+            
+            else:
+                # Handle fixed offsets
+                target_date = today_dt + timedelta(days=offset_or_handler)
+                extracted_date = target_date.strftime("%Y%m%d")
+            
+            # Clean the matched pattern from query
+            cleaned_query = re.sub(pattern, '', query, flags=re.IGNORECASE).strip()
+            cleaned_query = re.sub(r'\s+', ' ', cleaned_query)  # Remove extra spaces
+            
+            break  # Use first match found
+    
+    # Special handling for quarterly/annual requests
+    if re.search(r'\b(quarter|quarterly|q[1-4]|annual|yearly)\b', query_lower):
+        extracted_date = "None"
+    
+    # If no date found but asking about "news" without time context, assume recent
+    if extracted_date == "None" and re.search(r'\bnews\b', query_lower) and not re.search(r'\b(upcoming|future|next|will)\b', query_lower):
+        target_date = today_dt + timedelta(days=-3)  # Last 3 days for general news
+        extracted_date = target_date.strftime("%Y%m%d")
+        
+    return extracted_date, cleaned_query
+
+def is_followup_question(query: str, chat_history: list[str]) -> bool:
+    """
+    Determine if the query is a follow-up question that needs memory context.
+    """
+    if not chat_history:
+        return False
+        
+    query_lower = query.lower().strip()
+    
+    # Clear indicators of follow-up questions
+    followup_indicators = [
+        # Pronouns and references
+        r'\b(it|this|that|they|them|its|their)\b',
+        r'\b(the company|the stock|the news)\b',
+        r'\b(what about|how about|tell me more)\b',
+        
+        # Continuation words
+        r'\b(also|additionally|furthermore|moreover)\b',
+        r'\b(and what|what else|anything else)\b',
+        
+        # Comparative references
+        r'\b(compared to|versus|vs\.?|difference)\b',
+        r'\b(better than|worse than|similar to)\b',
+        
+        # Context-dependent questions
+        r'\b(why|how|when|where|who)\b.*\b(this|that|it)\b',
+        r'\bwhat.*\b(impact|effect|result|outcome)\b',
+        
+        # Short questions that likely need context
+        r'^\b(yes|no|ok|sure|thanks?|please)\b',
+        r'^\w{1,3}\?$',  # Very short questions like "Why?", "How?"
+    ]
+    
+    # Check for follow-up indicators
+    for indicator in followup_indicators:
+        if re.search(indicator, query_lower):
+            return True
+    
+    # If query is very short and chat history exists, likely a follow-up
+    if len(query_lower.split()) <= 3 and chat_history:
+        return True
+        
+    # Check if query contains company/stock names mentioned in recent history
+    recent_history = ' '.join(chat_history[-2:]).lower()  # Last 2 messages
+    query_words = set(query_lower.split())
+    history_words = set(recent_history.split())
+    
+    # If significant word overlap, might be follow-up
+    overlap = query_words.intersection(history_words)
+    if len(overlap) >= 2:  # At least 2 common words
+        return True
+        
+    return False
+
+# --- Combined LLM Processing Function ---
+
+async def combined_preprocessing(query: str, chat_history: list[str], today: str) -> dict:
+    """
+    Combined LLM call that handles validation, memory contextualization, and processing.
+    Only uses memory chain for follow-up questions.
+    """
+    
+    # First, do robust date extraction (no LLM needed)
+    extracted_date, cleaned_query = extract_date_robust(query, today)
+    
+    # Check if this is a follow-up question
+    is_followup = is_followup_question(query, chat_history)
+    
+    # Prepare the combined prompt
+    if is_followup and chat_history:
+        # For follow-up questions, include memory contextualization
+        combined_prompt = """
+You are a financial assistant. Analyze this user query and provide a JSON response.
+
+Context: This appears to be a follow-up question based on chat history.
+
+User Query: "{query}"
+Recent Chat History: {chat_history}
+Today's Date: {today}
+
+Tasks:
+1. VALIDATE: Is this query related to Indian stock market, finance, economics, elections, or companies? 
+2. REFORMULATE: Create a standalone question that incorporates relevant context from chat history
+3. CLEAN: Ensure the reformulated query is complete and grammatically correct
+
+Return JSON format:
+{{
+    "valid": 1 or 0,
+    "reformulated_query": "standalone question with context",
+    "is_followup": true,
+    "needs_memory": true
+}}
+
+Guidelines:
+- If user mentions "it", "this", "that", "the company", "the stock" - identify from context
+- Include specific company/stock names from history if referenced
+- Make the reformulated query understandable without chat history
+- For validation: 1=valid financial query, 0=not related to finance/markets
+"""
+        
+        input_data = {
+            "query": query,
+            "chat_history": chat_history[-3:],  # Last 3 messages only
+            "today": today
+        }
+    
+    else:
+        # For standalone questions, skip memory contextualization
+        combined_prompt = """
+You are a financial assistant. Analyze this user query and provide a JSON response.
+
+User Query: "{query}"
+Today's Date: {today}
+
+Tasks:
+1. VALIDATE: Is this query related to Indian stock market, finance, economics, elections, or companies?
+2. PROCESS: Clean the query and ensure it's grammatically correct
+
+Return JSON format:
+{{
+    "valid": 1 or 0,
+    "reformulated_query": "{query}",
+    "is_followup": false,
+    "needs_memory": false
+}}
+
+Guidelines:
+- If asking for "latest news" about any company, consider valid
+- If asking about "current news" or "trending news", consider valid  
+- For validation: 1=valid financial query, 0=not related to finance/markets
+- Keep reformulated_query same as original for standalone questions
+"""
+        
+        input_data = {
+            "query": query,
+            "today": today
+        }
+    
+    # Create the LLM chain
+    prompt_template = PromptTemplate(
+        template=combined_prompt,
+        input_variables=list(input_data.keys())
+    )
+    
+    chain = prompt_template | GPT4o_mini | JsonOutputParser()
+    
+    try:
+        # Single LLM call to handle everything
+        with get_openai_callback() as cb:
+            result = await chain.ainvoke(input_data)
+        
+        # Add our robust date extraction and token count
+        result["extracted_date"] = extracted_date
+        result["cleaned_query"] = cleaned_query
+        result["tokens_used"] = cb.total_tokens
+        
+        print(f"DEBUG: Combined preprocessing completed in single LLM call")
+        print(f"DEBUG: Valid: {result.get('valid')}, Follow-up: {result.get('is_followup')}")
+        print(f"DEBUG: Date extracted: {extracted_date}")
+        print(f"DEBUG: Tokens used: {cb.total_tokens}")
+        
+        return result
+        
+    except Exception as e:
+        print(f"ERROR in combined_preprocessing: {e}")
+        # Fallback response
+        return {
+            "valid": 1,  # Assume valid to be safe
+            "reformulated_query": query,
+            "is_followup": is_followup,
+            "needs_memory": is_followup,
+            "extracted_date": extracted_date,
+            "cleaned_query": cleaned_query,
+            "tokens_used": 0
+        }
+
+# --- Database Functions (Optimized) ---
 
 async def insert_post1(df: pd.DataFrame, db_pool: asyncpg.Pool):
-    """
-    Asynchronously inserts a DataFrame into the source_data table using a connection pool.
-    This is a non-blocking version that accepts an injected pool.
-    """
+    """Optimized bulk insert with better error handling."""
+    if df.empty:
+        return
+        
     async with db_pool.acquire() as conn:
         async with conn.transaction():
-            for index, row in df.iterrows():
-                try:
-                    exists = await conn.fetchval(
-                        "SELECT 1 FROM source_data WHERE source_url = $1",
-                        row['source_url']
-                    )
-                    if not exists:
-                        await conn.execute("""
-                            INSERT INTO source_data (source_url, image_url, heading, title, description, source_date)
-                            VALUES ($1, $2, $3, $4, $5, $6)
-                        """,
+            # Batch check for existing URLs
+            urls_to_check = df['source_url'].tolist()
+            existing_urls = await conn.fetch(
+                "SELECT source_url FROM source_data WHERE source_url = ANY($1)",
+                urls_to_check
+            )
+            existing_urls_set = {row['source_url'] for row in existing_urls}
+            
+            # Prepare new rows for bulk insert
+            new_rows = []
+            for _, row in df.iterrows():
+                if row['source_url'] not in existing_urls_set:
+                    new_rows.append((
                         row['source_url'], row.get('image_url'), row['heading'],
-                        row['title'], row['description'], row['source_date'])
-                except Exception as e:
-                    print(f"Error inserting row for URL {row['source_url']}: {e}")
-    print(f"DEBUG: Asynchronous insert for {len(df)} rows completed.")
-
-
-async def insert_red(df: pd.DataFrame, db_pool: asyncpg.Pool):
-    """Asynchronously inserts Reddit data from a DataFrame into the source_data table."""
-    async with db_pool.acquire() as conn:
-        for index, row in df.iterrows():
-            exists = await conn.fetchval("SELECT 1 FROM source_data WHERE source_url = $1", row['source_url'])
-            if not exists:
-                await conn.execute("""
+                        row['title'], row['description'], row['source_date']
+                    ))
+            
+            if new_rows:
+                await conn.executemany("""
                     INSERT INTO source_data (source_url, image_url, heading, title, description, source_date)
                     VALUES ($1, $2, $3, $4, $5, $6)
-                """, row['source_url'], None, None, row['title'], row['description'], row['source_date'])
+                """, new_rows)
+                print(f"DEBUG: Bulk inserted {len(new_rows)} new rows")
 
+async def insert_red(df: pd.DataFrame, db_pool: asyncpg.Pool):
+    """Optimized Reddit data insertion."""
+    if df.empty:
+        return
+        
+    async with db_pool.acquire() as conn:
+        async with conn.transaction():
+            for _, row in df.iterrows():
+                exists = await conn.fetchval("SELECT 1 FROM source_data WHERE source_url = $1", row['source_url'])
+                if not exists:
+                    await conn.execute("""
+                        INSERT INTO source_data (source_url, image_url, heading, title, description, source_date)
+                        VALUES ($1, $2, $3, $4, $5, $6)
+                    """, row['source_url'], None, None, row['title'], row['description'], row['source_date'])
 
 async def insert_credit_usage(user_id: int, plan_id: int, credit_used: float, db_pool: asyncpg.Pool):
-    """Asynchronously inserts credit usage data using the connection pool."""
+    """Optimized credit usage insertion."""
     current_time = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + '+00:00'
     async with db_pool.acquire() as conn:
         await conn.execute("""
             INSERT INTO credit_usage (user_id, plan_id, credit_used, "createdAt", "updatedAt")
             VALUES ($1, $2, $3, $4, $5)
         """, user_id, plan_id, credit_used, current_time, current_time)
-    print(f"SUCCESS: Token usage captured: {credit_used * 1000}")
-
 
 async def store_into_db(pid: int, ph_id: int, result_json: dict, db_pool: asyncpg.Pool):
-    """Asynchronously stores data into the streamingData table using the connection pool."""
+    """Optimized data storage."""
     result_json_str = json.dumps(result_json)
     async with db_pool.acquire() as conn:
         await conn.execute("""
@@ -142,93 +438,20 @@ async def store_into_db(pid: int, ph_id: int, result_json: dict, db_pool: asyncp
             VALUES ($1, $2, $3)
         """, pid, ph_id, result_json_str)
 
-
-async def query_validate(query: str, session_id: str, db_pool: asyncpg.Pool):
-    """Validates a query against chat history using the provided DB pool."""
-    res_prompt = """
-    You are a highly skilled indian stock market investor and financial advisor. Your task is to validate whether a given question is related to the stock market or finance or elections or economics or general private listed companies. Additionally, if the new question is a follow-up then only use chat history to determine its validity.
-    If question is asking about latest news about any company or current news or just company or trending news of any company consider it as valid question.
-    Given question : {q}
-    chat history : {list_qs}
-    Output the result in JSON format:
-    "valid": Return 1 if the question is valid, otherwise return 0.
-    """
-    R_prompt = PromptTemplate(template=res_prompt, input_variables=["list_qs", "q"])
-    chain = R_prompt | GPT4o_mini | JsonOutputParser()
-
-    messages = []
-    async with db_pool.acquire() as conn:
-        s_id = str(session_id)
-        rows = await conn.fetch("SELECT message FROM message_store WHERE session_id = $1", s_id)
-        # The 'message' column contains JSON strings, so we extract them.
-        messages = [row['message'] for row in rows]
-
-    # FIX: Parse the JSON string into a dictionary before accessing keys.
-    chat = [json.loads(row)['data']['content'] for row in messages[-2:]]
-    m_chat = [json.loads(row)['data']['content'] for row in messages[-4:]]
-    h_chat = [json.loads(row)['data']['content'] for row in messages[-6:]]
-
-
-    with get_openai_callback() as cb:
-        input_data = {"list_qs": chat, "q": query}
-        res = await chain.ainvoke(input_data)
-
-    return res['valid'], cb.total_tokens, m_chat, h_chat
-
-# --- Helper Functions (No DB interaction) ---
-
-async def llm_get_date(user_query):
-    today = datetime.now().strftime("%Y-%m-%d")
-    date_prompt = """
-        Today's date is {today}.
-        Here's the user query: {user_query}
-        Using the above given date for context, figure out which date the user wants data for.
-        If the user query mentions "today" ,then use the above given today's date. Output the date in the format YYYYMMDD.
-        If the user query mentions "yesterday"or "trending",output 1 day back date from todays date in YYYYMMDD.
-        If the user is asking about recently/latest news in user query .output 7 days back date from todays date in YYYYMMDD.
-        If the user is aksing about specifc time period in user query from past. output the start date the user mentioned in YYYYMMDD format.
-        If the user doesnot mention any date in user query or asking about upcoming date outpute date as  "None" and If the user mention anything about quater and year output date as "None".
-
-        Also, remove time-related references from the user query, ensuring it remains grammatically correct.
-
-        Format your output as:
-        YYYYMMDD,modified_user_query
-        """
-    D_prompt = PromptTemplate(template=date_prompt, input_variables=["today","user_query"])
-    llm_chain_date= LLMChain(prompt=D_prompt, llm=llm_date)
-    response=await llm_chain_date.arun(today=today,user_query=user_query)
-    response = response.strip()
-    date, general_user_query = split_input(response)
-    return date,general_user_query,today
-
-
-def split_input(input_string):
-    parts = input_string.split(',', 1)
-    date = parts[0].strip()
-    general_user_query = parts[1].strip() if len(parts) > 1 else ""
-    return date, general_user_query
-
+# --- Helper Functions ---
 
 def count_tokens(text, model_name="gpt-4o-mini"):
+    """Optimized token counting."""
     encoding = tiktoken.encoding_for_model(model_name)
     tokens = encoding.encode(text)
     return len(tokens)
 
-
-async def memory_chain(query,m_chat):
-    contextualize_q_system_prompt = """Given a chat history and the user question \
-    which might reference context in the chat history, formulate a standalone question if needed include time/date part also based on user previous question.\
-    which can be understood without the chat history. Do NOT answer the question,
-    If user question contains only stock name or stock ticker reformulate question as recent news of that stock.
-    If user question contains current news / recent trends reformulate question as todays market news or trends.
-    just reformulate it if needed and if the user question doesnt have any relevancy to chat history return as it is. 
-    chat history:{chat_his}
-    user question:{query}
-    """
-    c_q_prompt=PromptTemplate(template=contextualize_q_system_prompt,input_variables=['chat_his','query'])
-    memory_chain=LLMChain(prompt=c_q_prompt,llm=llm_date)
-    res=await memory_chain.arun(query=query,chat_his=m_chat)
-    return res
+def split_input(input_string):
+    """Legacy function - kept for compatibility."""
+    parts = input_string.split(',', 1)
+    date = parts[0].strip()
+    general_user_query = parts[1].strip() if len(parts) > 1 else ""
+    return date, general_user_query
 
 # --- API Endpoints ---
 
@@ -242,110 +465,193 @@ async def web_rag_mix(
     prompt_history_id: int = Query(...),
     user_id: int = Query(...),
     plan_id: int = Query(...),
-    db_pool: asyncpg.Pool = Depends(get_db_pool)  # Dependency Injection
+    db_pool: asyncpg.Pool = Depends(get_db_pool)
 ):
-    query = request.query
-    valid, v_tokens, m_chat, h_chat = await query_validate(query, str(session_id), db_pool)
-
-    matched_docs, memory_query, t_day, his, links = '', '', '', '', []
+    """Optimized web RAG endpoint with combined LLM processing."""
+    
+    query = request.query.strip()
+    start_time = time.time()
+    
+    # Get today's date
+    today = datetime.now().strftime("%Y-%m-%d")
+    
+    # Parallel execution: Get chat history while doing other prep
+    chat_history_task = asyncio.create_task(
+        get_chat_history_optimized(str(session_id), db_pool, limit=3)
+    )
+    
+    # Wait for chat history and do combined preprocessing
+    chat_history = await chat_history_task
+    
+    print(f"DEBUG: Chat history retrieved: {len(chat_history)} messages")
+    
+    # Single combined LLM call for all preprocessing
+    preprocessing_result = await combined_preprocessing(query, chat_history, today)
+    
+    preprocessing_time = time.time() - start_time
+    print(f"DEBUG: Preprocessing completed in {preprocessing_time:.2f}s")
+    
+    # Extract results
+    valid = preprocessing_result.get("valid", 0)
+    reformulated_query = preprocessing_result.get("reformulated_query", query)
+    extracted_date = preprocessing_result.get("extracted_date", "None")
+    is_followup = preprocessing_result.get("is_followup", False)
+    preprocessing_tokens = preprocessing_result.get("tokens_used", 0)
+    
+    matched_docs = ""
+    links = []
+    
     if valid != 0:
-        original_query = query
-        memory_query = await memory_chain(query, m_chat)
-
-        print(f"DEBUG: Original User Query: '{original_query}'")
-        print(f"DEBUG: Reformulated Memory Query: '{memory_query}'")
-
-        date, user_q, t_day = await llm_get_date(memory_query)
-        pinecone_results_with_scores = vs.similarity_search_with_score(original_query, k=15)
-
+        print(f"DEBUG: Processing valid query - Follow-up: {is_followup}")
+        print(f"DEBUG: Original: '{query}'")
+        print(f"DEBUG: Reformulated: '{reformulated_query}'")
+        print(f"DEBUG: Date: {extracted_date}")
+        
+        # Use reformulated query for search
+        search_query = reformulated_query
+        
+        # Get Pinecone results
+        pinecone_start = time.time()
+        pinecone_results_with_scores = vs.similarity_search_with_score(search_query, k=15)
+        pinecone_time = time.time() - pinecone_start
+        print(f"DEBUG: Pinecone search completed in {pinecone_time:.2f}s")
+        
+        # Check sufficiency and potentially trigger Brave search
         from api.news_rag.scoring_service import scoring_service
-        sufficiency_score = scoring_service.assess_context_sufficiency(original_query, pinecone_results_with_scores)
-
+        sufficiency_score = scoring_service.assess_context_sufficiency(search_query, pinecone_results_with_scores)
+        
         web_passages = []
         if sufficiency_score < CONTEXT_SUFFICIENCY_THRESHOLD:
-            print(f"DEBUG: Sufficiency score {sufficiency_score:.2f} is below threshold. Triggering Brave search.")
-            articles, df = await get_brave_results(memory_query)
+            print(f"DEBUG: Sufficiency {sufficiency_score:.2f} below threshold. Triggering Brave search.")
+            brave_start = time.time()
+            articles, df = await get_brave_results(search_query)
+            brave_time = time.time() - brave_start
+            print(f"DEBUG: Brave search completed in {brave_time:.2f}s")
+            
             if articles and df is not None and not df.empty:
-                await insert_post1(df, db_pool) # Pass the pool
-                # This section should be updated to properly handle document creation and upserting
-                # For now, it's assumed to populate `web_passages` correctly.
+                await insert_post1(df, db_pool)
+                # Convert articles to passages format
+                web_passages = [
+                    {
+                        "text": f"Title: {article.get('title', '')}\nDescription: {article.get('description', '')}",
+                        "metadata": {
+                            "title": article.get('title', ''),
+                            "link": article.get('source_url', ''),
+                            "publication_date": article.get('source_date', ''),
+                            "snippet": article.get('description', '')
+                        }
+                    }
+                    for article in articles
+                ]
         else:
-            print(f"DEBUG: Sufficiency score {sufficiency_score:.2f} is sufficient. Skipping Brave search.")
-
-        pinecone_passages = [{"text": doc.page_content, "metadata": {**doc.metadata, "score": score}} for doc, score in pinecone_results_with_scores]
+            print(f"DEBUG: Sufficiency {sufficiency_score:.2f} sufficient. Using existing data.")
+        
+        # Combine and rank all passages
+        pinecone_passages = [
+            {
+                "text": doc.page_content,
+                "metadata": {**doc.metadata, "score": score}
+            }
+            for doc, score in pinecone_results_with_scores
+        ]
+        
         all_passages_map = {}
         for p in web_passages + pinecone_passages:
             link = p["metadata"].get("link") or f"nolink_{hash(p['text'])}"
-            if link not in all_passages_map: all_passages_map[link] = p
+            if link not in all_passages_map:
+                all_passages_map[link] = p
+        
         all_passages = list(all_passages_map.values())
+        
         if all_passages:
-            reranked_passages = await scoring_service.score_and_rerank_passages(question=memory_query, passages=all_passages)
+            ranking_start = time.time()
+            reranked_passages = await scoring_service.score_and_rerank_passages(
+                question=search_query, 
+                passages=all_passages
+            )
+            ranking_time = time.time() - ranking_start
+            print(f"DEBUG: Passage ranking completed in {ranking_time:.2f}s")
+            
             matched_docs = scoring_service.create_enhanced_context(reranked_passages)
-            links = [p["metadata"]["link"] for p in reranked_passages if "link" in p.get("metadata", {})]
+            links = [
+                p["metadata"].get("link") 
+                for p in reranked_passages[:10] 
+                if p.get("metadata", {}).get("link")
+            ]
         else:
             matched_docs, links = "", []
-        his = h_chat
 
+    total_prep_time = time.time() - start_time
+    print(f"DEBUG: Total preprocessing time: {total_prep_time:.2f}s")
+
+    # Streaming response
     res_prompt = """
-     News Articles : {bing}
-    chat history : {history}
-    Today date:{date}
+    News Articles: {bing}
+    Chat history: {history}
+    Today date: {date}
     
-    use the date provided in the metadata to answer the user query if the user is asking in specific time periods.
-    If the same question {input} present in chat_history ignore that answer present in chat history dont consider that answer while generating final answer.
-    give priority to latest date provided in metadata while answering user query.
+    Use the date provided in the metadata to answer the user query if the user is asking in specific time periods.
+    Give priority to latest date provided in metadata while answering user query.
     
     I am a financial markets super-assistant trained to function like Perplexity.ai — with enhanced domain intelligence and deep search comprehension.
     I am connected to a real-time web search + scraping engine that extracts live content from verified financial websites, regulatory portals, media publishers, and government sources.
     I serve as an intelligent financial answer engine, capable of understanding and resolving even the most **complex multi-part queries**, returning **accurate, structured, and sourced answers**.
-    \n---\n
-    PRIMARY MISSION:\n
-    Deliver **bang-on**, complete, real-time financial answers about:\n
-    - Companies (ownership, results, ratios, filings, news, insiders)\n
-    - Stocks (live prices, historicals, volumes, charts, trends)\n
-    - People (CEOs, founders, investors, economists, politicians)\n
-    - Mutual Funds & ETFs (returns, risk, AUM, portfolio, comparisons)\n
-    - Regulators & Agencies (SEBI, RBI, IRDAI, MCA, MoF, CBIC, etc.)\n
-    - Government (policies, circulars, appointments, reforms, speeches)\n
-    - Macro Indicators (GDP, repo rate, inflation, tax policy, liquidity)\n
-    - Sectoral Data (FMCG, BFSI, Infra, IT, Auto, Pharma, Realty, etc.)\n
-    - Financial Concepts (with real-world context and current examples)\n
-    \n---\n
-    COMPLEX QUERY UNDERSTANDING:\n
-    You are optimized to handle **simple to deeply complex queries**.\n
-    \n---\n
-    INTELLIGENT BEHAVIOR GUIDELINES:\n
-    1. **Bang-On Precision**: Always provide factual, up-to-date data from verified sources. Never hallucinate.\n
-    2. **Break Down Complex Queries**: Decompose long or layered queries. Use intelligent reasoning to structure the answer.\n
-    3. **Research Assistant Tone**: Neutral, professional, data-first. No assumptions, no opinions. Cite all key facts.\n
-    4. **Source-Based**: Every metric or statement must include a credible source: (Source: [Link Title or Description](URL)).\n
-    5. **Fresh + Archived Data**: Always prioritize today's/latest info. For long-term trends or legacy data, explicitly state the timeframe.\n
-    6. **Answer Structuring**: Start with a concise summary. Use bullet points, tables, and subheadings.\n
-    \n---\n
-    STRICT LIMITATIONS:\n
-    - Never make up data.\n
-    - No financial advice, tips, or trading guidance.\n
-    - No generic phrases like "As an AI, I…".\n
-    - No filler or irrelevant content — answer only the query's intent.\n
-    **DONT PROVIDE ANY EXTRA INFORMATION APART FROM USER QUESTION AND ANSWER SHOULD BE IN PROPER MARKDOWN FORMATTING**
-    
+
+    PRIMARY MISSION:
+    Deliver **bang-on**, complete, real-time financial answers about:
+    - Companies (ownership, results, ratios, filings, news, insiders)
+    - Stocks (live prices, historicals, volumes, charts, trends)  
+    - People (CEOs, founders, investors, economists, politicians)
+    - Mutual Funds & ETFs (returns, risk, AUM, portfolio, comparisons)
+    - Regulators & Agencies (SEBI, RBI, IRDAI, MCA, MoF, CBIC, etc.)
+    - Government (policies, circulars, appointments, reforms, speeches)
+    - Macro Indicators (GDP, repo rate, inflation, tax policy, liquidity)
+    - Sectoral Data (FMCG, BFSI, Infra, IT, Auto, Pharma, Realty, etc.)
+    - Financial Concepts (with real-world context and current examples)
+
+    INTELLIGENT BEHAVIOR GUIDELINES:
+    1. **Bang-On Precision**: Always provide factual, up-to-date data from verified sources. Never hallucinate.
+    2. **Break Down Complex Queries**: Decompose long or layered queries. Use intelligent reasoning to structure the answer.
+    3. **Research Assistant Tone**: Neutral, professional, data-first. No assumptions, no opinions. Cite all key facts.
+    4. **Source-Based**: Every metric or statement must include a credible source.
+    5. **Fresh + Archived Data**: Always prioritize today's/latest info. For long-term trends, explicitly state the timeframe.
+    6. **Answer Structuring**: Start with a concise summary. Use bullet points, tables, and subheadings.
+
+    STRICT LIMITATIONS:
+    - Never make up data
+    - No financial advice, tips, or trading guidance
+    - No generic phrases like "As an AI, I…"
+    - No filler or irrelevant content — answer only the query's intent
+    - Answer should be in proper markdown formatting
+
     The user has asked the following question: {input}
     """
-    R_prompt = PromptTemplate(template=res_prompt, input_variables=["bing","input","date","history"])
+    
+    R_prompt = PromptTemplate(
+        template=res_prompt, 
+        input_variables=["bing", "input", "date", "history"]
+    )
     ans_chain = R_prompt | llm_stream
 
-    async def generate_chat_res(matched_docs, query, t_day, history):
+    async def generate_chat_res(matched_docs, query, today, history):
         if valid == 0:
-            error_message = "The search query is not related to Indian financial markets..."
+            error_message = "The search query is not related to Indian financial markets, companies, economics, or finance. Please ask questions about stocks, companies, market trends, financial news, or economic developments."
             yield error_message.encode("utf-8")
             return
 
         final_response = ""
+        response_tokens = 0
+        
         try:
-            prompt_text = f"{matched_docs}\n{history}\n{query}\n{t_day}"
+            # Calculate prompt tokens
+            prompt_text = f"{matched_docs}\n{history}\n{query}\n{today}"
             prompt_tokens = count_tokens(prompt_text)
-
-            async for event in ans_chain.astream_events({"bing": matched_docs, "history": history, "input": query, "date": t_day}, version="v1"):
+            
+            # Stream the response
+            async for event in ans_chain.astream_events(
+                {"bing": matched_docs, "history": history, "input": query, "date": today}, 
+                version="v1"
+            ):
                 if event["event"] == "on_chat_model_stream":
                     content = event["data"]["chunk"].content
                     if content:
@@ -353,22 +659,30 @@ async def web_rag_mix(
                         yield content.encode("utf-8")
                         await asyncio.sleep(0.01)
 
+            # Calculate total tokens and store usage
             completion_tokens = count_tokens(final_response)
-            total_tokens = prompt_tokens + completion_tokens
+            total_tokens = preprocessing_tokens + prompt_tokens + completion_tokens
+            
             await insert_credit_usage(user_id, plan_id, total_tokens / 1000, db_pool)
             await store_into_db(session_id, prompt_history_id, {"links": links}, db_pool)
 
+            # Store conversation in history
             if final_response:
                 history_db = PostgresChatMessageHistory(str(session_id), psql_url)
-                history_db.add_user_message(memory_query)
+                history_db.add_user_message(reformulated_query if is_followup else query)
                 history_db.add_ai_message(final_response)
+
+            total_time = time.time() - start_time
+            print(f"DEBUG: Total request completed in {total_time:.2f}s")
 
         except Exception as e:
             print(f"ERROR: An error occurred during streaming: {e}")
             yield b"An error occurred while generating the response."
 
-    return StreamingResponse(generate_chat_res(matched_docs, memory_query, t_day, his), media_type="text/event-stream")
-
+    return StreamingResponse(
+        generate_chat_res(matched_docs, reformulated_query, today, chat_history), 
+        media_type="text/event-stream"
+    )
 
 @cmots_rag.post("/cmots_rag")
 async def cmots_only(
@@ -377,45 +691,79 @@ async def cmots_only(
     prompt_history_id: int = Query(...),
     user_id: int = Query(...),
     plan_id: int = Query(...),
-    db_pool: asyncpg.Pool = Depends(get_db_pool) # Dependency Injection
+    db_pool: asyncpg.Pool = Depends(get_db_pool)
 ):
-    query = request.query
-    valid, v_tokens, m_chat, h_chat = await query_validate(query, str(session_id), db_pool)
-
-    docs, his, memory_query, date = '', '', '', ''
+    """Optimized CMOTS RAG endpoint."""
+    
+    query = request.query.strip()
+    today = datetime.now().strftime("%Y-%m-%d")
+    
+    # Get chat history and do combined preprocessing
+    chat_history = await get_chat_history_optimized(str(session_id), db_pool, limit=3)
+    preprocessing_result = await combined_preprocessing(query, chat_history, today)
+    
+    # Extract results
+    valid = preprocessing_result.get("valid", 0)
+    reformulated_query = preprocessing_result.get("reformulated_query", query)
+    extracted_date = preprocessing_result.get("extracted_date", "None")
+    is_followup = preprocessing_result.get("is_followup", False)
+    preprocessing_tokens = preprocessing_result.get("tokens_used", 0)
+    
+    docs = ""
+    
     if valid != 0:
-        memory_query = await memory_chain(query, m_chat)
-        date, user_q, t_day = await llm_get_date(memory_query)
-        his = h_chat
         try:
-            filter_dict = {"date": {"$gte": int(date)}} if date != 'None' else None
-            results = vs.similarity_search_with_score(memory_query, k=10, filter=filter_dict)
-            docs = [doc[0].page_content for doc in results]
+            # Apply date filter if extracted
+            filter_dict = None
+            if extracted_date != 'None':
+                try:
+                    date_int = int(extracted_date)
+                    filter_dict = {"date": {"$gte": date_int}}
+                    print(f"DEBUG: Applying date filter: {filter_dict}")
+                except ValueError:
+                    print(f"DEBUG: Invalid date format: {extracted_date}")
+            
+            # Search vector store with reformulated query
+            results = vs.similarity_search_with_score(reformulated_query, k=10, filter=filter_dict)
+            docs = "\n\n".join([doc[0].page_content for doc in results])
+            print(f"DEBUG: Retrieved {len(results)} documents from vector store")
+            
         except Exception as e:
-            docs = None
-            print(f"An error occurred during vector search: {e}")
+            docs = ""
+            print(f"ERROR: Vector search failed: {e}")
 
     res_prompt = """
-    cmots news articles :{cmots} 
-    chat history : {history}
-    Today date:{date}
+    CMOTS news articles: {cmots} 
+    Chat history: {history}
+    Today date: {date}
+    
     You are a stock news and stock market information bot. 
     Using only the provided News Articles and chat history, respond to the user's inquiries in detail without omitting any context. 
+    Provide accurate, factual information based solely on the given articles.
+    Use proper markdown formatting for better readability.
+    
     The user has asked the following question: {input}
     """
-    question_prompt = PromptTemplate(input_variables=["history", "cmots", "date", "input"], template=res_prompt)
+    
+    question_prompt = PromptTemplate(
+        input_variables=["history", "cmots", "date", "input"], 
+        template=res_prompt
+    )
     ans_chain = question_prompt | llm_stream
 
     async def generate_chat_res(docs, history, input_query, date):
         if valid == 0:
-            error_message = "The search query is not related to Indian financial markets..."
+            error_message = "The search query is not related to Indian financial markets, companies, economics, or finance. Please ask questions about stocks, companies, market trends, financial news, or economic developments."
             yield error_message.encode("utf-8")
             return
 
         final_response = ""
         try:
             with get_openai_callback() as cb:
-                async for event in ans_chain.astream_events({"cmots": docs, "history": history, "input": input_query, "date": date}, version="v1"):
+                async for event in ans_chain.astream_events(
+                    {"cmots": docs, "history": history, "input": input_query, "date": date}, 
+                    version="v1"
+                ):
                     if event["event"] == "on_chat_model_stream":
                         content = event["data"]["chunk"].content
                         if content:
@@ -423,21 +771,26 @@ async def cmots_only(
                             yield content.encode("utf-8")
                             await asyncio.sleep(0.01)
                 
-                total_tokens = cb.total_tokens / 1000
-                await insert_credit_usage(user_id, plan_id, total_tokens, db_pool)
+                # Calculate total tokens
+                total_tokens = preprocessing_tokens + cb.total_tokens
+                await insert_credit_usage(user_id, plan_id, total_tokens / 1000, db_pool)
 
             await store_into_db(session_id, prompt_history_id, {"links": []}, db_pool)
 
+            # Store conversation in history
             if final_response:
                 history_db = PostgresChatMessageHistory(str(session_id), psql_url)
-                history_db.add_user_message(memory_query)
+                history_db.add_user_message(reformulated_query if is_followup else query)
                 history_db.add_ai_message(final_response)
 
         except Exception as e:
             print(f"ERROR: An error occurred during streaming: {e}")
             yield b"An error occurred while generating the response."
 
-    return StreamingResponse(generate_chat_res(docs, his, memory_query, date), media_type="text/event-stream")
+    return StreamingResponse(
+        generate_chat_res(docs, chat_history, reformulated_query, today), 
+        media_type="text/event-stream"
+    )
 
 
 @red_rag.post("/reddit_rag")
@@ -449,37 +802,76 @@ async def red_rag_bing(
     plan_id: int = Query(...),
     db_pool: asyncpg.Pool = Depends(get_db_pool)
 ):
-    query = request.query
-    valid, v_tokens, m_chat, h_chat = await query_validate(query, str(session_id), db_pool)
-
-    his, docs, memory_query, links = '', '', '', []
+    """Optimized Reddit RAG endpoint."""
+    
+    query = request.query.strip()
+    today = datetime.now().strftime("%Y-%m-%d")
+    
+    # Get chat history and do combined preprocessing
+    chat_history = await get_chat_history_optimized(str(session_id), db_pool, limit=3)
+    preprocessing_result = await combined_preprocessing(query, chat_history, today)
+    
+    # Extract results
+    valid = preprocessing_result.get("valid", 0)
+    reformulated_query = preprocessing_result.get("reformulated_query", query)
+    is_followup = preprocessing_result.get("is_followup", False)
+    preprocessing_tokens = preprocessing_result.get("tokens_used", 0)
+    
+    docs = ""
+    links = []
+    
     if valid != 0:
-        memory_query = await memory_chain(query, m_chat)
-        sr = await fetch_search_red(memory_query)
-        docs, df, links = await process_search_red(sr)
-        if df is not None and not df.empty:
-            await insert_red(df, db_pool) # Pass the pool
-        his = h_chat
+        try:
+            # Fetch and process Reddit data
+            sr = await fetch_search_red(reformulated_query)
+            docs, df, links = await process_search_red(sr)
+            
+            if df is not None and not df.empty:
+                await insert_red(df, db_pool)
+                print(f"DEBUG: Processed {len(df)} Reddit posts")
+                
+        except Exception as e:
+            print(f"ERROR: Reddit processing failed: {e}")
+            docs, links = "", []
 
     res_prompt = """
     Reddit articles: {context}
-    chat history : {history}
-    ...
+    Chat history: {history}
+    Today date: {date}
+    
+    You are a financial information assistant specializing in Reddit discussions and community insights.
+    Using the provided Reddit articles and chat history, respond to the user's inquiries with detailed analysis.
+    
+    Focus on:
+    - Community sentiment and discussions
+    - Popular opinions and debates
+    - Emerging trends mentioned by users
+    - Different perspectives from the Reddit community
+    
+    Use proper markdown formatting and cite relevant Reddit discussions.
+    
     The user has asked the following question: {input}        
     """
-    R_prompt = PromptTemplate(template=res_prompt, input_variables=["history", "context", "input"])
+    
+    R_prompt = PromptTemplate(
+        template=res_prompt, 
+        input_variables=["history", "context", "input", "date"]
+    )
     ans_chain = R_prompt | llm_stream
 
-    async def generate_chat_res(his, docs, query):
+    async def generate_chat_res(history, docs, query, date):
         if valid == 0:
-            error_message = "The search query is not related to Indian financial markets..."
+            error_message = "The search query is not related to Indian financial markets, companies, economics, or finance. Please ask questions about stocks, companies, market trends, financial news, or economic developments."
             yield error_message.encode("utf-8")
             return
 
         final_response = ""
         try:
             with get_openai_callback() as cb:
-                async for event in ans_chain.astream_events({"history": his, "context": docs, "input": query}, version="v1"):
+                async for event in ans_chain.astream_events(
+                    {"history": history, "context": docs, "input": query, "date": date}, 
+                    version="v1"
+                ):
                     if event["event"] == "on_chat_model_stream":
                         content = event["data"]["chunk"].content
                         if content:
@@ -487,22 +879,27 @@ async def red_rag_bing(
                             yield content.encode("utf-8")
                             await asyncio.sleep(0.01)
 
-                total_tokens = cb.total_tokens / 1000
-                await insert_credit_usage(user_id, plan_id, total_tokens, db_pool)
+                # Calculate total tokens
+                total_tokens = preprocessing_tokens + cb.total_tokens
+                await insert_credit_usage(user_id, plan_id, total_tokens / 1000, db_pool)
 
+            # Store links and conversation
             links_data = {"links": links}
             await store_into_db(session_id, prompt_history_id, links_data, db_pool)
 
             if final_response:
                 history_db = PostgresChatMessageHistory(str(session_id), psql_url)
-                history_db.add_user_message(query)
+                history_db.add_user_message(reformulated_query if is_followup else query)
                 history_db.add_ai_message(final_response)
 
         except Exception as e:
             print(f"ERROR: An error occurred during streaming: {e}")
             yield b"An error occurred while generating the response."
 
-    return StreamingResponse(generate_chat_res(his, docs, memory_query), media_type="text/event-stream")
+    return StreamingResponse(
+        generate_chat_res(chat_history, docs, reformulated_query, today), 
+        media_type="text/event-stream"
+    )
 
 
 @yt_rag.post("/yt_rag")
@@ -514,36 +911,74 @@ async def yt_rag_bing(
     plan_id: int = Query(...),
     db_pool: asyncpg.Pool = Depends(get_db_pool)
 ):
-    query = request.query
-    valid, v_tokens, m_chat, h_chat = await query_validate(query, str(session_id), db_pool)
-
-    his, data, memory_query, links = '', '', '', []
+    """Optimized YouTube RAG endpoint."""
+    
+    query = request.query.strip()
+    today = datetime.now().strftime("%Y-%m-%d")
+    
+    # Get chat history and do combined preprocessing
+    chat_history = await get_chat_history_optimized(str(session_id), db_pool, limit=3)
+    preprocessing_result = await combined_preprocessing(query, chat_history, today)
+    
+    # Extract results
+    valid = preprocessing_result.get("valid", 0)
+    reformulated_query = preprocessing_result.get("reformulated_query", query)
+    is_followup = preprocessing_result.get("is_followup", False)
+    preprocessing_tokens = preprocessing_result.get("tokens_used", 0)
+    
+    data = ""
+    links = []
+    
     if valid != 0:
-        memory_query = await memory_chain(query, m_chat)
-        # NOTE: Assumes get_yt_data_async and get_data are refactored to accept the db_pool for caching
-        links = await get_yt_data_async(memory_query) # Pass db_pool if needed
-        data = await get_data(links, db_pool) # Pass db_pool if needed
-        his = h_chat
+        try:
+            # Get YouTube data with reformulated query
+            links = await get_yt_data_async(reformulated_query)
+            data = await get_data(links, db_pool)
+            print(f"DEBUG: Retrieved {len(links)} YouTube videos")
+            
+        except Exception as e:
+            print(f"ERROR: YouTube processing failed: {e}")
+            data, links = "", []
 
     prompt = """
-    Given youtube transcripts {summaries}
-    chat_history {history}
-    ...
+    Given YouTube transcripts: {summaries}
+    Chat history: {history}
+    Today date: {date}
+    
+    You are a financial information assistant specializing in video content analysis.
+    Using the provided YouTube transcripts and chat history, respond to the user's inquiries with insights from video discussions.
+    
+    Focus on:
+    - Key insights from financial experts and analysts
+    - Market predictions and analysis from videos
+    - Educational content and explanations
+    - Different expert perspectives on financial topics
+    
+    Always mention the source videos when referencing specific information.
+    Use proper markdown formatting for better readability.
+    
     The user has asked the following question: {query}
     """
-    yt_prompt = PromptTemplate(template=prompt, input_variables=["history", "query", "summaries"])
+    
+    yt_prompt = PromptTemplate(
+        template=prompt, 
+        input_variables=["history", "query", "summaries", "date"]
+    )
     chain = yt_prompt | llm_stream
 
-    async def generate_chat_res(his, data, query):
+    async def generate_chat_res(history, data, query, date):
         if valid == 0:
-            error_message = "The search query is not related to Indian financial markets..."
+            error_message = "The search query is not related to Indian financial markets, companies, economics, or finance. Please ask questions about stocks, companies, market trends, financial news, or economic developments."
             yield error_message.encode("utf-8")
             return
 
         final_response = ""
         try:
             with get_openai_callback() as cb:
-                async for event in chain.astream_events({"history": his, "summaries": data, "query": query}, version="v1"):
+                async for event in chain.astream_events(
+                    {"history": history, "summaries": data, "query": query, "date": date}, 
+                    version="v1"
+                ):
                     if event["event"] == "on_chat_model_stream":
                         content = event["data"]["chunk"].content
                         if content:
@@ -551,19 +986,24 @@ async def yt_rag_bing(
                             yield content.encode("utf-8")
                             await asyncio.sleep(0.01)
 
-                total_tokens = cb.total_tokens / 1000
-                await insert_credit_usage(user_id, plan_id, total_tokens, db_pool)
+                # Calculate total tokens
+                total_tokens = preprocessing_tokens + cb.total_tokens
+                await insert_credit_usage(user_id, plan_id, total_tokens / 1000, db_pool)
 
+            # Store links and conversation
             links_data = {"links": links}
             await store_into_db(session_id, prompt_history_id, links_data, db_pool)
 
             if final_response:
                 history_db = PostgresChatMessageHistory(str(session_id), psql_url)
-                history_db.add_user_message(query)
+                history_db.add_user_message(reformulated_query if is_followup else query)
                 history_db.add_ai_message(final_response)
 
         except Exception as e:
             print(f"ERROR: An error occurred during streaming: {e}")
             yield b"An error occurred while generating the response."
 
-    return StreamingResponse(generate_chat_res(his, data, memory_query), media_type="text/event-stream")
+    return StreamingResponse(
+        generate_chat_res(chat_history, data, reformulated_query, today), 
+        media_type="text/event-stream"
+    )
