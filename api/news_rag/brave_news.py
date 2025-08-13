@@ -30,6 +30,8 @@ from psycopg2 import sql
 from datetime import datetime
 import time
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 
 from dotenv import load_dotenv
@@ -38,6 +40,7 @@ from config import (
     MAX_EMBEDDING_TOKENS,
     MAX_PAGES,
     MAX_SCRAPED_SOURCES,
+    SOURCE_CREDIBILITY_WEIGHTS,
     encoding,
     embeddings
 )
@@ -152,7 +155,7 @@ class BraveNews:
                 print(f"DEBUG: Skipping blacklisted domain: {url}")
                 return url, ""
         # --- END OF MODIFICATION ---
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=7)) as response: # Stricter 7-second timeout
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=3)) as response: # Stricter 3-second timeout
                 if response.status != 200:
                     print(f"WARNING: HTTP {response.status} for URL: {url}")
                     return url, ""
@@ -266,6 +269,63 @@ class BraveNews:
             print(f"ERROR: Brave API call failed for page {page_num}: {str(e)}")
             return {}, False
 
+    def _deduplicate_content(self, processed_items: list[dict], similarity_threshold: float = 0.9) -> list[dict]:
+        """
+        Deduplicates scraped content to avoid redundant information.
+        """
+        if len(processed_items) < 2:
+            return processed_items
+
+        contents = [item.get("full_webpage_content", "") for item in processed_items]
+        
+        # Filter out items with no content to avoid errors
+        valid_indices = [i for i, content in enumerate(contents) if content and len(content.split()) > 10]
+        if len(valid_indices) < 2:
+            return processed_items # Not enough content to compare
+
+        valid_contents = [contents[i] for i in valid_indices]
+
+        try:
+            vectorizer = TfidfVectorizer(stop_words='english', min_df=1)
+            tfidf_matrix = vectorizer.fit_transform(valid_contents)
+            cosine_sim = cosine_similarity(tfidf_matrix)
+
+            to_remove = set()
+            for i in range(len(cosine_sim)):
+                if i in to_remove:
+                    continue
+                for j in range(i + 1, len(cosine_sim)):
+                    if j in to_remove:
+                        continue
+                    if cosine_sim[i, j] > similarity_threshold:
+                        to_remove.add(j) # Mark the second item in a pair for removal
+            
+            deduplicated_items = []
+            for i, item in enumerate(processed_items):
+                if i not in valid_indices: # Always keep items that were not compared
+                    deduplicated_items.append(item)
+                    continue
+                
+                # Map back to original index
+                try:
+                    valid_content_index = valid_indices.index(i)
+                    if valid_content_index not in to_remove:
+                        deduplicated_items.append(item)
+                except ValueError:
+                    # This case handles items that were filtered out initially
+                    deduplicated_items.append(item)
+
+
+            num_removed = len(processed_items) - len(deduplicated_items)
+            if num_removed > 0:
+                print(f"DEBUG: Deduplicated {num_removed} items based on content similarity.")
+            
+            return deduplicated_items
+
+        except Exception as e:
+            print(f"WARNING: Deduplication failed: {e}. Returning original items.")
+            return processed_items
+
     async def search_and_scrape(self, query_term: str, max_pages: int = MAX_PAGES, max_sources: int = MAX_SCRAPED_SOURCES) -> list[dict]:
         """
         Optimized search and scrape with concurrent processing and better resource management.
@@ -310,6 +370,23 @@ class BraveNews:
             api_time = time.time() - start_time
             print(f"DEBUG: Brave API phase completed in {api_time:.2f}s, collected {len(all_extracted_content)} URLs")
 
+            # Phase 1.5: Prioritize sources based on credibility from config
+            def get_credibility(item):
+                link = item.get('link')
+                if not link:
+                    return SOURCE_CREDIBILITY_WEIGHTS.get("default", 0.5)
+                try:
+                    domain = urlparse(link).netloc.replace('www.', '')
+                    return SOURCE_CREDIBILITY_WEIGHTS.get(domain, SOURCE_CREDIBILITY_WEIGHTS.get("default", 0.5))
+                except Exception:
+                    return SOURCE_CREDIBILITY_WEIGHTS.get("default", 0.5)
+
+            all_extracted_content.sort(key=get_credibility, reverse=True)
+            print(f"DEBUG: Prioritized URLs based on credibility. Top 3 sources:")
+            for item in all_extracted_content[:3]:
+                print(f"  - {item.get('link')} (Credibility: {get_credibility(item)})")
+
+
             # Phase 2: Concurrent web scraping
             scrape_start = time.time()
             links_to_scrape = [item['link'] for item in all_extracted_content if item.get('link')]
@@ -339,7 +416,7 @@ class BraveNews:
         # Phase 3: Process and prepare final items with chunking
         # Phase 3: Process and prepare final items with SMART chunking
         processed_items = []
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=150)
 
         for item in all_extracted_content:
             link = item.get('link')
@@ -376,10 +453,13 @@ class BraveNews:
                     })
 
 
+        # Phase 4: Deduplicate content before returning
+        deduplicated_items = self._deduplicate_content(processed_items)
+
         total_time = time.time() - start_time
-        print(f"DEBUG: Total processing time: {total_time:.2f}s for {len(processed_items)} items")
+        print(f"DEBUG: Total processing time: {total_time:.2f}s for {len(deduplicated_items)} items (after deduplication)")
         
-        return processed_items
+        return deduplicated_items
 
     def _process_for_dataframe(self, processed_items: list[dict]) -> pd.DataFrame:
         """
