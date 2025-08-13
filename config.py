@@ -194,7 +194,11 @@ if index_name not in pinecone_client.list_indexes().names():
     )
 
 # This 'vs' object can be imported and used across the application.
-vs = PineconeVectorStore.from_existing_index(index_name, embeddings)
+vs = PineconeVectorStore.from_existing_index(
+    index_name, 
+    embeddings,
+    pool_threads=4
+)
 
 print("INFO: Pinecone vector store initialized.")
 

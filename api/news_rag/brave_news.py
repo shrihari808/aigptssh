@@ -83,6 +83,57 @@ class BraveNews:
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
             }
         }
+    
+    
+
+    async def get_snippets_only(self, query_term: str, max_results: int = 5) -> list[str]:
+        """
+        Ultra-fast function that gets only snippets from Brave API without any web scraping.
+        Returns formatted snippets ready for LLM consumption.
+        """
+        async with aiohttp.ClientSession(**self.session_config) as session:
+            brave_params = {
+                "q": query_term, 
+                "count": max_results, 
+                "country": "in",
+                "result_filter": "web,news", 
+                "freshness": "pm"
+            }
+            brave_headers = {
+                "Accept": "application/json", 
+                "X-Subscription-Token": self.brave_api_key
+            }
+
+            try:
+                async with session.get(
+                    self.BRAVE_API_BASE_URL, 
+                    headers=brave_headers, 
+                    params=brave_params,
+                    timeout=aiohttp.ClientTimeout(total=3)  # Very fast timeout
+                ) as response:
+                    if response.status != 200:
+                        print(f"ERROR: Brave API returned status {response.status}")
+                        return []
+                        
+                    brave_results = await response.json()
+                    
+                    # Extract snippets immediately
+                    snippets = []
+                    web_results = brave_results.get('web', {}).get('results', [])
+                    news_results = brave_results.get('news', {}).get('results', [])
+                    
+                    all_results = web_results + news_results
+                    
+                    for item in all_results[:max_results]:
+                        if item.get("title") and item.get("description"):
+                            snippet = f"**{item['title']}**\n{item['description']}\nSource: {item.get('url', 'N/A')}"
+                            snippets.append(snippet)
+                    
+                    return snippets
+                    
+            except Exception as e:
+                print(f"ERROR: Failed to get snippets: {str(e)}")
+                return []
 
     async def _fetch_and_parse_url_async(self, session: aiohttp.ClientSession, url: str) -> tuple[str, str]:
         """
@@ -380,6 +431,25 @@ class BraveNews:
         return pd.DataFrame()
 
 # --- Standalone Functions ---
+
+async def get_brave_snippets_only(query: str, max_results: int = 5) -> list[str]:
+        """
+        Standalone function to get only Brave API snippets without any scraping.
+        Ultra-fast for preliminary responses.
+        """
+        brave_api_key = os.getenv('BRAVE_API_KEY')
+        if not brave_api_key:
+            print("ERROR: BRAVE_API_KEY not found.")
+            return []
+        
+        searcher = BraveNews(brave_api_key)
+        try:
+            snippets = await searcher.get_snippets_only(query, max_results)
+            print(f"DEBUG: Retrieved {len(snippets)} snippets in <3s")
+            return snippets
+        except Exception as e:
+            print(f"ERROR in get_brave_snippets_only: {str(e)}")
+            return []
 
 async def get_brave_results(query: str, max_pages: int = MAX_PAGES, max_sources: int = MAX_SCRAPED_SOURCES):
     """

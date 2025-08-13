@@ -43,6 +43,7 @@ from config import (
     chroma_server_client, llm_date, llm_stream, vs, GPT4o_mini,
     PINECONE_INDEX_NAME, CONTEXT_SUFFICIENCY_THRESHOLD
 )
+from api.news_rag.brave_news import get_brave_snippets_only
 from langchain_chroma import Chroma
 
 # --- Functions imported from other modules ---
@@ -543,61 +544,84 @@ async def web_rag_mix(
     db_pool: asyncpg.Pool = Depends(get_db_pool)
 ):
     """
-    A robust, tiered response system that performs a single web search to avoid rate limiting and errors.
+    Optimized tiered response system with true <5s preliminary response.
     """
     query = request.query.strip()
     today = datetime.now().strftime("%Y-%m-%d")
 
+    # Get chat history (keep this fast)
     chat_history = await get_chat_history_optimized(str(session_id), db_pool, limit=3)
-    preprocessing_result = await combined_preprocessing(query, chat_history, today)
-
-    if preprocessing_result.get("valid", 0) == 0:
-        async def invalid_query_stream():
-            yield "The search query is not related to Indian financial markets...".encode("utf-8")
-        return StreamingResponse(invalid_query_stream(), media_type="text/event-stream")
-
-    reformulated_query = preprocessing_result.get("reformulated_query", query)
-
+    
+    # Skip heavy preprocessing for preliminary response
+    reformulated_query = query  # Use original query initially
+    
     async def tiered_stream_generator():
         preliminary_prompt = PromptTemplate.from_template(
-            "You are a financial news assistant. Based on these initial snippets, provide a brief, 2-3 bullet point summary for the user's question. Mention that a more detailed analysis is being prepared.\n\nSnippets:\n{context}\n\nUser Question: {input}\n\nPreliminary Summary:"
+            "You are a financial news assistant. Based on these quick search snippets, provide a brief, 2-3 bullet point preliminary summary. Mention that detailed analysis is being prepared.\n\nQuick Snippets:\n{context}\n\nUser Question: {input}\n\nPreliminary Summary:"
         )
         preliminary_chain = preliminary_prompt | llm_stream
 
         final_prompt = PromptTemplate.from_template(
-            "You are a financial markets super-assistant. Provide a detailed, well-structured final answer to the user's question using all available context. Use markdown, cite sources with links, and be thorough.\n\nComprehensive Context:\n{context}\n\nChat History: {history}\n\nUser Question: {input}\n\nFinal Detailed Answer:"
+            "You are a financial markets super-assistant. Provide a detailed, well-structured final answer using all available context. Use markdown, cite sources with links.\n\nComprehensive Context:\n{context}\n\nChat History: {history}\n\nUser Question: {input}\n\nFinal Detailed Answer:"
         )
         final_chain = final_prompt | llm_stream
         
-        # --- Tier 1: Perform a Single Web Search and Start Vector Search ---
-        web_search_task = asyncio.create_task(get_brave_results(reformulated_query, max_pages=1, max_sources=10))
-        vector_search_task = asyncio.create_task(vs.asimilarity_search_with_score(reformulated_query, k=5))
-
-        # Await ONLY the web search first, as it's needed for the preliminary summary
-        web_articles, df = await web_search_task
-        
-        # --- Tier 2: Generate Preliminary Summary Immediately ---
-        if web_articles:
-            yield "### Preliminary Summary\n".encode("utf-8")
-            # Generate snippets from the results of our single search
-            initial_snippets = await quick_brave_search_for_snippets(web_articles)
-            preliminary_context = "\n\n".join(initial_snippets)
+        # --- INSTANT TIER: Get snippets from Brave API only (no scraping) ---
+        try:
+            brave_snippets = await get_brave_snippets_only(query)  # New function - API only
+            vector_results = await vs.asimilarity_search_with_score(query, k=3)  # Reduced k
             
-            async for chunk in preliminary_chain.astream({"context": preliminary_context, "input": reformulated_query}):
-                if chunk.content:
-                    yield chunk.content.encode("utf-8")
+            # Create preliminary context immediately
+            preliminary_context = ""
+            if brave_snippets:
+                preliminary_context += "\n\n".join(brave_snippets)
+            if vector_results:
+                preliminary_context += "\n\n" + "\n\n".join([doc.page_content[:200] for doc, _ in vector_results[:2]])
+            
+            # Stream preliminary response immediately
+            if preliminary_context.strip():
+                yield "### Preliminary Summary\n".encode("utf-8")
+                async for chunk in preliminary_chain.astream({"context": preliminary_context, "input": query}):
+                    if chunk.content:
+                        yield chunk.content.encode("utf-8")
+            else:
+                yield "### Searching for information...\n".encode("utf-8")
+                
+        except Exception as e:
+            print(f"ERROR in preliminary response: {e}")
+            yield "### Preparing analysis...\n".encode("utf-8")
         
-        # --- Tier 3: Assemble and Stream Detailed Analysis ---
+        # --- BACKGROUND TIER: Start heavy processing in parallel ---
         yield "\n\n---\n### Detailed Analysis\n".encode("utf-8")
         
-        # Now, await the vector search results
-        initial_vector_results = await vector_search_task
-
-        final_passages = []
-        if initial_vector_results:
-            final_passages.extend([{"text": doc.page_content, "metadata": {**doc.metadata, "link": doc.metadata.get("source_url") or doc.metadata.get("url")}} for doc, score in initial_vector_results])
+        # Run preprocessing and full search in background
+        preprocessing_task = asyncio.create_task(combined_preprocessing(query, chat_history, today))
+        full_search_task = asyncio.create_task(get_brave_results(query, max_pages=1, max_sources=10))
         
-        # Add the web articles we already fetched
+        # Wait for preprocessing to get proper reformulated query
+        preprocessing_result = await preprocessing_task
+        if preprocessing_result.get("valid", 0) == 0:
+            yield "The search query is not related to Indian financial markets...".encode("utf-8")
+            return
+        
+        reformulated_query = preprocessing_result.get("reformulated_query", query)
+        
+        # Get full results
+        web_articles, df = await full_search_task
+        
+        # Build final context
+        final_passages = []
+        
+        # Add vector results with reformulated query
+        if reformulated_query != query:
+            vector_results = await vs.asimilarity_search_with_score(reformulated_query, k=5)
+        else:
+            vector_results = await vs.asimilarity_search_with_score(query, k=5)
+            
+        if vector_results:
+            final_passages.extend([{"text": doc.page_content, "metadata": {**doc.metadata, "link": doc.metadata.get("source_url") or doc.metadata.get("url")}} for doc, score in vector_results])
+        
+        # Add web articles
         if web_articles:
             existing_links = {p['metadata'].get('link') for p in final_passages}
             new_passages = [
@@ -608,14 +632,16 @@ async def web_rag_mix(
             final_passages.extend(new_passages)
 
         if not final_passages:
-            yield "Could not find sufficient information to provide a detailed analysis.".encode("utf-8")
+            yield "Could not find sufficient information for detailed analysis.".encode("utf-8")
             return
 
+        # Score and rank
         reranked_passages = await scoring_service.score_and_rerank_passages(question=reformulated_query, passages=final_passages)
         diversified_passages = diversify_results(reranked_passages, max_per_source=3)
         final_context = scoring_service.create_enhanced_context(diversified_passages)
         final_links = [p["metadata"].get("link") for p in diversified_passages[:10] if p.get("metadata", {}).get("link")]
 
+        # Stream final response
         final_response = ""
         try:
             with get_openai_callback() as cb:
@@ -625,12 +651,13 @@ async def web_rag_mix(
                         final_response += content
                         yield content.encode("utf-8")
 
-                # Final database updates
+                # Database updates (fire and forget)
                 if df is not None and not df.empty:
-                    await insert_post1(df, db_pool)
-                total_tokens = cb.total_tokens
-                await insert_credit_usage(user_id, plan_id, total_tokens / 1000, db_pool)
-                await store_into_db(session_id, prompt_history_id, {"links": final_links}, db_pool)
+                    asyncio.create_task(insert_post1(df, db_pool))
+                total_tokens = cb.total_tokens + preprocessing_result.get("tokens_used", 0)
+                asyncio.create_task(insert_credit_usage(user_id, plan_id, total_tokens / 1000, db_pool))
+                asyncio.create_task(store_into_db(session_id, prompt_history_id, {"links": final_links}, db_pool))
+                
                 if final_response:
                     history_db = PostgresChatMessageHistory(str(session_id), psql_url)
                     history_db.add_user_message(reformulated_query)
