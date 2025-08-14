@@ -38,13 +38,14 @@ import time
 from starlette.status import HTTP_403_FORBIDDEN
 from fastapi.responses import JSONResponse
 import pandas as pd
+import aiohttp
 
 # --- Local Project Imports ---
 from config import (
     chroma_server_client, llm_date, llm_stream, vs, GPT4o_mini,
     PINECONE_INDEX_NAME, CONTEXT_SUFFICIENCY_THRESHOLD
 )
-from api.news_rag.brave_news import get_brave_snippets_only
+from api.news_rag.brave_news import get_brave_snippets_only,BraveNews
 from langchain_chroma import Chroma
 
 # --- Functions imported from other modules ---
@@ -553,10 +554,20 @@ def split_input(input_string):
     general_user_query = parts[1].strip() if len(parts) > 1 else ""
     return date, general_user_query
 
+def create_progress_bar_string(progress: int, message: str = "", length: int = 40):
+    """Creates a visual progress bar string with a dynamic message."""
+    filled_length = int(length * progress // 100)
+    bar = '█' * filled_length + '-' * (length - filled_length)
+    # The '\r' moves the cursor to the start of the line to overwrite it.
+    # We also add padding and clear the rest of the line to prevent artifacts.
+    return f'\rProgress: |{bar}| {progress}%  {message:<50}\033[K'
+
 # --- API Endpoints ---
 
 class InRequest(BaseModel):
     query: str
+
+# In streaming/streaming.py
 
 @web_rag.post("/web_rag")
 async def web_rag_mix(
@@ -568,137 +579,98 @@ async def web_rag_mix(
     db_pool: asyncpg.Pool = Depends(get_db_pool)
 ):
     """
-    Optimized tiered response system with a fast preliminary response followed by detailed analysis.
+    REPLACED: Final version with corrected session management.
+    Implements the full, multi-stage "search and re-rank" strategy.
     """
     query = request.query.strip()
     today = datetime.now().strftime("%Y-%m-%d")
-
-    # Get chat history (keep this fast)
     chat_history = await get_chat_history_optimized(str(session_id), db_pool, limit=3)
+
+    brave_api_key = os.getenv('BRAVE_API_KEY')
+    if not brave_api_key:
+        raise HTTPException(status_code=500, detail="Brave API key not configured.")
     
-    # The generator function that will yield responses in tiers
+    brave_searcher = BraveNews(brave_api_key)
+
     async def tiered_stream_generator():
-        # --- Define Prompts for different tiers ---
-        preliminary_prompt = PromptTemplate.from_template(
-            "You are a financial news assistant. Based on these quick search snippets and vector data, provide a brief, 2-3 bullet point preliminary summary. State that a more detailed analysis is being prepared.\n\nQuick Snippets:\n{context}\n\nUser Question: {input}\n\nPreliminary Summary:"
-        )
-        preliminary_chain = preliminary_prompt | llm_stream
-
-        final_prompt = PromptTemplate.from_template(
-            "You are a financial markets super-assistant. Provide a detailed, well-structured final answer using all available context. Use markdown for readability and cite sources with links where possible.\n\nComprehensive Context:\n{context}\n\nChat History: {history}\n\nUser Question: {input}\n\nFinal Detailed Answer:"
-        )
-        final_chain = final_prompt | llm_stream
-        
-        # --- TIER 1: IMMEDIATE PRELIMINARY RESPONSE (<5 seconds) ---
-        preliminary_context = ""
-        vector_results = []
-        try:
-            # Run vector search and the FIRST Brave call (snippets only) in parallel
-            vector_task = asyncio.create_task(vs.asimilarity_search_with_score(query, k=5))
-            brave_snippets_task = asyncio.create_task(get_brave_snippets_only(query))
-
-            brave_snippets, vector_results = await asyncio.gather(brave_snippets_task, vector_task)
-
-            # Wait 1.1 seconds to avoid rate limiting before the next Brave call
-            await asyncio.sleep(1.1)
-
-            # Start the SECOND Brave call (full scraping) in the background
-            full_scraping_task = asyncio.create_task(get_brave_results(query, max_pages=1, max_sources=10))
+        # Create one session to be used for the entire request lifecycle
+        async with aiohttp.ClientSession(**brave_searcher.session_config) as session:
             
-            # Create preliminary context immediately
-            if brave_snippets:
-                preliminary_context += "\n\n".join(brave_snippets)
-            if vector_results:
-                preliminary_context += "\n\n" + "\n\n".join([doc.page_content[:250] for doc, _ in vector_results])
+            # --- PROGRESS BAR START ---
+            yield create_progress_bar_string(10, "Searching for sources...").encode("utf-8")
             
-            # Stream preliminary response as soon as it's ready
-            if preliminary_context.strip():
-                yield "### Preliminary Summary\n".encode("utf-8")
-                async for chunk in preliminary_chain.astream({"context": preliminary_context, "input": query}):
-                    if chunk.content:
-                        yield chunk.content.encode("utf-8")
-            else:
-                yield "### Searching for information...\n".encode("utf-8")
+            # --- STEP 1: BROAD SEARCH ---
+            initial_sources = await brave_searcher.search_and_scrape(session, query, max_sources=30)
+            if not initial_sources:
+                yield "\nCould not find any initial sources.".encode("utf-8")
+                return
+            
+            yield create_progress_bar_string(20, f"Found {len(initial_sources)} sources...").encode("utf-8")
+
+            # --- Skip snippet re-ranking and prepare for scrape ---
+            sources_to_scrape = initial_sources[:10]
+            
+            # --- STEP 2: DYNAMIC DEEP SCRAPE & PROGRESS UPDATE ---
+            scraped_sources = []
+            total_to_scrape = len(sources_to_scrape)
+            start_progress = 20
+            end_progress = 70
+            
+            for i, source in enumerate(sources_to_scrape):
+                # Calculate current progress percentage
+                progress = start_progress + int(((i + 1) / total_to_scrape) * (end_progress - start_progress))
+                title = source.get('title', 'Untitled Source')[:45] # Truncate title
+                yield create_progress_bar_string(progress, f"Analyzing: {title}...").encode("utf-8")
                 
-        except Exception as e:
-            print(f"ERROR in preliminary response tier: {e}")
-            yield "### Preparing detailed analysis...\n".encode("utf-8")
-        
-        # --- TIER 2: FULL, DETAILED ANALYSIS (Background processing) ---
-        yield "\n\n---\n### Detailed Analysis\n".encode("utf-8")
-        
-        # Now, wait for the full scraping and preprocessing to complete
-        preprocessing_task = asyncio.create_task(combined_preprocessing(query, chat_history, today))
-        
-        web_articles, df = await full_scraping_task
-        preprocessing_result = await preprocessing_task
+                # Scrape a single source
+                scraped = await brave_searcher.scrape_top_urls(session, [source])
+                if scraped:
+                    scraped_sources.extend(scraped)
+                await asyncio.sleep(0.1) # Small delay for smoother UX
 
-        if preprocessing_result.get("valid", 0) == 0:
-            yield "The search query does not appear to be related to financial markets.".encode("utf-8")
-            return
+            yield create_progress_bar_string(80, "Analyzing content...").encode("utf-8")
+
+            # --- STEP 3: CONTENT RE-RANKING ---
+            final_passages = await scoring_service.rerank_content_chunks(query, scraped_sources, top_n=7)
+            if not final_passages:
+                yield "\nCould not extract sufficient detailed information.".encode("utf-8")
+                return
+
+            yield create_progress_bar_string(95, "Generating final answer...").encode("utf-8")
             
-        reformulated_query = preprocessing_result.get("reformulated_query", query)
-        
-        # Build the final, comprehensive context
-        final_passages = []
-        if vector_results:
-            # FIX: Ensure 'link' metadata is correctly created from vector source
-            for doc, score in vector_results:
-                passage = {
-                    "text": doc.page_content,
-                    "metadata": {
-                        "title": doc.metadata.get("title"),
-                        "link": doc.metadata.get("url") or doc.metadata.get("source_url") or doc.metadata.get("source"),
-                        "publication_date": doc.metadata.get("date"),
-                        "snippet": doc.page_content[:300] # Create a snippet if not present
-                    }
-                }
-                final_passages.append(passage)
-        
-        if web_articles:
-            existing_links = {p['metadata'].get('link') for p in final_passages}
-            for a in web_articles:
-                if a.get('source_url') not in existing_links:
-                    final_passages.append({
-                        "text": f"Title: {a.get('title', '')}\nDescription: {a.get('description', '')}",
-                        "metadata": {"title": a.get('title'), "link": a.get('source_url'), "publication_date": a.get('source_date'), "snippet": a.get('description')}
-                    })
+            # --- FINAL ANSWER STREAMING ---
+            final_context = scoring_service.create_enhanced_context(final_passages)
+            final_links = list(set([p["metadata"].get("link") for p in final_passages if p.get("metadata", {}).get("link")]))
 
-        if not final_passages:
-            yield "Could not find sufficient information for a detailed analysis.".encode("utf-8")
-            return
-
-        # Score, rerank, and create the final context string
-        reranked_passages = await scoring_service.score_and_rerank_passages(question=reformulated_query, passages=final_passages)
-        diversified_passages = diversify_results(reranked_passages, max_per_source=3)
-        final_context = scoring_service.create_enhanced_context(diversified_passages)
-        final_links = [p["metadata"].get("link") for p in diversified_passages[:10] if p.get("metadata", {}).get("link")]
-
-        # Stream the final, detailed response
-        final_response_text = ""
-        try:
+            final_prompt = PromptTemplate.from_template(
+                "You are a financial markets expert. Provide a detailed, well-structured final answer using the comprehensive context provided. Use markdown for readability and cite the source links where appropriate.\n\nComprehensive Context:\n{context}\n\nChat History: {history}\n\nUser Question: {input}\n\nFinal Detailed Answer:"
+            )
+            final_chain = final_prompt | llm_stream
+            
+            yield create_progress_bar_string(100, "Done!").encode("utf-8")
+            yield "\n\n".encode("utf-8") 
+            yield "### Detailed Analysis\n".encode("utf-8")
+            
+            final_response_text = ""
             with get_openai_callback() as cb:
-                async for chunk in final_chain.astream({"context": final_context, "history": chat_history, "input": reformulated_query}):
+                async for chunk in final_chain.astream({"context": final_context, "history": chat_history, "input": query}):
                     if chunk.content:
-                        content = chunk.content
-                        final_response_text += content
-                        yield content.encode("utf-8")
-
-                # --- Final Database Operations (Fire and Forget) ---
-                if df is not None and not df.empty:
-                    asyncio.create_task(insert_post1(df, db_pool))
+                        final_response_text += chunk.content
+                        yield chunk.content.encode("utf-8")
                 
-                total_tokens = cb.total_tokens + preprocessing_result.get("tokens_used", 0)
+                # --- FINAL DATABASE OPERATIONS ---
+                df_to_insert = brave_searcher._process_for_dataframe(scraped_sources)
+                if not df_to_insert.empty:
+                    asyncio.create_task(insert_post1(df_to_insert, db_pool))
+
+                total_tokens = cb.total_tokens
                 asyncio.create_task(insert_credit_usage(user_id, plan_id, total_tokens / 1000, db_pool))
                 asyncio.create_task(store_into_db(session_id, prompt_history_id, {"links": final_links}, db_pool))
                 
                 if final_response_text:
                     history_db = PostgresChatMessageHistory(str(session_id), psql_url)
-                    history_db.add_user_message(reformulated_query)
+                    history_db.add_user_message(query)
                     history_db.add_ai_message(final_response_text)
-        except Exception as e:
-            print(f"ERROR: An error occurred during final streaming: {e}")
-            yield b"An error occurred while generating the final response."
 
     return StreamingResponse(tiered_stream_generator(), media_type="text/event-stream")
 

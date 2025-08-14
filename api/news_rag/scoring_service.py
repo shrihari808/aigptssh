@@ -5,7 +5,9 @@ from datetime import datetime
 from urllib.parse import urlparse
 from transformers import pipeline
 from sentence_transformers import CrossEncoder
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langdetect import detect, DetectorFactory
+import asyncio
 
 from config import (
     W_RELEVANCE,
@@ -53,6 +55,130 @@ class NewsRagScoringService:
         except Exception as e:
             print(f"WARNING: Could not initialize CrossEncoder model: {e}")
             self.cross_encoder_model = None
+
+    async def rerank_sources_by_snippet(self, query: str, sources: list[dict], top_n: int = 10) -> list[dict]:
+        """
+        NEW: Reranks a list of sources based on the relevance of their snippets to the query.
+        This is the 'First Re-ranking' step in our new strategy.
+        
+        Args:
+            query (str): The user's query.
+            sources (list[dict]): The list of source metadata dictionaries from the broad search.
+            top_n (int): The number of top sources to return.
+            
+        Returns:
+            list[dict]: The top_n sources, sorted by relevance score.
+        """
+        if not sources or not self.cross_encoder_model:
+            print("WARNING: No sources or cross-encoder model available for reranking. Returning original sources.")
+            return sources[:top_n]
+
+        # Create pairs of [query, snippet] for the cross-encoder
+        snippets = [
+            f"{source.get('title', '')} - {source.get('snippet', '')}" 
+            for source in sources
+        ]
+        query_snippet_pairs = [[query, snippet] for snippet in snippets]
+
+        print(f"DEBUG: Reranking {len(sources)} snippets against the query...")
+        
+        # Get relevance scores from the model
+        # The predict method can be run in a thread to avoid blocking the event loop
+        scores = await asyncio.to_thread(self.cross_encoder_model.predict, query_snippet_pairs)
+
+        # Add scores to each source and sort
+        for source, score in zip(sources, scores):
+            source['relevance_score'] = float(score)
+            
+        reranked_sources = sorted(sources, key=lambda x: x['relevance_score'], reverse=True)
+
+        print(f"DEBUG: Reranking complete. Top source score: {reranked_sources[0]['relevance_score']:.4f}")
+        
+        return reranked_sources[:top_n]
+
+    async def rerank_content_chunks(self, query: str, sources: list[dict], top_n: int = 7) -> list[dict]:
+        """
+        NEW: Chunks the full content of sources, scores them using a multi-factor approach,
+        and reranks them for relevance. This is the 'Second Re-ranking' step.
+
+        Args:
+            query (str): The user's query.
+            sources (list[dict]): The list of source dictionaries with 'full_webpage_content'.
+            top_n (int): The number of top text chunks to return.
+
+        Returns:
+            list[dict]: A new list of the top_n passage dictionaries, ready for the final context.
+        """
+        if not sources or not self.cross_encoder_model:
+            return []
+
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
+        all_chunks = []
+
+        # 1. Chunk the content from all sources
+        for source in sources:
+            content = source.get('full_webpage_content')
+            if content and len(content) > 100:  # Process only if content is substantial
+                chunks = text_splitter.split_text(content)
+                for i, chunk_text in enumerate(chunks):
+                    # Keep a link back to the original source metadata
+                    all_chunks.append({
+                        'text': chunk_text,
+                        'metadata': source,  # The entire original source dict is the metadata
+                        'relevance_score': 0.0, # Initialize scores
+                        'sentiment_score': 0.0,
+                        'time_decay_score': 0.0,
+                        'impact_score': 0.0,
+                        'final_combined_score': 0.0
+                    })
+
+        if not all_chunks:
+            print("WARNING: No content chunks were generated after scraping.")
+            return []
+
+        # 2. Score all chunks for relevance using the cross-encoder
+        print(f"DEBUG: Calculating relevance for {len(all_chunks)} content chunks from {len(sources)} sources...")
+        query_chunk_pairs = [[query, chunk['text']] for chunk in all_chunks]
+        relevance_scores = await asyncio.to_thread(self.cross_encoder_model.predict, query_chunk_pairs)
+
+        # 3. Calculate other scores and the final combined score for each chunk
+        print(f"DEBUG: Calculating multi-factor scores (sentiment, time, impact)...")
+        for chunk, rel_score in zip(all_chunks, relevance_scores):
+            metadata = chunk.get("metadata", {})
+            text = chunk.get("text", "")
+            
+            # Assign relevance score
+            chunk['relevance_score'] = float(rel_score)
+            
+            # Calculate other scores using existing helper functions
+            chunk['sentiment_score'] = self._calculate_sentiment_score(text, query)
+            chunk['time_decay_score'] = self._calculate_time_decay_score(
+                metadata.get("publication_date") or str(metadata.get("date", "")),
+                query
+            )
+            chunk['impact_score'] = self._calculate_impact_score(text, metadata.get("link"))
+
+            # Calculate the final weighted score (you can adjust weights in config.py)
+            chunk['final_combined_score'] = (
+                W_RELEVANCE * chunk['relevance_score'] +
+                W_SENTIMENT * chunk['sentiment_score'] +
+                W_TIME_DECAY * chunk['time_decay_score'] +
+                W_IMPACT * chunk['impact_score']
+            )
+
+        # 4. Sort all chunks by the final combined score
+        reranked_chunks = sorted(all_chunks, key=lambda x: x['final_combined_score'], reverse=True)
+
+        # --- THIS IS THE DEBUG LOG YOU REQUESTED ---
+        print(f"DEBUG: Top {min(5, len(reranked_chunks))} passages after reranking:")
+        for i, passage in enumerate(reranked_chunks[:5]):
+            print(f"  {i+1}. Score: {passage['final_combined_score']:.4f} | "
+                  f"Rel: {passage['relevance_score']:.2f}, Sent: {passage['sentiment_score']:.2f}, "
+                  f"Time: {passage['time_decay_score']:.2f}, Impact: {passage['impact_score']:.2f} | "
+                  f"{passage.get('metadata', {}).get('link', 'No link')}")
+        # --- END OF DEBUG LOG ---
+
+        return reranked_chunks[:top_n]
 
     def assess_context_sufficiency(self, query: str, retrieved_docs: list) -> float:
         """
@@ -466,12 +592,15 @@ class NewsRagScoringService:
         reranked_passages = sorted(scored_passages, key=lambda x: x["final_combined_score"], reverse=True)
         
         # Log top results
+        # --- START: ADD THIS DEBUGGING BLOCK ---
+        # Log top results to show scoring breakdown
         print(f"DEBUG: Top {min(5, len(reranked_passages))} passages after reranking:")
         for i, passage in enumerate(reranked_passages[:5]):
             print(f"  {i+1}. Score: {passage['final_combined_score']:.4f} | "
                   f"Rel: {passage['relevance_score']:.2f}, Sent: {passage['sentiment_score']:.2f}, "
-                  f"Time: {passage['time_decay_score']:.2f}, Impact: {passage['impact_score']:.2f}"
-                  f"| {reranked_passages[i].get('metadata', {}).get('link', 'No link')}")
+                  f"Time: {passage['time_decay_score']:.2f}, Impact: {passage['impact_score']:.2f} | "
+                  f"{passage.get('metadata', {}).get('link', 'No link')}")
+        # --- END: ADD THIS DEBUGGING BLOCK ---
         
         return reranked_passages
 
