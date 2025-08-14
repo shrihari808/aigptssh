@@ -554,10 +554,20 @@ def split_input(input_string):
     general_user_query = parts[1].strip() if len(parts) > 1 else ""
     return date, general_user_query
 
+def create_progress_bar_string(progress: int, message: str = "", length: int = 40):
+    """Creates a visual progress bar string with a dynamic message."""
+    filled_length = int(length * progress // 100)
+    bar = '█' * filled_length + '-' * (length - filled_length)
+    # The '\r' moves the cursor to the start of the line to overwrite it.
+    # We also add padding and clear the rest of the line to prevent artifacts.
+    return f'\rProgress: |{bar}| {progress}%  {message:<50}\033[K'
+
 # --- API Endpoints ---
 
 class InRequest(BaseModel):
     query: str
+
+# In streaming/streaming.py
 
 @web_rag.post("/web_rag")
 async def web_rag_mix(
@@ -585,44 +595,50 @@ async def web_rag_mix(
     async def tiered_stream_generator():
         # Create one session to be used for the entire request lifecycle
         async with aiohttp.ClientSession(**brave_searcher.session_config) as session:
-            yield "### Searching for relevant sources...\n".encode("utf-8")
-
+            
+            # --- PROGRESS BAR START ---
+            yield create_progress_bar_string(10, "Searching for sources...").encode("utf-8")
+            
             # --- STEP 1: BROAD SEARCH ---
             initial_sources = await brave_searcher.search_and_scrape(session, query, max_sources=30)
             if not initial_sources:
-                yield "Could not find any initial sources. Please try a different query.".encode("utf-8")
+                yield "\nCould not find any initial sources.".encode("utf-8")
                 return
-
-            # --- STEP 2: FIRST RE-RANKING (URLs) ---
-            reranked_urls = await scoring_service.rerank_sources_by_snippet(query, initial_sources, top_n=10)
-            if not reranked_urls:
-                yield "Could not determine relevant sources. Please try a different query.".encode("utf-8")
-                return
-                
-            # --- STREAM 1: PRELIMINARY SUMMARY ---
-            yield "\n\n---\n### Preliminary Summary\n".encode("utf-8")
-            preliminary_context = scoring_service.create_enhanced_context(reranked_urls[:3])
             
-            preliminary_prompt = PromptTemplate.from_template(
-                "You are a financial news assistant. Based on these initial headlines and snippets, provide a brief, 2-3 bullet point preliminary summary. State that a more detailed analysis is being prepared.\n\nContext:\n{context}\n\nUser Question: {input}\n\nPreliminary Summary:"
-            )
-            preliminary_chain = preliminary_prompt | llm_stream
-            async for chunk in preliminary_chain.astream({"context": preliminary_context, "input": query}):
-                if chunk.content:
-                    yield chunk.content.encode("utf-8")
+            yield create_progress_bar_string(20, f"Found {len(initial_sources)} sources...").encode("utf-8")
 
-            # --- STEP 3: DEEP SCRAPE ---
-            yield "\n\n---\n### Analyzing top sources for detailed answer...\n".encode("utf-8")
-            scraped_sources = await brave_searcher.scrape_top_urls(session, reranked_urls)
+            # --- Skip snippet re-ranking and prepare for scrape ---
+            sources_to_scrape = initial_sources[:10]
+            
+            # --- STEP 2: DYNAMIC DEEP SCRAPE & PROGRESS UPDATE ---
+            scraped_sources = []
+            total_to_scrape = len(sources_to_scrape)
+            start_progress = 20
+            end_progress = 70
+            
+            for i, source in enumerate(sources_to_scrape):
+                # Calculate current progress percentage
+                progress = start_progress + int(((i + 1) / total_to_scrape) * (end_progress - start_progress))
+                title = source.get('title', 'Untitled Source')[:45] # Truncate title
+                yield create_progress_bar_string(progress, f"Analyzing: {title}...").encode("utf-8")
+                
+                # Scrape a single source
+                scraped = await brave_searcher.scrape_top_urls(session, [source])
+                if scraped:
+                    scraped_sources.extend(scraped)
+                await asyncio.sleep(0.1) # Small delay for smoother UX
 
-            # --- STEP 4: SECOND RE-RANKING (CONTENT) ---
+            yield create_progress_bar_string(80, "Analyzing content...").encode("utf-8")
+
+            # --- STEP 3: CONTENT RE-RANKING ---
             final_passages = await scoring_service.rerank_content_chunks(query, scraped_sources, top_n=7)
             if not final_passages:
-                yield "\nCould not extract sufficient detailed information from the top sources.".encode("utf-8")
+                yield "\nCould not extract sufficient detailed information.".encode("utf-8")
                 return
 
-            # --- STREAM 2: FINAL DETAILED ANSWER ---
-            yield "\n\n---\n### Detailed Analysis\n".encode("utf-8")
+            yield create_progress_bar_string(95, "Generating final answer...").encode("utf-8")
+            
+            # --- FINAL ANSWER STREAMING ---
             final_context = scoring_service.create_enhanced_context(final_passages)
             final_links = list(set([p["metadata"].get("link") for p in final_passages if p.get("metadata", {}).get("link")]))
 
@@ -630,6 +646,10 @@ async def web_rag_mix(
                 "You are a financial markets expert. Provide a detailed, well-structured final answer using the comprehensive context provided. Use markdown for readability and cite the source links where appropriate.\n\nComprehensive Context:\n{context}\n\nChat History: {history}\n\nUser Question: {input}\n\nFinal Detailed Answer:"
             )
             final_chain = final_prompt | llm_stream
+            
+            yield create_progress_bar_string(100, "Done!").encode("utf-8")
+            yield "\n\n".encode("utf-8") 
+            yield "### Detailed Analysis\n".encode("utf-8")
             
             final_response_text = ""
             with get_openai_callback() as cb:

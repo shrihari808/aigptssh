@@ -98,65 +98,85 @@ class NewsRagScoringService:
 
     async def rerank_content_chunks(self, query: str, sources: list[dict], top_n: int = 7) -> list[dict]:
         """
-        MODIFIED: Integrates your existing multi-factor scoring functions into the second re-ranking stage.
+        NEW: Chunks the full content of sources, scores them using a multi-factor approach,
+        and reranks them for relevance. This is the 'Second Re-ranking' step.
+
+        Args:
+            query (str): The user's query.
+            sources (list[dict]): The list of source dictionaries with 'full_webpage_content'.
+            top_n (int): The number of top text chunks to return.
+
+        Returns:
+            list[dict]: A new list of the top_n passage dictionaries, ready for the final context.
         """
-        if not sources:
-            print("WARNING: No sources provided for content reranking.")
+        if not sources or not self.cross_encoder_model:
             return []
 
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
         all_chunks = []
-        
+
         # 1. Chunk the content from all sources
         for source in sources:
             content = source.get('full_webpage_content')
-            if content and len(content) > 100:
+            if content and len(content) > 100:  # Process only if content is substantial
                 chunks = text_splitter.split_text(content)
-                for chunk_text in chunks:
+                for i, chunk_text in enumerate(chunks):
+                    # Keep a link back to the original source metadata
                     all_chunks.append({
                         'text': chunk_text,
-                        'metadata': source 
+                        'metadata': source,  # The entire original source dict is the metadata
+                        'relevance_score': 0.0, # Initialize scores
+                        'sentiment_score': 0.0,
+                        'time_decay_score': 0.0,
+                        'impact_score': 0.0,
+                        'final_combined_score': 0.0
                     })
 
         if not all_chunks:
             print("WARNING: No content chunks were generated after scraping.")
             return []
 
-        print(f"DEBUG: Reranking {len(all_chunks)} content chunks with multi-factor scoring...")
+        # 2. Score all chunks for relevance using the cross-encoder
+        print(f"DEBUG: Calculating relevance for {len(all_chunks)} content chunks from {len(sources)} sources...")
+        query_chunk_pairs = [[query, chunk['text']] for chunk in all_chunks]
+        relevance_scores = await asyncio.to_thread(self.cross_encoder_model.predict, query_chunk_pairs)
 
-        # --- Calculate all scores for each chunk using your helper functions ---
-        tasks = []
-        for chunk in all_chunks:
-            text = chunk['text']
-            metadata = chunk['metadata']
+        # 3. Calculate other scores and the final combined score for each chunk
+        print(f"DEBUG: Calculating multi-factor scores (sentiment, time, impact)...")
+        for chunk, rel_score in zip(all_chunks, relevance_scores):
+            metadata = chunk.get("metadata", {})
+            text = chunk.get("text", "")
             
-            # 1. Relevance Score (already calculated in the previous step, but we'll re-calculate for consistency)
-            relevance_score = self._calculate_relevance_score(query, text)
-            chunk['relevance_score'] = relevance_score
-
-            # 2. Sentiment Score
+            # Assign relevance score
+            chunk['relevance_score'] = float(rel_score)
+            
+            # Calculate other scores using existing helper functions
             chunk['sentiment_score'] = self._calculate_sentiment_score(text, query)
+            chunk['time_decay_score'] = self._calculate_time_decay_score(
+                metadata.get("publication_date") or str(metadata.get("date", "")),
+                query
+            )
+            chunk['impact_score'] = self._calculate_impact_score(text, metadata.get("link"))
 
-            # 3. Time Decay Score
-            pub_date = metadata.get("publication_date") or str(metadata.get("date", ""))
-            chunk['time_decay_score'] = self._calculate_time_decay_score(pub_date, query)
-
-            # 4. Impact Score
-            link = metadata.get('link')
-            chunk['impact_score'] = self._calculate_impact_score(text, link)
-
-            # 5. Calculate Final Combined Score using weights from config.py
+            # Calculate the final weighted score (you can adjust weights in config.py)
             chunk['final_combined_score'] = (
                 W_RELEVANCE * chunk['relevance_score'] +
                 W_SENTIMENT * chunk['sentiment_score'] +
                 W_TIME_DECAY * chunk['time_decay_score'] +
                 W_IMPACT * chunk['impact_score']
             )
-        
-        # Sort by the new comprehensive score
+
+        # 4. Sort all chunks by the final combined score
         reranked_chunks = sorted(all_chunks, key=lambda x: x['final_combined_score'], reverse=True)
 
-        print(f"DEBUG: Multi-factor reranking complete. Top chunk score: {reranked_chunks[0]['final_combined_score']:.4f}")
+        # --- THIS IS THE DEBUG LOG YOU REQUESTED ---
+        print(f"DEBUG: Top {min(5, len(reranked_chunks))} passages after reranking:")
+        for i, passage in enumerate(reranked_chunks[:5]):
+            print(f"  {i+1}. Score: {passage['final_combined_score']:.4f} | "
+                  f"Rel: {passage['relevance_score']:.2f}, Sent: {passage['sentiment_score']:.2f}, "
+                  f"Time: {passage['time_decay_score']:.2f}, Impact: {passage['impact_score']:.2f} | "
+                  f"{passage.get('metadata', {}).get('link', 'No link')}")
+        # --- END OF DEBUG LOG ---
 
         return reranked_chunks[:top_n]
 
@@ -572,12 +592,15 @@ class NewsRagScoringService:
         reranked_passages = sorted(scored_passages, key=lambda x: x["final_combined_score"], reverse=True)
         
         # Log top results
+        # --- START: ADD THIS DEBUGGING BLOCK ---
+        # Log top results to show scoring breakdown
         print(f"DEBUG: Top {min(5, len(reranked_passages))} passages after reranking:")
         for i, passage in enumerate(reranked_passages[:5]):
             print(f"  {i+1}. Score: {passage['final_combined_score']:.4f} | "
                   f"Rel: {passage['relevance_score']:.2f}, Sent: {passage['sentiment_score']:.2f}, "
-                  f"Time: {passage['time_decay_score']:.2f}, Impact: {passage['impact_score']:.2f}"
-                  f"| {reranked_passages[i].get('metadata', {}).get('link', 'No link')}")
+                  f"Time: {passage['time_decay_score']:.2f}, Impact: {passage['impact_score']:.2f} | "
+                  f"{passage.get('metadata', {}).get('link', 'No link')}")
+        # --- END: ADD THIS DEBUGGING BLOCK ---
         
         return reranked_passages
 
