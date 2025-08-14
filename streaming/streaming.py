@@ -643,7 +643,21 @@ async def web_rag_mix(
             final_links = list(set([p["metadata"].get("link") for p in final_passages if p.get("metadata", {}).get("link")]))
 
             final_prompt = PromptTemplate.from_template(
-                "You are a financial markets expert. Provide a detailed, well-structured final answer using the comprehensive context provided. Use markdown for readability and cite the source links where appropriate.\n\nComprehensive Context:\n{context}\n\nChat History: {history}\n\nUser Question: {input}\n\nFinal Detailed Answer:"
+                """
+                You are a financial markets expert. Provide a detailed, well-structured final answer using the comprehensive context provided. 
+                Use markdown for readability and cite the source links where appropriate. The cited links should be given at the bottom of the response with their citation numbers.
+                
+                Comprehensive Context:
+                {context}
+                
+                Chat History: 
+                {history}
+                
+                User Question: {input}
+                
+                Final Detailed Answer:
+                
+                """
             )
             final_chain = final_prompt | llm_stream
             
