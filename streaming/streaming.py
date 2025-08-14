@@ -591,8 +591,8 @@ async def web_rag_mix(
         
         # --- TIER 1: IMMEDIATE PRELIMINARY RESPONSE (<5 seconds) ---
         preliminary_context = ""
+        vector_results = []
         try:
-            # --- TIER 1: IMMEDIATE PRELIMINARY RESPONSE (<5 seconds) ---
             # Run vector search and the FIRST Brave call (snippets only) in parallel
             vector_task = asyncio.create_task(vs.asimilarity_search_with_score(query, k=5))
             brave_snippets_task = asyncio.create_task(get_brave_snippets_only(query))
@@ -642,7 +642,18 @@ async def web_rag_mix(
         # Build the final, comprehensive context
         final_passages = []
         if vector_results:
-            final_passages.extend([{"text": doc.page_content, "metadata": {**doc.metadata, "link": doc.metadata.get("source_url") or doc.metadata.get("url")}} for doc, score in vector_results])
+            # FIX: Ensure 'link' metadata is correctly created from vector source
+            for doc, score in vector_results:
+                passage = {
+                    "text": doc.page_content,
+                    "metadata": {
+                        "title": doc.metadata.get("title"),
+                        "link": doc.metadata.get("url") or doc.metadata.get("source_url") or doc.metadata.get("source"),
+                        "publication_date": doc.metadata.get("date"),
+                        "snippet": doc.page_content[:300] # Create a snippet if not present
+                    }
+                }
+                final_passages.append(passage)
         
         if web_articles:
             existing_links = {p['metadata'].get('link') for p in final_passages}
