@@ -98,18 +98,10 @@ class NewsRagScoringService:
 
     async def rerank_content_chunks(self, query: str, sources: list[dict], top_n: int = 7) -> list[dict]:
         """
-        NEW: Chunks the full content of sources and reranks them for relevance.
-        This is the 'Second Re-ranking' step.
-        
-        Args:
-            query (str): The user's query.
-            sources (list[dict]): The list of source dictionaries with 'full_webpage_content'.
-            top_n (int): The number of top text chunks to return.
-            
-        Returns:
-            list[dict]: A new list of the top_n passage dictionaries, ready for the final context.
+        MODIFIED: Integrates your existing multi-factor scoring functions into the second re-ranking stage.
         """
-        if not sources or not self.cross_encoder_model:
+        if not sources:
+            print("WARNING: No sources provided for content reranking.")
             return []
 
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
@@ -118,33 +110,53 @@ class NewsRagScoringService:
         # 1. Chunk the content from all sources
         for source in sources:
             content = source.get('full_webpage_content')
-            if content and len(content) > 100: # Process only if content is substantial
+            if content and len(content) > 100:
                 chunks = text_splitter.split_text(content)
-                for i, chunk_text in enumerate(chunks):
-                    # Keep a link back to the original source metadata
+                for chunk_text in chunks:
                     all_chunks.append({
                         'text': chunk_text,
-                        'metadata': source # The entire original source dict is the metadata
+                        'metadata': source 
                     })
 
         if not all_chunks:
             print("WARNING: No content chunks were generated after scraping.")
             return []
 
-        # 2. Score all chunks for relevance
-        query_chunk_pairs = [[query, chunk['text']] for chunk in all_chunks]
+        print(f"DEBUG: Reranking {len(all_chunks)} content chunks with multi-factor scoring...")
+
+        # --- Calculate all scores for each chunk using your helper functions ---
+        tasks = []
+        for chunk in all_chunks:
+            text = chunk['text']
+            metadata = chunk['metadata']
+            
+            # 1. Relevance Score (already calculated in the previous step, but we'll re-calculate for consistency)
+            relevance_score = self._calculate_relevance_score(query, text)
+            chunk['relevance_score'] = relevance_score
+
+            # 2. Sentiment Score
+            chunk['sentiment_score'] = self._calculate_sentiment_score(text, query)
+
+            # 3. Time Decay Score
+            pub_date = metadata.get("publication_date") or str(metadata.get("date", ""))
+            chunk['time_decay_score'] = self._calculate_time_decay_score(pub_date, query)
+
+            # 4. Impact Score
+            link = metadata.get('link')
+            chunk['impact_score'] = self._calculate_impact_score(text, link)
+
+            # 5. Calculate Final Combined Score using weights from config.py
+            chunk['final_combined_score'] = (
+                W_RELEVANCE * chunk['relevance_score'] +
+                W_SENTIMENT * chunk['sentiment_score'] +
+                W_TIME_DECAY * chunk['time_decay_score'] +
+                W_IMPACT * chunk['impact_score']
+            )
         
-        print(f"DEBUG: Reranking {len(all_chunks)} content chunks from {len(sources)} sources...")
+        # Sort by the new comprehensive score
+        reranked_chunks = sorted(all_chunks, key=lambda x: x['final_combined_score'], reverse=True)
 
-        scores = await asyncio.to_thread(self.cross_encoder_model.predict, query_chunk_pairs)
-
-        for chunk, score in zip(all_chunks, scores):
-            chunk['relevance_score'] = float(score)
-
-        # 3. Sort and select the best chunks
-        reranked_chunks = sorted(all_chunks, key=lambda x: x['relevance_score'], reverse=True)
-
-        print(f"DEBUG: Content re-ranking complete. Top chunk score: {reranked_chunks[0]['relevance_score']:.4f}")
+        print(f"DEBUG: Multi-factor reranking complete. Top chunk score: {reranked_chunks[0]['final_combined_score']:.4f}")
 
         return reranked_chunks[:top_n]
 
