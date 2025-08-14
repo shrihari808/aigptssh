@@ -326,144 +326,91 @@ class BraveNews:
             print(f"WARNING: Deduplication failed: {e}. Returning original items.")
             return processed_items
 
-    async def search_and_scrape(self, query_term: str, max_pages: int = MAX_PAGES, max_sources: int = MAX_SCRAPED_SOURCES) -> list[dict]:
+    async def search_and_scrape(self, session: aiohttp.ClientSession, query_term: str, max_pages: int = MAX_PAGES, max_sources: int = 30) -> list[dict]:
         """
-        Optimized search and scrape with concurrent processing and better resource management.
-        Now accepts max_pages and max_sources to control search depth.
+        MODIFIED: Now accepts an active aiohttp session to prevent premature closing.
+        Implements the 'Broad Search' phase of our strategy.
         """
         start_time = time.time()
         all_extracted_content = []
         links_encountered = set()
 
-        # Create optimized session
-        async with aiohttp.ClientSession(**self.session_config) as session:
-            
-            # Phase 1: Collect all URLs from Brave API
-            print(f"DEBUG: Starting Brave API search for: '{query_term}' (max_pages={max_pages}, max_sources={max_sources})")
-            
-            for current_page in range(1, max_pages + 1):
-                if len(all_extracted_content) >= max_sources:
-                    print(f"DEBUG: Reached max_sources ({max_sources}). Stopping API calls.")
-                    break
+        # Phase 1: Collect all URLs from Brave API up to the new 'max_sources' limit
+        print(f"DEBUG: Starting Broad Search for: '{query_term}' (max_sources={max_sources})")
 
-                brave_results, has_more = await self._fetch_brave_page(session, query_term, current_page)
-                
-                if not brave_results:
-                    break
+        for current_page in range(1, max_pages + 1):
+            if len(all_extracted_content) >= max_sources:
+                print(f"DEBUG: Reached max_sources ({max_sources}). Stopping API calls.")
+                break
 
-                page_extracted_content = self._extract_relevant_text(brave_results)
-                if not page_extracted_content:
-                    break
+            brave_results, has_more = await self._fetch_brave_page(session, query_term, current_page)
 
-                # Add unique URLs only
-                for item in page_extracted_content:
-                    link = item.get('link')
-                    if (link and link not in links_encountered and len(all_extracted_content) < max_sources and is_valid_news_url(link)):
-                        all_extracted_content.append(item)
-                        links_encountered.add(link)
-                
-                if len(all_extracted_content) >= max_sources or not has_more:
-                    break
-                    
-                await asyncio.sleep(0.5)
+            if not brave_results:
+                break
 
-            api_time = time.time() - start_time
-            print(f"DEBUG: Brave API phase completed in {api_time:.2f}s, collected {len(all_extracted_content)} URLs")
+            page_extracted_content = self._extract_relevant_text(brave_results)
+            if not page_extracted_content:
+                break
 
-            # Phase 1.5: Prioritize sources based on credibility from config
-            def get_credibility(item):
+            # Add unique URLs only
+            for item in page_extracted_content:
                 link = item.get('link')
-                if not link:
-                    return SOURCE_CREDIBILITY_WEIGHTS.get("default", 0.5)
-                try:
-                    domain = urlparse(link).netloc.replace('www.', '')
-                    return SOURCE_CREDIBILITY_WEIGHTS.get(domain, SOURCE_CREDIBILITY_WEIGHTS.get("default", 0.5))
-                except Exception:
-                    return SOURCE_CREDIBILITY_WEIGHTS.get("default", 0.5)
+                if (link and link not in links_encountered and len(all_extracted_content) < max_sources and is_valid_news_url(link)):
+                    all_extracted_content.append(item)
+                    links_encountered.add(link)
 
-            all_extracted_content.sort(key=get_credibility, reverse=True)
-            print(f"DEBUG: Prioritized URLs based on credibility. Top 3 sources:")
-            for item in all_extracted_content[:3]:
-                print(f"  - {item.get('link')} (Credibility: {get_credibility(item)})")
+            if len(all_extracted_content) >= max_sources or not has_more:
+                break
 
+            await asyncio.sleep(0.5)
 
-            # Phase 2: Concurrent web scraping
-            scrape_start = time.time()
-            links_to_scrape = [item['link'] for item in all_extracted_content if item.get('link')]
-            
-            if not links_to_scrape:
-                return []
+        api_time = time.time() - start_time
+        print(f"DEBUG: Broad Search phase completed in {api_time:.2f}s, collected {len(all_extracted_content)} potential sources")
 
-            scraped_content_map = {}
-            batch_size = 10
-            
-            for i in range(0, len(links_to_scrape), batch_size):
-                batch_links = links_to_scrape[i:i + batch_size]
-                batch_tasks = [self._fetch_and_parse_url_async(session, url) for url in batch_links]
-                batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
-                
-                for result in batch_results:
-                    if not isinstance(result, Exception) and isinstance(result, tuple) and len(result) == 2:
-                        url, content = result
-                        scraped_content_map[url] = content
-                
-                if i + batch_size < len(links_to_scrape):
-                    await asyncio.sleep(0.2)
+        return all_extracted_content
 
-            scrape_time = time.time() - scrape_start
-            print(f"DEBUG: Scraping phase completed in {scrape_time:.2f}s")
+    async def scrape_top_urls(self, session: aiohttp.ClientSession, sources: list[dict]) -> list[dict]:
+        """
+        MODIFIED: Now accepts an active aiohttp session.
+        Performs the 'Deep Scrape' on a pre-selected list of top sources.
+        """
+        scrape_start_time = time.time()
+        links_to_scrape = [source['link'] for source in sources if source.get('link')]
 
-        # Phase 3: Process and prepare final items with chunking
-        # Phase 3: Process and prepare final items with SMART chunking
-        processed_items = []
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=150)
+        if not links_to_scrape:
+            return []
 
-        for item in all_extracted_content:
-            link = item.get('link')
-            full_webpage_content = scraped_content_map.get(link, "")
-
-            if full_webpage_content:
-                # Smart chunking: limit chunks per article to prevent flooding
-                chunks = text_splitter.split_text(full_webpage_content)
-                
-                # Only take first 3 chunks per article to prevent one source dominating
-                max_chunks_per_article = 3
-                selected_chunks = chunks[:max_chunks_per_article]
-                
-                for i, chunk in enumerate(selected_chunks):
-                    # Add chunk position info to help with deduplication
-                    text_to_embed = f"Title: {item['title']}\nSnippet: {item['snippet']}\nContent Part {i+1}: {chunk}"
-                    
-                    processed_items.append({
-                        "text_to_embed": text_to_embed,
-                        "original_item": item,
-                        "full_webpage_content": chunk,
-                        "chunk_position": i + 1,  # This needs to be passed to the final passage
-                        "source_domain": urlparse(link).netloc.replace('www.', '') if link else "unknown"
-                    })
-            else:
-                # If no content, just use title and snippet
-                text_to_embed = f"Title: {item['title']}\nSnippet: {item['snippet']}"
-                processed_items.append({
-                        "text_to_embed": text_to_embed,
-                        "original_item": item,
-                        "full_webpage_content": "",
-                        "chunk_position": 0,
-                        "source_domain": urlparse(item.get('link', '')).netloc.replace('www.', '') if item.get('link') else "unknown"
-                    })
-
-
-        # Phase 4: Deduplicate content before returning
-        deduplicated_items = self._deduplicate_content(processed_items)
-
-        total_time = time.time() - start_time
-        print(f"DEBUG: Total processing time: {total_time:.2f}s for {len(deduplicated_items)} items (after deduplication)")
+        print(f"DEBUG: Starting Deep Scrape for {len(links_to_scrape)} top-ranked URLs.")
         
-        return deduplicated_items
+        scraped_content_map = {}
+        batch_size = 10
+
+        # NOTE: Removed the 'async with' block to use the provided session
+        for i in range(0, len(links_to_scrape), batch_size):
+            batch_links = links_to_scrape[i:i + batch_size]
+            batch_tasks = [self._fetch_and_parse_url_async(session, url) for url in batch_links]
+            batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+            
+            for result in batch_results:
+                if not isinstance(result, Exception) and isinstance(result, tuple) and len(result) == 2:
+                    url, content = result
+                    scraped_content_map[url] = content
+            
+            if i + batch_size < len(links_to_scrape):
+                await asyncio.sleep(0.2)
+        
+        for source in sources:
+            source['full_webpage_content'] = scraped_content_map.get(source.get('link'), "")
+
+        scrape_time = time.time() - scrape_start_time
+        print(f"DEBUG: Deep Scrape phase completed in {scrape_time:.2f}s.")
+        
+        return sources
 
     def _process_for_dataframe(self, processed_items: list[dict]) -> pd.DataFrame:
         """
-        Optimized DataFrame processing with better error handling.
+        MODIFIED: Updated to handle the new, simpler data structure from our pipeline.
+        It no longer expects a nested 'original_item' dictionary.
         """
         if not processed_items:
             return pd.DataFrame()
@@ -472,7 +419,9 @@ class BraveNews:
         current_time = datetime.now()
         
         for item in processed_items:
-            original = item['original_item']
+            # FIX: The item itself is now the source of metadata.
+            # We no longer need to access a nested 'original_item'.
+            original = item 
             
             # Optimize heading extraction
             heading = "Unknown Source"
