@@ -655,7 +655,7 @@ async def web_rag_mix(
                         scraped_sources.extend(scraped)
                     await asyncio.sleep(0.1)
 
-                yield create_progress_bar_string(80, "Analyzing content...").encode("utf-8")
+                yield create_progress_bar_string(80, "Ranking context...").encode("utf-8")
                 
                 final_passages = await scoring_service.rerank_content_chunks(query, scraped_sources, top_n=7)
                 if not final_passages:
