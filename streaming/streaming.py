@@ -43,8 +43,13 @@ import aiohttp
 # --- Local Project Imports ---
 from config import (
     chroma_server_client, llm_date, llm_stream, vs, GPT4o_mini,
-    PINECONE_INDEX_NAME, CONTEXT_SUFFICIENCY_THRESHOLD
+    PINECONE_INDEX_NAME, CONTEXT_SUFFICIENCY_THRESHOLD, ENABLE_CACHING
 )
+from api.news_rag.caching_service import (
+    query_session_cache,
+    add_passages_to_cache
+)
+from langchain_core.documents import Document
 from api.news_rag.brave_news import get_brave_snippets_only,BraveNews
 from langchain_chroma import Chroma
 
@@ -568,7 +573,7 @@ class InRequest(BaseModel):
     query: str
 
 # In streaming/streaming.py
-
+use_caching = ENABLE_CACHING
 @web_rag.post("/web_rag")
 async def web_rag_mix(
     request: InRequest,
@@ -592,98 +597,124 @@ async def web_rag_mix(
     
     brave_searcher = BraveNews(brave_api_key)
 
+    # /aigptssh/streaming/streaming.py
+
     async def tiered_stream_generator():
-        # Create one session to be used for the entire request lifecycle
-        async with aiohttp.ClientSession(**brave_searcher.session_config) as session:
+        # --- Caching Logic Start ---
+        cached_passages = []
+        if use_caching:
+            yield create_progress_bar_string(5, "Checking cache for context...").encode("utf-8")
             
-            # --- PROGRESS BAR START ---
-            yield create_progress_bar_string(10, "Searching for sources...").encode("utf-8")
-            
-            # --- STEP 1: BROAD SEARCH ---
-            initial_sources = await brave_searcher.search_and_scrape(session, query, max_sources=30)
-            if not initial_sources:
-                yield "\nCould not find any initial sources.".encode("utf-8")
-                return
-            
-            yield create_progress_bar_string(20, f"Found {len(initial_sources)} sources...").encode("utf-8")
+            # Check if it's a follow-up question that could benefit from cache
+            if is_followup_question(query, chat_history):
+                # Query the session-specific cache
+                cached_docs_with_scores = query_session_cache(str(session_id), query)
+                
+                # Assess sufficiency of cached documents
+                sufficiency_score = scoring_service.assess_context_sufficiency(query, cached_docs_with_scores)
+                
+                # A threshold of 0.4 is a good starting point
+                if sufficiency_score > 0.4:
+                    print("DEBUG: Sufficient context found in cache. Bypassing web scrape.")
+                    # Convert results back to the passage dictionary format for processing
+                    for doc, score in cached_docs_with_scores:
+                        cached_passages.append({
+                            "text": doc.page_content,
+                            "metadata": doc.metadata,
+                            "final_combined_score": score # Use similarity score as the ranking metric
+                        })
+        
+        if cached_passages:
+            # If cache was sufficient, use the cached passages directly
+            final_passages = cached_passages
+            yield create_progress_bar_string(95, "Generating answer from cache...").encode("utf-8")
+        else:
+            # --- Fallback to Web Scraping Logic (if cache is not used, empty, or insufficient) ---
+            async with aiohttp.ClientSession(**brave_searcher.session_config) as session:
+                yield create_progress_bar_string(10, "Searching for sources...").encode("utf-8")
+                
+                initial_sources = await brave_searcher.search_and_scrape(session, query, max_sources=30)
+                if not initial_sources:
+                    yield "\nCould not find any initial sources.".encode("utf-8")
+                    return
+                
+                yield create_progress_bar_string(20, f"Found {len(initial_sources)} sources...").encode("utf-8")
+                sources_to_scrape = initial_sources[:10]
+                
+                scraped_sources = []
+                total_to_scrape = len(sources_to_scrape)
+                start_progress, end_progress = 20, 70
+                
+                for i, source in enumerate(sources_to_scrape):
+                    progress = start_progress + int(((i + 1) / total_to_scrape) * (end_progress - start_progress))
+                    title = source.get('title', 'Untitled Source')[:45]
+                    yield create_progress_bar_string(progress, f"Analyzing: {title}...").encode("utf-8")
+                    
+                    scraped = await brave_searcher.scrape_top_urls(session, [source])
+                    if scraped:
+                        scraped_sources.extend(scraped)
+                    await asyncio.sleep(0.1)
 
-            # --- Skip snippet re-ranking and prepare for scrape ---
-            sources_to_scrape = initial_sources[:10]
-            
-            # --- STEP 2: DYNAMIC DEEP SCRAPE & PROGRESS UPDATE ---
-            scraped_sources = []
-            total_to_scrape = len(sources_to_scrape)
-            start_progress = 20
-            end_progress = 70
-            
-            for i, source in enumerate(sources_to_scrape):
-                # Calculate current progress percentage
-                progress = start_progress + int(((i + 1) / total_to_scrape) * (end_progress - start_progress))
-                title = source.get('title', 'Untitled Source')[:45] # Truncate title
-                yield create_progress_bar_string(progress, f"Analyzing: {title}...").encode("utf-8")
+                yield create_progress_bar_string(80, "Analyzing content...").encode("utf-8")
                 
-                # Scrape a single source
-                scraped = await brave_searcher.scrape_top_urls(session, [source])
-                if scraped:
-                    scraped_sources.extend(scraped)
-                await asyncio.sleep(0.1) # Small delay for smoother UX
+                final_passages = await scoring_service.rerank_content_chunks(query, scraped_sources, top_n=7)
+                if not final_passages:
+                    yield "\nCould not extract sufficient detailed information.".encode("utf-8")
+                    return
 
-            yield create_progress_bar_string(80, "Analyzing content...").encode("utf-8")
+                # Add newly scraped passages to the cache if caching is enabled
+                if use_caching:
+                    add_passages_to_cache(str(session_id), final_passages)
 
-            # --- STEP 3: CONTENT RE-RANKING ---
-            final_passages = await scoring_service.rerank_content_chunks(query, scraped_sources, top_n=7)
-            if not final_passages:
-                yield "\nCould not extract sufficient detailed information.".encode("utf-8")
-                return
+                yield create_progress_bar_string(95, "Generating final answer...").encode("utf-8")
 
-            yield create_progress_bar_string(95, "Generating final answer...").encode("utf-8")
-            
-            # --- FINAL ANSWER STREAMING ---
-            final_context = scoring_service.create_enhanced_context(final_passages)
-            final_links = list(set([p["metadata"].get("link") for p in final_passages if p.get("metadata", {}).get("link")]))
+        # --- Final Answer Generation (common for both cached and scraped paths) ---
+        final_context = scoring_service.create_enhanced_context(final_passages)
+        final_links = list(set([p["metadata"].get("link") for p in final_passages if p.get("metadata", {}).get("link")]))
 
-            final_prompt = PromptTemplate.from_template(
-                """
-                You are a financial markets expert. Provide a detailed, well-structured final answer using the comprehensive context provided.
-                Use markdown for readability and cite the source links where appropriate. Provide the source links with their citation numbers at the end of the response.
-                
-                Comprehensive Context:
-                {context}
-                
-                Chat History: 
-                {history}
-                
-                User Question: {input}
-                
-                Final Detailed Answer:
-                """
-            )
-            final_chain = final_prompt | llm_stream
+        final_prompt = PromptTemplate.from_template(
+            """
+            You are a financial markets expert. Provide a detailed, well-structured final answer using the comprehensive context provided.
+            Use markdown for readability and cite the source links where appropriate. Provide the source links with their citation numbers at the end of the response.
             
-            yield create_progress_bar_string(100, "Done!").encode("utf-8")
-            yield "\n\n".encode("utf-8") 
-            yield "### Detailed Analysis\n".encode("utf-8")
+            Comprehensive Context:
+            {context}
             
-            final_response_text = ""
-            with get_openai_callback() as cb:
-                async for chunk in final_chain.astream({"context": final_context, "history": chat_history, "input": query}):
-                    if chunk.content:
-                        final_response_text += chunk.content
-                        yield chunk.content.encode("utf-8")
-                
-                # --- FINAL DATABASE OPERATIONS ---
+            Chat History: 
+            {history}
+            
+            User Question: {input}
+            
+            Final Detailed Answer:
+            """
+        )
+        final_chain = final_prompt | llm_stream
+        
+        yield create_progress_bar_string(100, "Done!").encode("utf-8")
+        yield "\n\n".encode("utf-8") 
+        yield "### Detailed Analysis\n".encode("utf-8")
+        
+        final_response_text = ""
+        with get_openai_callback() as cb:
+            async for chunk in final_chain.astream({"context": final_context, "history": chat_history, "input": query}):
+                if chunk.content:
+                    final_response_text += chunk.content
+                    yield chunk.content.encode("utf-8")
+            
+            # --- Final Database Operations ---
+            if not cached_passages: # Only process for dataframe if it was a fresh scrape
                 df_to_insert = brave_searcher._process_for_dataframe(scraped_sources)
                 if not df_to_insert.empty:
                     asyncio.create_task(insert_post1(df_to_insert, db_pool))
 
-                total_tokens = cb.total_tokens
-                asyncio.create_task(insert_credit_usage(user_id, plan_id, total_tokens / 1000, db_pool))
-                asyncio.create_task(store_into_db(session_id, prompt_history_id, {"links": final_links}, db_pool))
-                
-                if final_response_text:
-                    history_db = PostgresChatMessageHistory(str(session_id), psql_url)
-                    history_db.add_user_message(query)
-                    history_db.add_ai_message(final_response_text)
+            total_tokens = cb.total_tokens
+            asyncio.create_task(insert_credit_usage(user_id, plan_id, total_tokens / 1000, db_pool))
+            asyncio.create_task(store_into_db(session_id, prompt_history_id, {"links": final_links}, db_pool))
+            
+            if final_response_text:
+                history_db = PostgresChatMessageHistory(str(session_id), psql_url)
+                history_db.add_user_message(query)
+                history_db.add_ai_message(final_response_text)
 
     return StreamingResponse(tiered_stream_generator(), media_type="text/event-stream")
 

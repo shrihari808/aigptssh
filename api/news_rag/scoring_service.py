@@ -184,6 +184,7 @@ class NewsRagScoringService:
         """
         FIXED: Assess if retrieved documents are sufficient to answer the query
         with proper similarity score interpretation and realistic thresholds.
+        This version now handles both Cosine and L2 distance metrics.
         
         Args:
             query (str): The user's query.
@@ -196,18 +197,28 @@ class NewsRagScoringService:
             print(f"DEBUG: Too few documents ({len(retrieved_docs)}), insufficient.")
             return 0.0
 
-        # FIXED: Convert Pinecone cosine distance to similarity scores
-        # Pinecone cosine distance: 0 = identical, 2 = opposite
-        # For cosine distance: similarity = 1 - distance
-        similarity_scores = [1 - score for doc, score in retrieved_docs]
+        raw_scores = [score for doc, score in retrieved_docs]
+
+        # --- SNIPPET START ---
+        # Heuristic to determine the distance metric. High average scores are likely L2.
+        # Cosine distance for relevant documents is typically low (e.g., < 0.6).
+        avg_score = sum(raw_scores) / len(raw_scores)
+        if avg_score > 0.8:
+            print("DEBUG: High scores detected, assuming L2 distance. Converting with exp(-score).")
+            # Convert L2 distance to a 0-1 similarity score. exp(-distance) is a good choice.
+            similarity_scores = [np.exp(-score) for score in raw_scores]
+        else:
+            print("DEBUG: Low scores detected, assuming Cosine distance. Converting with 1 - score.")
+            # For cosine distance: similarity = 1 - distance
+            similarity_scores = [1 - score for score in raw_scores]
+        # --- SNIPPET END ---
+        
         average_relevance = sum(similarity_scores) / len(similarity_scores)
         
-        # FIXED: Use realistic threshold for text similarity
-        # For cosine similarity, 0.3-0.4 is often a good threshold
-        HIGH_RELEVANCE_THRESHOLD = 0.35  # Much more realistic than 0.8
+        HIGH_RELEVANCE_THRESHOLD = 0.35
         highly_relevant_docs = sum(1 for score in similarity_scores if score > HIGH_RELEVANCE_THRESHOLD)
         
-        print(f"DEBUG: Raw distance scores: {[f'{score:.3f}' for _, score in retrieved_docs[:5]]}")
+        print(f"DEBUG: Raw distance scores: {[f'{score:.3f}' for score in raw_scores[:5]]}")
         print(f"DEBUG: Converted similarities: {[f'{score:.3f}' for score in similarity_scores[:5]]}")
         print(f"DEBUG: Average relevance: {average_relevance:.3f}")
         print(f"DEBUG: Docs above {HIGH_RELEVANCE_THRESHOLD} threshold: {highly_relevant_docs}")

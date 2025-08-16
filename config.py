@@ -35,7 +35,7 @@ OPENAI_CHAT_MODEL = os.getenv("OPENAI_CHAT_MODEL", "gpt-4o")
 OPENAI_EMBEDDING_MODEL = "text-embedding-ada-002"
 
 DB_POOL = None
-
+ENABLE_CACHING = True  # Set to True to enable caching
 # Tokenizer
 encoding = tiktoken.get_encoding("cl100k_base")
 
