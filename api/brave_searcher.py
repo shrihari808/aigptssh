@@ -470,8 +470,7 @@ class BraveVideoSearch:
         params = {
             "q": query,
             "count": max_results,
-            "country": "in",
-            "freshness": "pm"
+            "country": "in"
         }
         
         urls = []

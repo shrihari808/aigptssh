@@ -55,7 +55,7 @@ from langchain_chroma import Chroma
 
 # --- Functions imported from other modules ---
 from streaming.reddit_stream import fetch_search_red, process_search_red
-from streaming.yt_stream import get_data, get_yt_data_async
+from streaming.yt_stream import get_data, get_yt_data_async # Corrected import
 from api.news_rag.scoring_service import scoring_service
 
 from dotenv import load_dotenv
@@ -935,8 +935,51 @@ async def red_rag_bing(
     )
 
 
+async def validate_query_only(query: str) -> dict:
+    """
+    Performs a simple validation check on the user's query without reformulation.
+    """
+    prompt_template_str = """
+    You are a financial query validator. Your task is to determine if the user's query is related to the Indian stock market, finance, economics, companies, or related news.
+
+    User Query: "{query}"
+
+    Return a single JSON object with one key, "valid", which should be 1 for a valid query and 0 for an invalid one.
+
+    Example:
+    User Query: "latest news on RBI monetary policy"
+    {{
+        "valid": 1
+    }}
+
+    User Query: "what is the best pizza topping"
+    {{
+        "valid": 0
+    }}
+    """
+    input_data = {"query": query}
+    
+    prompt_template = PromptTemplate(template=prompt_template_str, input_variables=["query"])
+    chain = prompt_template | GPT4o_mini | JsonOutputParser()
+
+    try:
+        with get_openai_callback() as cb:
+            result = await chain.ainvoke(input_data)
+        
+        result["tokens_used"] = cb.total_tokens
+        print(f"DEBUG: Validation-only check complete. Valid: {result.get('valid')}")
+        return result
+        
+    except Exception as e:
+        print(f"ERROR in validate_query_only: {e}")
+        # Fallback to a safe default to allow the query to proceed
+        return {
+            "valid": 1,
+            "tokens_used": 0
+        }
+
 @yt_rag.post("/yt_rag")
-async def yt_rag_bing(
+async def yt_rag_brave(
     request: InRequest,
     session_id: int = Query(...),
     prompt_history_id: int = Query(...),
@@ -944,105 +987,92 @@ async def yt_rag_bing(
     plan_id: int = Query(...),
     db_pool: asyncpg.Pool = Depends(get_db_pool)
 ):
-    """Optimized YouTube RAG endpoint."""
-    
-    query = request.query.strip()
-    today = datetime.now().strftime("%Y-%m-%d")
-    
-    # Get chat history and do combined preprocessing
-    chat_history = await get_chat_history_optimized(str(session_id), db_pool, limit=3)
-    preprocessing_result = await combined_preprocessing(query, chat_history, today)
-    
-    # Extract results
-    valid = preprocessing_result.get("valid", 0)
-    reformulated_query = preprocessing_result.get("reformulated_query", query)
-    is_followup = preprocessing_result.get("is_followup", False)
-    preprocessing_tokens = preprocessing_result.get("tokens_used", 0)
-    
-    data = ""
-    links = []
-    
-    if valid != 0:
-        try:
-            # THIS IS THE KEY CHANGE: Ensuring it calls the right function
-            links = await get_yt_data_async(reformulated_query)
-            print(f"\n--- DEBUG: yt_rag_bing endpoint (Data Fetch) ---")
-            print(f"Links after filtering, before transcript processing: {links}")
-            data = await get_data(links, db_pool)
-            print(f"Data passed to summary generation (length: {len(str(data))} chars)")
-            print(f"--- END DEBUG: yt_rag_bing endpoint (Data Fetch) ---\n")
-            
-        except Exception as e:
-            print(f"ERROR: YouTube processing failed: {e}")
-            data, links = "", []
-
-    prompt = """
-    Given YouTube transcripts: {summaries}
-    Chat history: {history}
-    Today date: {date}
-    
-    You are a financial information assistant specializing in video content analysis.
-    Using the provided YouTube transcripts and chat history, respond to the user's inquiries with insights from video discussions.
-    
-    Focus on:
-    - Key insights from financial experts and analysts
-    - Market predictions and analysis from videos
-    - Educational content and explanations
-    - Different expert perspectives on financial topics
-    
-    Always cite the sources wherever referenced and their citation numbers with the source links at the end of the response.
-    Use proper markdown formatting for better readability.
-    
-    The user has asked the following question: {query}
     """
+    Handles YouTube-based RAG requests. It validates the user's query, fetches relevant
+    YouTube video transcripts, generates a comprehensive summary, and streams the
+    response back to the user.
+    """
+    original_query = request.query.strip()
     
-    yt_prompt = PromptTemplate(
-        template=prompt, 
-        input_variables=["history", "query", "summaries", "date"]
-    )
-    chain = yt_prompt | llm_stream
-
-    async def generate_chat_res(history, data, query, date):
+    # Perform a simple, fast validation on the query without reformulation.
+    validation_result = await validate_query_only(original_query)
+    
+    valid = validation_result.get("valid", 0)
+    validation_tokens = validation_result.get("tokens_used", 0)
+    
+    async def generate_chat_res():
+        """A generator function that streams the entire process."""
         if valid == 0:
-            error_message = "The search query is not related to Indian financial markets, companies, economics, or finance. Please ask questions about stocks, companies, market trends, financial news, or economic developments."
+            error_message = "The search query is not related to financial markets, companies, or economics. Please ask a relevant question."
             yield error_message.encode("utf-8")
             return
 
+        final_links = []
+        data_for_summary = ""
+
+        try:
+            # Step 1: Get relevant YouTube video URLs using the original query.
+            final_links = await get_yt_data_async(original_query)
+            
+            if not final_links:
+                yield "Could not find any relevant YouTube videos for your query.".encode("utf-8")
+                return
+
+            # Step 2: Fetch transcripts and metadata for the found videos, passing the database pool.
+            data_for_summary = await get_data(final_links, db_pool)
+            if not data_for_summary:
+                yield "Found videos, but could not retrieve their transcripts.".encode("utf-8")
+                return
+
+        except Exception as e:
+            print(f"ERROR: YouTube processing pipeline failed: {e}")
+            yield "An error occurred while fetching video data.".encode("utf-8")
+            return
+
+        # Step 3: Define the prompt and chain for generating the final answer.
+        prompt = """
+        Given the following YouTube video transcripts: {summaries}
+        
+        You are a financial information assistant. Your task is to answer the user's question in detail using ONLY the provided transcripts.
+        
+        Guidelines:
+        - Base your answer STRICTLY on the information within the transcripts. Do not invent or use outside knowledge.
+        - Cite your sources by adding a number like [1], [2], etc., after each piece of information you use.
+        - At the end of your response, create a "Sources" section and list all the YouTube links with their corresponding citation numbers.
+        
+        User's question: {query}
+        """
+        yt_prompt = PromptTemplate(template=prompt, input_variables=["query", "summaries"])
+        chain = yt_prompt | llm_stream
+
+        # Step 4: Stream the final response to the user.
         final_response = ""
         try:
             with get_openai_callback() as cb:
-                async for event in chain.astream_events(
-                    {"history": history, "summaries": data, "query": query, "date": date}, 
-                    version="v1"
-                ):
-                    if event["event"] == "on_chat_model_stream":
-                        content = event["data"]["chunk"].content
-                        if content:
-                            final_response += content
-                            yield content.encode("utf-8")
-                            await asyncio.sleep(0.01)
+                async for chunk in chain.astream({
+                    "summaries": str(data_for_summary), 
+                    "query": original_query,
+                }):
+                    content = chunk.content
+                    if content:
+                        final_response += content
+                        yield content.encode("utf-8")
+                        await asyncio.sleep(0.01)
 
-                # Calculate total tokens
-                total_tokens = preprocessing_tokens + cb.total_tokens
+                # After streaming, calculate costs and update database records.
+                total_tokens = validation_tokens + cb.total_tokens
                 await insert_credit_usage(user_id, plan_id, total_tokens / 1000, db_pool)
-
-            # Store links and conversation
-            links_data = {"links": links}
-            print(f"\n--- DEBUG: yt_rag_bing endpoint (Final Step) ---")
-            print(f"Storing these links in the database: {links_data}")
-            print(f"--- END DEBUG: yt_rag_bing endpoint (Final Step) ---\n")
+            
+            links_data = {"links": final_links}
             await store_into_db(session_id, prompt_history_id, links_data, db_pool)
 
             if final_response:
                 history_db = PostgresChatMessageHistory(str(session_id), psql_url)
-                history_db.add_user_message(reformulated_query if is_followup else query)
+                history_db.add_user_message(original_query)
                 history_db.add_ai_message(final_response)
 
         except Exception as e:
-            print(f"ERROR: An error occurred during streaming: {e}")
+            print(f"ERROR: An error occurred during final response streaming: {e}")
             yield b"An error occurred while generating the response."
-
-    return StreamingResponse(
-        generate_chat_res(chat_history, data, reformulated_query, today), 
-        media_type="text/event-stream"
-    )
+            
+    return StreamingResponse(generate_chat_res(), media_type="text/event-stream")

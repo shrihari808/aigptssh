@@ -53,6 +53,30 @@ youtube = build('youtube', 'v3', developerKey=youtube_api_key)
 llm=ChatOpenAI(temperature=0.5, model="gpt-4o-mini")
 psql_url=os.getenv('DATABASE_URL')
 
+yt_prompt_template = """
+Your task is to determine if a YouTube video title is relevant to a user question.
+
+user question : {q}
+Youtube title : {yt}
+Output the result in JSON format:
+
+"valid": Return 1 if the question is related, otherwise return 0.
+"""
+yt_prompt = PromptTemplate(template=yt_prompt_template, input_variables=["q", "yt"])
+yt_chain = yt_prompt | llm | JsonOutputParser()
+
+async def check_youtube_relevance(query: str, youtube_title: str):
+    """Asynchronously checks if a YouTube title is relevant to the query."""
+    if not youtube_title or youtube_title == "Video not found":
+        return 0
+    input_data = {"q": query, "yt": youtube_title}
+    try:
+        res = await yt_chain.ainvoke(input_data)
+        return res.get('valid', 0)
+    except Exception as e:
+        print(f"  -> ERROR: LLM relevance check failed: {e}")
+        return 0
+
 def get_length(url):
     try:
         yt = YouTube(url)
@@ -253,111 +277,86 @@ async def turl(video_url):
             else:
                 return None
 
-async def insert_into_database(source_url, image_url, title, description, s_date, youtube_summary):
-    if not DB_POOL:
+async def insert_into_database(db_pool, source_url, image_url, title, description, s_date, youtube_summary):
+    if not db_pool: # Check the passed argument
         print("ERROR: Database pool not initialized.")
         return
     try:
-        async with DB_POOL.acquire() as conn:
+        async with db_pool.acquire() as conn: # Use the passed argument
+            # ... (rest of the function is the same)
             data = (source_url, image_url, title, description, s_date, youtube_summary)
-
-            check_query = """
-                SELECT 1 FROM source_data WHERE source_url = $1
-            """
+            check_query = "SELECT 1 FROM source_data WHERE source_url = $1"
             exists = await conn.fetchrow(check_query, source_url)
-
             if not exists:
-                insert_query = """
-                    INSERT INTO source_data (source_url, image_url, title, description, source_date, youtube_summary)
-                    VALUES ($1, $2, $3, $4, $5, $6)
-                """
+                insert_query = "INSERT INTO source_data (source_url, image_url, title, description, source_date, youtube_summary) VALUES ($1, $2, $3, $4, $5, $6)"
                 await conn.execute(insert_query, *data)
                 print("Data inserted successfully into PostgreSQL")
             else:
                 print("Source URL already exists. Skipping insertion.")
-
+    except (Exception, asyncpg.Error) as error:
+        print("Error while inserting data into PostgreSQL:", error)
     except (Exception, asyncpg.Error) as error:
         print("Error while inserting data into PostgreSQL:", error)
 
-async def get_summary_from_database(source_url):
-    if not DB_POOL:
+async def get_summary_from_database(db_pool, source_url):
+    if not db_pool: # Check the passed argument
         print("ERROR: Database pool not initialized.")
         return None
     try:
-        async with DB_POOL.acquire() as conn:
-            select_query = """
-                SELECT youtube_summary FROM source_data WHERE source_url = $1
-            """
+        async with db_pool.acquire() as conn: # Use the passed argument
+            select_query = "SELECT youtube_summary FROM source_data WHERE source_url = $1"
             result = await conn.fetchrow(select_query, source_url)
-
-            if result:
-                return result['youtube_summary']
-            else:
-                return None
-
+            return result['youtube_summary'] if result else None
+    except (Exception, asyncpg.Error) as error:
+        print("Error while fetching data from PostgreSQL:", error)
+        return None
     except (Exception, asyncpg.Error) as error:
         print("Error while fetching data from PostgreSQL:", error)
         return None
 
-async def extract_youtube_video_data(session, url):
+async def extract_youtube_video_data(session, url, db_pool): # Add db_pool here
     start_time = time.time()
+    # ... (soup parsing logic is the same) ...
     async with session.get(url) as response:
         content = await response.text()
     soup = BeautifulSoup(content, 'html.parser')
-
+    
     video_id_match = re.search(r"v=([^\&\?\/]+)", url)
     video_id = video_id_match.group(1) if video_id_match else ""
-    #print(video_id)
         
-    summary = await get_summary_from_database(url)
-    #print(summary)
+    # Pass db_pool to the database function
+    summary = await get_summary_from_database(db_pool, url) 
     if not summary:
-        #transcript = await get_video_transcript(video_id) if video_id else ""
-        transcript=await get_youtube_transcript(video_id) if video_id else ""
-        #print(transcript)
+        transcript = await get_video_transcript(video_id) if video_id else ""
         summary = transcript
 
     if summary:
-
-        # title_tag = soup.find("meta", {"name": "title"})
-        # title = title_tag["content"] if title_tag else "No Title Available"
+        # ... (logic to get title, description, etc. is the same) ...
         try:
-            #yt = YouTube(url)
-            #title = yt.title
             title=get_youtube_title(video_id)
-        except LiveStreamError:
-            # Skip the video if it's a live stream
-            title =None
-            print(f"Skipping live stream video: {url}")
         except Exception as e:
-            # Handle any other potential exceptions
             title=None
             print(f"An error occurred with URL {url}: {str(e)}")
-        
+
         description_tag = soup.find("meta", {"name": "description"})
         description = description_tag["content"] if description_tag else "No Description Available"
-        
         date = await get_video_statistics(video_id) if video_id else {}
         t_image = await turl(url)
 
-        end_time = time.time()
-        execution_time = end_time - start_time
+        # Pass db_pool to the database function
+        await insert_into_database(db_pool, url, t_image, title, description, date, summary) 
 
-        #print(url, t_image, title, description, date, summary)
-        await insert_into_database(url, t_image, title, description, date, summary)
-
-        print(f"Execution time for URL {url}: {execution_time:.2f} seconds")
-        
         return title, description, summary, url
-
     else:
-        pass
+        return None, None, None, None # Return None if no summary
 
-async def get_data(urls):
+async def get_data(urls, db_pool): # Add db_pool here
     async with aiohttp.ClientSession() as session:
-        tasks = [extract_youtube_video_data(session, url) for url in urls]
+        # Pass db_pool to each task
+        tasks = [extract_youtube_video_data(session, url, db_pool) for url in urls] 
         results = await asyncio.gather(*tasks)
-        return results
+        # Filter out None results for videos that had no summary
+        return [res for res in results if res[0] is not None]
 
 def count_tokens(text, model_name="gpt-3.5-turbo"):
     encoding = tiktoken.encoding_for_model(model_name)
@@ -399,9 +398,9 @@ def summarize_transcript(trans):
     
     return summary
 
-async def get_yt_data_async(query):
+async def get_yt_data_async(query: str):
     """
-    Searches for YouTube videos using the Brave Video Search API and filters them
+    Asynchronously searches for YouTube videos using the Brave Video Search API and filters them
     based on relevance and video length.
     """
     start_time = time.time()
@@ -417,7 +416,6 @@ async def get_yt_data_async(query):
     video_urls = await brave_video_searcher.search(query, max_results=10)
     print(f"Step 2: Received {len(video_urls)} URLs to filter: {video_urls}")
 
-    # Asynchronously filter videos by relevance and length
     async def filter_video(url):
         print(f"\n  --- Filtering URL: {url} ---")
         loop = asyncio.get_event_loop()
@@ -470,6 +468,7 @@ async def get_yt_data_async(query):
     
     # Return the top 5 most relevant videos
     return filtered_urls[:5]
+
 
 def generate_final_summary(query, summaries):
     start_time = time.time()
