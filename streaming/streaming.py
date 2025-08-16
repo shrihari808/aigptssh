@@ -692,7 +692,7 @@ async def web_rag_mix(
         
         yield create_progress_bar_string(100, "Done!").encode("utf-8")
         yield "\n\n".encode("utf-8") 
-        yield "### Detailed Analysis\n".encode("utf-8")
+        yield "#Thinking ...\n".encode("utf-8")
         
         final_response_text = ""
         with get_openai_callback() as cb:
