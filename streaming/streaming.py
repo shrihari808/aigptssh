@@ -50,11 +50,10 @@ from api.news_rag.caching_service import (
     add_passages_to_cache
 )
 from langchain_core.documents import Document
-from api.news_rag.brave_news import get_brave_snippets_only,BraveNews
+from api.brave_searcher import BraveNews, get_brave_results
 from langchain_chroma import Chroma
 
 # --- Functions imported from other modules ---
-from api.news_rag.brave_news import get_brave_results
 from streaming.reddit_stream import fetch_search_red, process_search_red
 from streaming.yt_stream import get_data, get_yt_data_async
 from api.news_rag.scoring_service import scoring_service
@@ -965,10 +964,13 @@ async def yt_rag_bing(
     
     if valid != 0:
         try:
-            # Get YouTube data with reformulated query
+            # THIS IS THE KEY CHANGE: Ensuring it calls the right function
             links = await get_yt_data_async(reformulated_query)
+            print(f"\n--- DEBUG: yt_rag_bing endpoint (Data Fetch) ---")
+            print(f"Links after filtering, before transcript processing: {links}")
             data = await get_data(links, db_pool)
-            print(f"DEBUG: Retrieved {len(links)} YouTube videos")
+            print(f"Data passed to summary generation (length: {len(str(data))} chars)")
+            print(f"--- END DEBUG: yt_rag_bing endpoint (Data Fetch) ---\n")
             
         except Exception as e:
             print(f"ERROR: YouTube processing failed: {e}")
@@ -988,7 +990,7 @@ async def yt_rag_bing(
     - Educational content and explanations
     - Different expert perspectives on financial topics
     
-    Always mention the source videos when referencing specific information.
+    Always cite the sources wherever referenced and their citation numbers with the source links at the end of the response.
     Use proper markdown formatting for better readability.
     
     The user has asked the following question: {query}
@@ -1026,6 +1028,9 @@ async def yt_rag_bing(
 
             # Store links and conversation
             links_data = {"links": links}
+            print(f"\n--- DEBUG: yt_rag_bing endpoint (Final Step) ---")
+            print(f"Storing these links in the database: {links_data}")
+            print(f"--- END DEBUG: yt_rag_bing endpoint (Final Step) ---\n")
             await store_into_db(session_id, prompt_history_id, links_data, db_pool)
 
             if final_response:

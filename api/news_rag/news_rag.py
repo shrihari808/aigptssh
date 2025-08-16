@@ -1,7 +1,7 @@
 import os
 import time
 from pinecone import Pinecone
-from app_service.api.news_rag.brave_news import BraveNews
+from app_service.api.brave_searcher import BraveNews
 from langchain_community.vectorstores import Pinecone as PineconeVectors
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough

@@ -210,3 +210,4 @@ langdetect
 trafilatura
 lxml_html_clean
 sacremoses
+youtube-transcript-api

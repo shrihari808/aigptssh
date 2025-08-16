@@ -26,7 +26,6 @@ import concurrent.futures
 import openai
 from langchain_openai import OpenAIEmbeddings
 import psycopg2
-from pytube import YouTube 
 from psycopg2 import sql
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -35,6 +34,7 @@ import asyncio
 import aiohttp
 import concurrent.futures
 import time
+from api.brave_searcher import BraveVideoSearch
 from pytube import YouTube
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound, NoTranscriptAvailable
 from dotenv import load_dotenv
@@ -180,46 +180,46 @@ async def check_youtube_relevance(query: str, youtube_title: str):
 
 
 
-def get_bing_search_results(query, count=10):
-    headers = {"Ocp-Apim-Subscription-Key": bing_api_key}
-    params = {"q": query, "count": 5, "mkt": "en-IN", 'freshness': 'Month', "cc": 'IND'}
-    search_url = "https://api.bing.microsoft.com/v7.0/search"
-    response = requests.get(search_url, headers=headers, params=params)
-    response.raise_for_status()
-    search_results = response.json()
-    return search_results.get('webPages', {}).get('value', [])
+# def get_bing_search_results(query, count=10):
+#     headers = {"Ocp-Apim-Subscription-Key": bing_api_key}
+#     params = {"q": query, "count": 5, "mkt": "en-IN", 'freshness': 'Month', "cc": 'IND'}
+#     search_url = "https://api.bing.microsoft.com/v7.0/search"
+#     response = requests.get(search_url, headers=headers, params=params)
+#     response.raise_for_status()
+#     search_results = response.json()
+#     return search_results.get('webPages', {}).get('value', [])
 
-async def search_youtube_videos(query):
-    youtube_search_results = []
-    one_month_ago = datetime.utcnow() - timedelta(days=30)
-    one_month_ago_iso = one_month_ago.isoformat("T") + "Z"
+# async def search_youtube_videos(query):
+#     youtube_search_results = []
+#     one_month_ago = datetime.utcnow() - timedelta(days=30)
+#     one_month_ago_iso = one_month_ago.isoformat("T") + "Z"
     
-    # Replace this line with your actual YouTube API client initialization
-    request = youtube.search().list(
-        part='snippet',
-        q=query,
-        type='video',
-        maxResults=5,
-        regionCode='IN',
-        publishedAfter=one_month_ago_iso
-    )
-    response = request.execute()
-    #print(response)
+#     # Replace this line with your actual YouTube API client initialization
+#     request = youtube.search().list(
+#         part='snippet',
+#         q=query,
+#         type='video',
+#         maxResults=5,
+#         regionCode='IN',
+#         publishedAfter=one_month_ago_iso
+#     )
+#     response = request.execute()
+#     #print(response)
 
-    for item in response['items']:
-        video_id = item['id']['videoId']
-        title = item['snippet']['title']
-        video_url = f'https://www.youtube.com/watch?v={video_id}'
-        #print(title)
-        # Check if title is relevant
-        relevance_check = await check_youtube_relevance(query, title)
+#     for item in response['items']:
+#         video_id = item['id']['videoId']
+#         title = item['snippet']['title']
+#         video_url = f'https://www.youtube.com/watch?v={video_id}'
+#         #print(title)
+#         # Check if title is relevant
+#         relevance_check = await check_youtube_relevance(query, title)
         
-        # Proceed if valid
-        if relevance_check == 1 and 60 < get_video_length(video_url) < 3601:
-            #print("valid",title)
-            youtube_search_results.append(video_url)
+#         # Proceed if valid
+#         if relevance_check == 1 and 60 < get_video_length(video_url) < 3601:
+#             #print("valid",title)
+#             youtube_search_results.append(video_url)
 
-    return youtube_search_results
+#     return youtube_search_results
 
 async def get_video_statistics(video_id):
     youtube = build('youtube', 'v3', developerKey=youtube_api_key)
@@ -400,39 +400,76 @@ def summarize_transcript(trans):
     return summary
 
 async def get_yt_data_async(query):
+    """
+    Searches for YouTube videos using the Brave Video Search API and filters them
+    based on relevance and video length.
+    """
     start_time = time.time()
-    combined_search_results = []
+    brave_api_key = os.getenv('BRAVE_API_KEY')
+    if not brave_api_key:
+        print("ERROR: BRAVE_API_KEY not found in environment variables.")
+        return []
+        
+    brave_video_searcher = BraveVideoSearch(brave_api_key)
+    
+    print(f"\n--- DEBUG: get_yt_data_async ---")
+    print(f"Step 1: Fetching video URLs for query: '{query}'")
+    video_urls = await brave_video_searcher.search(query, max_results=10)
+    print(f"Step 2: Received {len(video_urls)} URLs to filter: {video_urls}")
 
-    async def fetch_bing_results():
+    # Asynchronously filter videos by relevance and length
+    async def filter_video(url):
+        print(f"\n  --- Filtering URL: {url} ---")
+        loop = asyncio.get_event_loop()
         try:
-            bing_search_results = get_bing_search_results(f"site:youtube.com {query}")
-            for result in bing_search_results:
-                url = result['url']
-                title = result['name']
-                #print(title)
-                # Check relevance asynchronously
-                relevance_check = await check_youtube_relevance(query, title)
-                if relevance_check == 1 and 60 < get_video_length(url) < 3601:
-                    #print("valid",title)
-                    combined_search_results.append(url)
+            # Run synchronous I/O-bound functions in a thread pool executor
+            video_length = await loop.run_in_executor(None, get_video_length, url)
+            print(f"  Video Length: {video_length} seconds")
+            
+            # Filter by length first to avoid unnecessary API calls for title
+            if not (60 < video_length < 3601):
+                print(f"  -> REJECTED: Video length ({video_length}s) is outside the 60-3600s range.")
+                return None
+
+            video_id = await loop.run_in_executor(None, extract_video_id, url)
+            if not video_id:
+                print(f"  -> REJECTED: Could not extract video ID.")
+                return None
+            print(f"  Video ID: {video_id}")
+            
+            title = await loop.run_in_executor(None, get_youtube_title, video_id)
+            print(f"  Video Title: {title}")
+            
+            # Asynchronous relevance check using LLM
+            relevance_check = await check_youtube_relevance(query, title)
+            print(f"  Relevance Check (LLM): {relevance_check}")
+            
+            if relevance_check == 1:
+                print(f"  -> ACCEPTED: Video is relevant and within length limits.")
+                return url
+            else:
+                print(f"  -> REJECTED: LLM determined the video is not relevant.")
+                return None
         except Exception as e:
-            print(f"Failed to fetch results from Bing: {e}")
+            print(f"  -> ERROR: Failed to process video URL {url}: {e}")
+            return None
 
-    async def fetch_youtube_api_results():
-        try:
-            youtube_search_results = await search_youtube_videos(query)  # Assuming search_youtube_videos is async
-            for video_url in youtube_search_results:
-                combined_search_results.append(video_url)
-        except Exception as e:
-            print(f"Failed to fetch results from YouTube API: {e}")
-
-    # Run both Bing and YouTube fetchers concurrently
-    await asyncio.gather(fetch_bing_results(), fetch_youtube_api_results())
-
+    # Create and run filtering tasks concurrently
+    print(f"Step 3: Starting concurrent filtering of {len(video_urls)} videos...")
+    tasks = [filter_video(url) for url in video_urls]
+    results = await asyncio.gather(*tasks)
+    
+    # Collect non-None results
+    filtered_urls = [url for url in results if url is not None]
+    
     end_time = time.time()
     elapsed_time = end_time - start_time
-    print(f"Function executed in: {elapsed_time} seconds")
-    return combined_search_results
+    print(f"Step 4: Filtering complete in {elapsed_time:.2f} seconds.")
+    print(f"Final list of filtered URLs ({len(filtered_urls)}): {filtered_urls}")
+    print(f"--- END DEBUG: get_yt_data_async ---\n")
+    
+    # Return the top 5 most relevant videos
+    return filtered_urls[:5]
 
 def generate_final_summary(query, summaries):
     start_time = time.time()
