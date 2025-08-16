@@ -461,44 +461,63 @@ class BraveVideoSearch:
             "X-Subscription-Token": self.brave_api_key
         }
     
-    async def search(self, query: str, max_results: int = 10) -> list[str]:
+    async def search_detailed(self, query: str, max_results: int = 10) -> list[dict]:
         """
-        Performs a video search using the Brave API and returns a list of URLs.
+        Performs a video search using the Brave API and returns detailed video data.
+        
+        Args:
+            query: Search query
+            max_results: Maximum number of results to return
+            
+        Returns:
+            List of dictionaries containing detailed video information
         """
-        print(f"\n--- DEBUG: BraveVideoSearch ---")
+        print(f"\n--- DEBUG: BraveVideoSearch.search_detailed ---")
         print(f"Querying Brave Video API with: '{query}'")
+        
         params = {
             "q": query,
             "count": max_results,
             "country": "in"
         }
         
-        urls = []
+        video_results = []
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(self.BRAVE_API_BASE_URL, headers=self.headers, params=params) as response:
                     if response.status == 200:
                         data = await response.json()
-                        print(f"Brave API Raw Response: {json.dumps(data, indent=2)}")
+                        print(f"Brave API Response Status: {response.status}")
+                        
                         results = data.get("results", [])
+                        print(f"Found {len(results)} video results")
+                        
                         for item in results:
-                            if 'url' in item:
-                                url = item['url']
-                                print(f"  - Found URL: {url}")
-                                if 'youtube.com' in url or 'youtu.be' in url:
-                                    urls.append(url)
-                                    print(f"    -> Accepted as YouTube URL.")
-                                else:
-                                    print(f"    -> Rejected: Not a YouTube URL.")
+                            if 'url' in item and ('youtube.com' in item['url'] or 'youtu.be' in item['url']):
+                                video_info = {
+                                    'url': item['url'],
+                                    'title': item.get('title', 'No title available'),
+                                    'description': item.get('description', 'No description available'),
+                                    'page_age': item.get('page_age', ''),
+                                    'video': item.get('video', {}),
+                                    'thumbnail': item.get('thumbnail', {})
+                                }
+                                video_results.append(video_info)
+                                print(f"  -> Added: {video_info['title']}")
+                            else:
+                                print(f"  -> Skipped non-YouTube URL: {item.get('url', 'No URL')}")
+                                
                     else:
                         print(f"Brave Video Search API error: {response.status}")
-                        print(f"Response Body: {await response.text()}")
+                        error_text = await response.text()
+                        print(f"Response Body: {error_text}")
+                        
         except Exception as e:
             print(f"An error occurred during Brave video search: {e}")
 
-        print(f"Final list of YouTube URLs from Brave: {urls}")
-        print(f"--- END DEBUG: BraveVideoSearch ---\n")
-        return urls
+        print(f"Final list of {len(video_results)} YouTube videos from Brave API")
+        print(f"--- END DEBUG: BraveVideoSearch.search_detailed ---\n")
+        return video_results
 
 # --- Standalone Functions ---
 

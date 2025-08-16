@@ -55,7 +55,7 @@ from langchain_chroma import Chroma
 
 # --- Functions imported from other modules ---
 from streaming.reddit_stream import fetch_search_red, process_search_red
-from streaming.yt_stream import get_data, get_yt_data_async # Corrected import
+from streaming.yt_stream import get_data, get_yt_data_async
 from api.news_rag.scoring_service import scoring_service
 
 from dotenv import load_dotenv
@@ -988,20 +988,20 @@ async def yt_rag_brave(
     db_pool: asyncpg.Pool = Depends(get_db_pool)
 ):
     """
-    Handles YouTube-based RAG requests. It validates the user's query, fetches relevant
-    YouTube video transcripts, generates a comprehensive summary, and streams the
-    response back to the user.
+    Handles YouTube-based RAG requests using only youtube-transcript-api and pytube.
+    Validates the user's query, fetches relevant YouTube video transcripts, 
+    generates a comprehensive summary, and streams the response back to the user.
     """
     original_query = request.query.strip()
     
-    # Perform a simple, fast validation on the query without reformulation.
+    # Perform a simple, fast validation on the query without reformulation
     validation_result = await validate_query_only(original_query)
     
     valid = validation_result.get("valid", 0)
     validation_tokens = validation_result.get("tokens_used", 0)
     
     async def generate_chat_res():
-        """A generator function that streams the entire process."""
+        """Generator function that streams the entire process."""
         if valid == 0:
             error_message = "The search query is not related to financial markets, companies, or economics. Please ask a relevant question."
             yield error_message.encode("utf-8")
@@ -1011,25 +1011,30 @@ async def yt_rag_brave(
         data_for_summary = ""
 
         try:
-            # Step 1: Get relevant YouTube video URLs using the original query.
+            # Step 1: Get relevant YouTube video URLs using the original query
+            print(f"DEBUG: Starting YouTube search for query: '{original_query}'")
             final_links = await get_yt_data_async(original_query)
             
             if not final_links:
                 yield "Could not find any relevant YouTube videos for your query.".encode("utf-8")
                 return
 
-            # Step 2: Fetch transcripts and metadata for the found videos, passing the database pool.
+            print(f"DEBUG: Found {len(final_links)} relevant videos")
+
+            # Step 2: Fetch transcripts and metadata for the found videos
             data_for_summary = await get_data(final_links, db_pool)
             if not data_for_summary:
                 yield "Found videos, but could not retrieve their transcripts.".encode("utf-8")
                 return
+
+            print(f"DEBUG: Successfully processed {len(data_for_summary)} videos with transcripts")
 
         except Exception as e:
             print(f"ERROR: YouTube processing pipeline failed: {e}")
             yield "An error occurred while fetching video data.".encode("utf-8")
             return
 
-        # Step 3: Define the prompt and chain for generating the final answer.
+        # Step 3: Generate the final answer using the transcript data
         prompt = """
         Given the following YouTube video transcripts: {summaries}
         
@@ -1039,13 +1044,15 @@ async def yt_rag_brave(
         - Base your answer STRICTLY on the information within the transcripts. Do not invent or use outside knowledge.
         - Cite your sources by adding a number like [1], [2], etc., after each piece of information you use.
         - At the end of your response, create a "Sources" section and list all the YouTube links with their corresponding citation numbers.
+        - Provide a comprehensive and detailed response covering all relevant aspects from the transcripts.
         
         User's question: {query}
         """
+        
         yt_prompt = PromptTemplate(template=prompt, input_variables=["query", "summaries"])
         chain = yt_prompt | llm_stream
 
-        # Step 4: Stream the final response to the user.
+        # Step 4: Stream the final response to the user
         final_response = ""
         try:
             with get_openai_callback() as cb:
@@ -1059,13 +1066,15 @@ async def yt_rag_brave(
                         yield content.encode("utf-8")
                         await asyncio.sleep(0.01)
 
-                # After streaming, calculate costs and update database records.
+                # Calculate total tokens and update database records
                 total_tokens = validation_tokens + cb.total_tokens
                 await insert_credit_usage(user_id, plan_id, total_tokens / 1000, db_pool)
             
+            # Store links data
             links_data = {"links": final_links}
             await store_into_db(session_id, prompt_history_id, links_data, db_pool)
 
+            # Store conversation in chat history
             if final_response:
                 history_db = PostgresChatMessageHistory(str(session_id), psql_url)
                 history_db.add_user_message(original_query)

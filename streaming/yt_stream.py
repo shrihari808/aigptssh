@@ -1,561 +1,547 @@
 import asyncio
 import aiohttp
-from pytube.exceptions import LiveStreamError
 import time
 import asyncpg
-import requests
 from langchain_community.callbacks import get_openai_callback
 from langchain_text_splitters import TokenTextSplitter
-from googleapiclient.discovery import build
-from langchain_community.chat_message_histories import PostgresChatMessageHistory
-from youtube_transcript_api import YouTubeTranscriptApi
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
+from youtube_transcript_api import YouTubeTranscriptApi, NoTranscriptFound
 from bs4 import BeautifulSoup
 import re
 from langchain_core.output_parsers import JsonOutputParser
-import datetime
+from datetime import datetime, timedelta
 from langchain_openai import ChatOpenAI
 from langchain.chains import LLMChain
 from langchain import PromptTemplate
 import os
 import tiktoken
-from fastapi.responses import StreamingResponse
-import chromadb
-import concurrent.futures
-import openai
-from langchain_openai import OpenAIEmbeddings
-import psycopg2
-from psycopg2 import sql
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from datetime import datetime, timedelta
-import asyncio
-import aiohttp
-import concurrent.futures
-import time
-from api.brave_searcher import BraveVideoSearch
 from pytube import YouTube
-from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound, NoTranscriptAvailable
+from api.brave_searcher import BraveVideoSearch
 from dotenv import load_dotenv
-from config import GPT4o_mini, DB_POOL
+from config import GPT4o_mini
+
 load_dotenv(override=True)
 
-#llm=GPT4o_mini
+# Initialize LLM
+llm = ChatOpenAI(temperature=0.5, model="gpt-4o-mini")
+psql_url = os.getenv('DATABASE_URL')
 
-bing_api_key = os.getenv('BING_API_KEY')
-google_custom_search_api_key = os.getenv('google_custom_search_api_key')
-google_cx = os.getenv('google_cx')
-youtube_api_key = os.getenv('youtube_api_key')
-
-youtube = build('youtube', 'v3', developerKey=youtube_api_key)
-
-llm=ChatOpenAI(temperature=0.5, model="gpt-4o-mini")
-psql_url=os.getenv('DATABASE_URL')
-
+# LLM chain for relevance checking
 yt_prompt_template = """
 Your task is to determine if a YouTube video title is relevant to a user question.
 
-user question : {q}
-Youtube title : {yt}
-Output the result in JSON format:
+User question: {q}
+YouTube title: {yt}
 
-"valid": Return 1 if the question is related, otherwise return 0.
+Output the result in JSON format:
+{{"valid": 1 if the video is relevant to the question, otherwise 0}}
 """
+
 yt_prompt = PromptTemplate(template=yt_prompt_template, input_variables=["q", "yt"])
 yt_chain = yt_prompt | llm | JsonOutputParser()
 
-async def check_youtube_relevance(query: str, youtube_title: str):
-    """Asynchronously checks if a YouTube title is relevant to the query."""
+def yt_chat(query: str, session_id: str) -> dict:
+    pass
+
+async def check_youtube_relevance(query: str, youtube_title: str) -> int:
+    """
+    Asynchronously checks if a YouTube title is relevant to the query using LLM.
+    
+    Args:
+        query: User's search query
+        youtube_title: Title of the YouTube video
+        
+    Returns:
+        1 if relevant, 0 if not relevant
+    """
     if not youtube_title or youtube_title == "Video not found":
         return 0
+        
     input_data = {"q": query, "yt": youtube_title}
     try:
         res = await yt_chain.ainvoke(input_data)
         return res.get('valid', 0)
     except Exception as e:
-        print(f"  -> ERROR: LLM relevance check failed: {e}")
+        print(f"ERROR: LLM relevance check failed: {e}")
         return 0
 
-def get_length(url):
+def extract_video_id(url: str) -> str:
+    """
+    Extract video ID from YouTube URL.
+    
+    Args:
+        url: YouTube URL
+        
+    Returns:
+        Video ID string or None if not found
+    """
+    patterns = [
+        r'(?:v=|\/)([0-9A-Za-z_-]{11})',
+        r'youtu\.be\/([0-9A-Za-z_-]{11})',
+        r'embed\/([0-9A-Za-z_-]{11})'
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, url)
+        if match:
+            return match.group(1)
+    return None
+
+def parse_duration_to_seconds(duration_str: str) -> int:
+    """
+    Parse duration string (e.g., "02:30", "1:15:30") to seconds.
+    
+    Args:
+        duration_str: Duration in format "MM:SS" or "HH:MM:SS"
+        
+    Returns:
+        Duration in seconds
+    """
+    try:
+        parts = duration_str.split(':')
+        if len(parts) == 2:  # MM:SS
+            minutes, seconds = map(int, parts)
+            return minutes * 60 + seconds
+        elif len(parts) == 3:  # HH:MM:SS
+            hours, minutes, seconds = map(int, parts)
+            return hours * 3600 + minutes * 60 + seconds
+        else:
+            return 0
+    except (ValueError, AttributeError):
+        return 0
+
+def get_video_length_pytube(url: str) -> int:
+    """
+    Get video length using pytube as fallback.
+    
+    Args:
+        url: YouTube URL
+        
+    Returns:
+        Video length in seconds, or 999999 if error
+    """
     try:
         yt = YouTube(url)
-        #print(yt)  ## this creates a YOUTUBE OBJECT
-        video_length = yt.length
-        #print(video_length)
-        #print(video_length) 
-        return video_length
+        return yt.length if yt.length else 999999
     except Exception as e:
-        #print(f"Error getting video length for {url}: {e}")
-        #print(float('inf'))
+        print(f"WARNING: Could not get video length for {url}: {e}")
         return 999999
 
-def extract_video_id(url):
-    match = re.search(r'(?:v=|\/)([0-9A-Za-z_-]{11})', url)
-    return match.group(1) if match else None
-
-def get_video_length(url):
-    video_id=extract_video_id(url)
-    url = f"https://www.googleapis.com/youtube/v3/videos?id={video_id}&part=contentDetails&key={youtube_api_key}"
-    response = requests.get(url)
+async def get_available_transcripts(video_id: str) -> list:
+    """
+    Get list of available transcripts for a video.
     
-    if response.status_code == 200:
-        data = response.json()
-        duration = data["items"][0]["contentDetails"]["duration"]
-        #print(parse_duration(duration))
-        return parse_duration(duration)
-    else:
-        print("Error fetching video details:", response.status_code)
-        return None
-
-def parse_duration(duration):
-    # Converts ISO 8601 duration to seconds
-    match = re.match(r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?', duration)
-    hours = int(match.group(1) or 0)
-    minutes = int(match.group(2) or 0)
-    seconds = int(match.group(3) or 0)
-    return timedelta(hours=hours, minutes=minutes, seconds=seconds).total_seconds()
-
-def get_youtube_title(video_id):
-    # Build the YouTube service
-    youtube = build('youtube', 'v3', developerKey=youtube_api_key)
-
-    try:
-        # Make an API call to get the video details
-        request = youtube.videos().list(part="snippet", id=video_id)
-        response = request.execute()
-
-        # Extract the video title
-        if response['items']:
-            title = response['items'][0]['snippet']['title']
-            return title
-        else:
-            return "Video not found"
-    except Exception as e:
-        return f"Error: {str(e)}"
-    
-
-async def get_youtube_transcript(video_id):
-    rapidapi_key=os.getenv('rapid_key')  # Your API key here
-    try:
-        async with aiohttp.ClientSession() as session:
-            # Step 1: Get video details to fetch the subtitles URL
-            details_url = "https://youtube-media-downloader.p.rapidapi.com/v2/video/details"
-            querystring_details = {"videoId": video_id}
-
-            headers = {
-                "x-rapidapi-key": rapidapi_key,
-                "x-rapidapi-host": "youtube-media-downloader.p.rapidapi.com"
-            }
-
-            async with session.get(details_url, headers=headers, params=querystring_details) as response:
-                response.raise_for_status()  # Ensure the request was successful
-                data = await response.json()
-
-            # Step 2: Extract subtitle URL from the response
-            if 'subtitles' in data and 'items' in data['subtitles'] and data['subtitles']['items']:
-                cc_url = data['subtitles']['items'][0]['url']
-            else:
-                return "No subtitles available for this video."
-
-            # Step 3: Get the transcript using the subtitle URL
-            transcript_url = "https://youtube-media-downloader.p.rapidapi.com/v2/video/subtitles"
-            querystring_transcript = {"subtitleUrl": cc_url, "format": "json"}
-
-            async with session.get(transcript_url, headers=headers, params=querystring_transcript) as trans:
-                trans.raise_for_status()  # Ensure the request was successful
-                transcript_data = await trans.json()
-
-            # Step 4: Concatenate all the transcript text
-            full_transcript = " ".join([item['text'] for item in transcript_data])
-            summary = await asyncio.to_thread(summarize_transcript, full_transcript)
-            return summary
-            # print(full_transcript)
-
-            # return full_transcript
-
-    except Exception as e:
-        return None
-
-
-yt_prompt = """
-Your task is to determine if a YouTube video title is relevant to a user question
-
-user question : {q}
-Youtube title : {yt}
-Output the result in JSON format:
-
-"valid": Return 1 if the question is related , otherwise return 0.
-
-"""
-
-y_prompt = PromptTemplate(template=yt_prompt)
-#llm_chain_res= LLMChain(prompt=R_prompt, llm=GPT4o_mini)
-yt_chain = y_prompt | GPT4o_mini | JsonOutputParser()
-
-
-async def check_youtube_relevance(query: str, youtube_title: str):
-    input_data = {
-        "q": query,
-        "yt": youtube_title
-    }
-    res = await yt_chain.ainvoke(input_data)
-    return res['valid']
-
-
-
-# def get_bing_search_results(query, count=10):
-#     headers = {"Ocp-Apim-Subscription-Key": bing_api_key}
-#     params = {"q": query, "count": 5, "mkt": "en-IN", 'freshness': 'Month', "cc": 'IND'}
-#     search_url = "https://api.bing.microsoft.com/v7.0/search"
-#     response = requests.get(search_url, headers=headers, params=params)
-#     response.raise_for_status()
-#     search_results = response.json()
-#     return search_results.get('webPages', {}).get('value', [])
-
-# async def search_youtube_videos(query):
-#     youtube_search_results = []
-#     one_month_ago = datetime.utcnow() - timedelta(days=30)
-#     one_month_ago_iso = one_month_ago.isoformat("T") + "Z"
-    
-#     # Replace this line with your actual YouTube API client initialization
-#     request = youtube.search().list(
-#         part='snippet',
-#         q=query,
-#         type='video',
-#         maxResults=5,
-#         regionCode='IN',
-#         publishedAfter=one_month_ago_iso
-#     )
-#     response = request.execute()
-#     #print(response)
-
-#     for item in response['items']:
-#         video_id = item['id']['videoId']
-#         title = item['snippet']['title']
-#         video_url = f'https://www.youtube.com/watch?v={video_id}'
-#         #print(title)
-#         # Check if title is relevant
-#         relevance_check = await check_youtube_relevance(query, title)
+    Args:
+        video_id: YouTube video ID
         
-#         # Proceed if valid
-#         if relevance_check == 1 and 60 < get_video_length(video_url) < 3601:
-#             #print("valid",title)
-#             youtube_search_results.append(video_url)
-
-#     return youtube_search_results
-
-async def get_video_statistics(video_id):
-    youtube = build('youtube', 'v3', developerKey=youtube_api_key)
-    request = youtube.videos().list(part='statistics,snippet', id=video_id)
-    response = await asyncio.to_thread(request.execute)
-
-    if not response['items']:
-        return None
-
-    snippet = response['items'][0]['snippet']
-    return snippet['publishedAt']
-
-async def get_video_transcript(video_id):
+    Returns:
+        List of available transcript information
+    """
     try:
-        transcript_en = await asyncio.to_thread(YouTubeTranscriptApi.get_transcript, video_id, languages=['en'])
-        text_en = ' '.join([entry['text'] for entry in transcript_en])
-        summary = await asyncio.to_thread(summarize_transcript, text_en)
-        return summary
-    except (NoTranscriptFound, NoTranscriptAvailable, TranscriptsDisabled):
-        return None
-
-async def turl(video_url):
-    video_id_match = re.search(r"v=([^\&\?\/]+)", video_url)
-    video_id = video_id_match.group(1) if video_id_match else ""
-    thumbnail_url = f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
-    
-    async with aiohttp.ClientSession() as session:
-        async with session.get(thumbnail_url) as response:
-            if response.status == 200:
-                return thumbnail_url
-            else:
-                return None
-
-async def insert_into_database(db_pool, source_url, image_url, title, description, s_date, youtube_summary):
-    if not db_pool: # Check the passed argument
-        print("ERROR: Database pool not initialized.")
-        return
-    try:
-        async with db_pool.acquire() as conn: # Use the passed argument
-            # ... (rest of the function is the same)
-            data = (source_url, image_url, title, description, s_date, youtube_summary)
-            check_query = "SELECT 1 FROM source_data WHERE source_url = $1"
-            exists = await conn.fetchrow(check_query, source_url)
-            if not exists:
-                insert_query = "INSERT INTO source_data (source_url, image_url, title, description, source_date, youtube_summary) VALUES ($1, $2, $3, $4, $5, $6)"
-                await conn.execute(insert_query, *data)
-                print("Data inserted successfully into PostgreSQL")
-            else:
-                print("Source URL already exists. Skipping insertion.")
-    except (Exception, asyncpg.Error) as error:
-        print("Error while inserting data into PostgreSQL:", error)
-    except (Exception, asyncpg.Error) as error:
-        print("Error while inserting data into PostgreSQL:", error)
-
-async def get_summary_from_database(db_pool, source_url):
-    if not db_pool: # Check the passed argument
-        print("ERROR: Database pool not initialized.")
-        return None
-    try:
-        async with db_pool.acquire() as conn: # Use the passed argument
-            select_query = "SELECT youtube_summary FROM source_data WHERE source_url = $1"
-            result = await conn.fetchrow(select_query, source_url)
-            return result['youtube_summary'] if result else None
-    except (Exception, asyncpg.Error) as error:
-        print("Error while fetching data from PostgreSQL:", error)
-        return None
-    except (Exception, asyncpg.Error) as error:
-        print("Error while fetching data from PostgreSQL:", error)
-        return None
-
-async def extract_youtube_video_data(session, url, db_pool): # Add db_pool here
-    start_time = time.time()
-    # ... (soup parsing logic is the same) ...
-    async with session.get(url) as response:
-        content = await response.text()
-    soup = BeautifulSoup(content, 'html.parser')
-    
-    video_id_match = re.search(r"v=([^\&\?\/]+)", url)
-    video_id = video_id_match.group(1) if video_id_match else ""
+        ytt_api = YouTubeTranscriptApi()
+        transcript_list = await asyncio.to_thread(ytt_api.list, video_id)
         
-    # Pass db_pool to the database function
-    summary = await get_summary_from_database(db_pool, url) 
-    if not summary:
-        transcript = await get_video_transcript(video_id) if video_id else ""
-        summary = transcript
+        available_transcripts = []
+        for transcript in transcript_list:
+            available_transcripts.append({
+                'language': transcript.language,
+                'language_code': transcript.language_code,
+                'is_generated': transcript.is_generated,
+                'is_translatable': transcript.is_translatable
+            })
+        
+        return available_transcripts
+        
+    except Exception as e:
+        print(f"ERROR: Failed to list transcripts for video {video_id}: {e}")
+        return []
 
-    if summary:
-        # ... (logic to get title, description, etc. is the same) ...
+async def get_video_transcript_with_fallback(video_id: str) -> str:
+    """
+    Enhanced transcript retrieval with multiple language fallbacks and translation.
+    
+    Args:
+        video_id: YouTube video ID
+        
+    Returns:
+        Summarized transcript or empty string if not available
+    """
+    try:
+        ytt_api = YouTubeTranscriptApi()
+        
+        # First try to get transcript list to see what's available
+        transcript_list = await asyncio.to_thread(ytt_api.list, video_id)
+        
+        # Try to find the best transcript
+        transcript = None
+        
+        # Priority order: English manual > English auto > Other manual > Other auto > Translated
         try:
-            title=get_youtube_title(video_id)
-        except Exception as e:
-            title=None
-            print(f"An error occurred with URL {url}: {str(e)}")
+            # Try English transcripts first
+            transcript = transcript_list.find_transcript(['en', 'en-US', 'en-GB'])
+        except NoTranscriptFound:
+            try:
+                # Try any manually created transcript
+                transcript = transcript_list.find_manually_created_transcript(['de', 'es', 'fr', 'hi', 'ja', 'ko', 'pt', 'ru', 'zh'])
+            except NoTranscriptFound:
+                try:
+                    # Try any generated transcript
+                    transcript = transcript_list.find_generated_transcript(['de', 'es', 'fr', 'hi', 'ja', 'ko', 'pt', 'ru', 'zh'])
+                except NoTranscriptFound:
+                    # As last resort, try to translate the first available transcript
+                    for available_transcript in transcript_list:
+                        if available_transcript.is_translatable:
+                            transcript = available_transcript.translate('en')
+                            break
+        
+        if not transcript:
+            print(f"WARNING: No suitable transcript found for video {video_id}")
+            return ""
+        
+        # Fetch the transcript
+        fetched_transcript = await asyncio.to_thread(transcript.fetch)
+        
+        # Convert to text
+        transcript_data = fetched_transcript.to_raw_data()
+        full_text = ' '.join([entry['text'] for entry in transcript_data])
+        
+        print(f"DEBUG: Successfully retrieved transcript for {video_id} in {fetched_transcript.language}")
+        
+        # Summarize the transcript
+        summary = await asyncio.to_thread(summarize_transcript, full_text)
+        return summary
+        
+    except (NoTranscriptFound, NoTranscriptAvailable, TranscriptsDisabled) as e:
+        print(f"WARNING: No transcript available for video {video_id}: {e}")
+        return ""
+    except Exception as e:
+        print(f"ERROR: Failed to get transcript for video {video_id}: {e}")
+        return ""
 
-        description_tag = soup.find("meta", {"name": "description"})
-        description = description_tag["content"] if description_tag else "No Description Available"
-        date = await get_video_statistics(video_id) if video_id else {}
-        t_image = await turl(url)
+def count_tokens(text: str, model_name: str = "gpt-4o-mini") -> int:
+    """
+    Count tokens in text using tiktoken.
+    
+    Args:
+        text: Text to count tokens for
+        model_name: Model name for encoding
+        
+    Returns:
+        Number of tokens
+    """
+    try:
+        encoding = tiktoken.encoding_for_model(model_name)
+        tokens = encoding.encode(text)
+        return len(tokens)
+    except Exception as e:
+        print(f"ERROR: Could not count tokens: {e}")
+        return 0
 
-        # Pass db_pool to the database function
-        await insert_into_database(db_pool, url, t_image, title, description, date, summary) 
-
-        return title, description, summary, url
-    else:
-        return None, None, None, None # Return None if no summary
-
-async def get_data(urls, db_pool): # Add db_pool here
-    async with aiohttp.ClientSession() as session:
-        # Pass db_pool to each task
-        tasks = [extract_youtube_video_data(session, url, db_pool) for url in urls] 
-        results = await asyncio.gather(*tasks)
-        # Filter out None results for videos that had no summary
-        return [res for res in results if res[0] is not None]
-
-def count_tokens(text, model_name="gpt-3.5-turbo"):
-    encoding = tiktoken.encoding_for_model(model_name)
-    tokens = encoding.encode(text)
-    return len(tokens)
-
-def summarize_transcript_of_each_video(trans):
+def summarize_transcript_chunk(transcript: str) -> str:
+    """
+    Summarize a single transcript chunk.
+    
+    Args:
+        transcript: Transcript text to summarize
+        
+    Returns:
+        Summary of the transcript
+    """
     prompt = """
     Based on the following video transcript, provide a structured summary focusing on key insights and critical information.
-    Organize the summary into a paragraph with a clear, comprehensive flow.
-    The paragraph should cover all points in the video transcript and should be in 1000 words.
+    Organize the summary into a comprehensive paragraph covering all important points.
+    The summary should be detailed and around 800-1000 words.
+    
+    Transcript:
     {transcript}
     
     Provide a structured summary as described above.
     """
 
-    # llm = ChatOpenAI(model_name='gpt-3.5-turbo-1106', temperature=0.3)
     yt_prompt = PromptTemplate(template=prompt, input_variables=["transcript"])
     chain = LLMChain(prompt=yt_prompt, llm=llm)
 
-    input_data = {
-        "transcript": trans
-    }
-    res = chain.invoke(input_data)
-    return res['text']
+    try:
+        input_data = {"transcript": transcript}
+        res = chain.invoke(input_data)
+        return res['text']
+    except Exception as e:
+        print(f"ERROR: Failed to summarize transcript: {e}")
+        return ""
 
-def summarize_transcript(trans):
-    c = count_tokens(trans)
-    summary = ""
-
-    if c < 16000:
-        summary = summarize_transcript_of_each_video(trans)
-    else:
-        text_splitter = TokenTextSplitter(chunk_size=16000, chunk_overlap=0)
-        texts = text_splitter.split_text(trans)
-        for t in texts:
-            chunk_summary = summarize_transcript_of_each_video(t)
-            summary += chunk_summary
-    
-    return summary
-
-async def get_yt_data_async(query: str):
+def summarize_transcript(transcript: str) -> str:
     """
-    Asynchronously searches for YouTube videos using the Brave Video Search API and filters them
-    based on relevance and video length.
+    Summarize transcript, splitting into chunks if too long.
+    
+    Args:
+        transcript: Full transcript text
+        
+    Returns:
+        Complete summary
+    """
+    try:
+        token_count = count_tokens(transcript)
+        summary = ""
+
+        if token_count < 16000:
+            # Small enough to process in one go
+            summary = summarize_transcript_chunk(transcript)
+        else:
+            # Split into manageable chunks
+            text_splitter = TokenTextSplitter(chunk_size=16000, chunk_overlap=200)
+            chunks = text_splitter.split_text(transcript)
+            
+            for chunk in chunks:
+                chunk_summary = summarize_transcript_chunk(chunk)
+                summary += chunk_summary + "\n\n"
+        
+        return summary.strip()
+    except Exception as e:
+        print(f"ERROR: Failed to summarize transcript: {e}")
+        return ""
+
+async def insert_into_database(db_pool: asyncpg.Pool, source_url: str, image_url: str, 
+                              title: str, description: str, source_date: str, 
+                              youtube_summary: str) -> None:
+    """
+    Insert video data into database.
+    
+    Args:
+        db_pool: Database connection pool
+        source_url: YouTube video URL
+        image_url: Thumbnail URL
+        title: Video title
+        description: Video description
+        source_date: Publication date
+        youtube_summary: Summarized transcript
+    """
+    if not db_pool:
+        print("ERROR: Database pool not initialized.")
+        return
+        
+    try:
+        async with db_pool.acquire() as conn:
+            # Check if URL already exists
+            check_query = "SELECT 1 FROM source_data WHERE source_url = $1"
+            exists = await conn.fetchrow(check_query, source_url)
+            
+            if not exists:
+                insert_query = """
+                    INSERT INTO source_data (source_url, image_url, title, description, source_date, youtube_summary)
+                    VALUES ($1, $2, $3, $4, $5, $6)
+                """
+                await conn.execute(insert_query, source_url, image_url, title, description, source_date, youtube_summary)
+                print(f"DEBUG: Inserted video data for: {title}")
+            else:
+                print(f"DEBUG: Video already exists in database: {source_url}")
+                
+    except (Exception, asyncpg.Error) as error:
+        print(f"ERROR: Failed to insert data into database: {error}")
+
+async def get_summary_from_database(db_pool: asyncpg.Pool, source_url: str) -> str:
+    """
+    Get existing summary from database.
+    
+    Args:
+        db_pool: Database connection pool
+        source_url: YouTube video URL
+        
+    Returns:
+        Existing summary or None if not found
+    """
+    if not db_pool:
+        print("ERROR: Database pool not initialized.")
+        return None
+        
+    try:
+        async with db_pool.acquire() as conn:
+            select_query = "SELECT youtube_summary FROM source_data WHERE source_url = $1"
+            result = await conn.fetchrow(select_query, source_url)
+            return result['youtube_summary'] if result else None
+            
+    except (Exception, asyncpg.Error) as error:
+        print(f"ERROR: Failed to fetch data from database: {error}")
+        return None
+
+async def process_video_data(video_data: dict, db_pool: asyncpg.Pool) -> tuple:
+    """
+    Process a single video's data from Brave API results.
+    
+    Args:
+        video_data: Video data from Brave API
+        db_pool: Database connection pool
+        
+    Returns:
+        Tuple of (title, description, summary, url) or (None, None, None, None) if failed
+    """
+    start_time = time.time()
+    
+    try:
+        url = video_data.get('url', '')
+        title = video_data.get('title', 'No Title Available')
+        description = video_data.get('description', 'No Description Available')
+        
+        # Extract video ID
+        video_id = extract_video_id(url)
+        if not video_id:
+            print(f"WARNING: Could not extract video ID from {url}")
+            return None, None, None, None
+        
+        # Check if we already have a summary in the database
+        summary = await get_summary_from_database(db_pool, url)
+        
+        if not summary:
+            # Get transcript and summarize using enhanced method
+            summary = await get_video_transcript_with_fallback(video_id)
+            if not summary:
+                print(f"WARNING: Could not get transcript for video {video_id}")
+                return None, None, None, None
+        
+        # Get additional metadata
+        source_date = video_data.get('page_age', datetime.now().isoformat())
+        thumbnail_url = video_data.get('thumbnail', {}).get('src')
+        
+        # Insert into database
+        await insert_into_database(db_pool, url, thumbnail_url, title, description, source_date, summary)
+        
+        end_time = time.time()
+        print(f"DEBUG: Processed video in {end_time - start_time:.2f}s: {title}")
+        
+        return title, description, summary, url
+        
+    except Exception as e:
+        print(f"ERROR: Failed to process video data: {e}")
+        return None, None, None, None
+
+async def get_yt_data_async(query: str) -> list[str]:
+    """
+    Search for YouTube videos using Brave Video Search API and filter them.
+    
+    Args:
+        query: Search query
+        
+    Returns:
+        List of filtered YouTube URLs
     """
     start_time = time.time()
     brave_api_key = os.getenv('BRAVE_API_KEY')
+    
     if not brave_api_key:
         print("ERROR: BRAVE_API_KEY not found in environment variables.")
         return []
-        
+    
     brave_video_searcher = BraveVideoSearch(brave_api_key)
     
     print(f"\n--- DEBUG: get_yt_data_async ---")
-    print(f"Step 1: Fetching video URLs for query: '{query}'")
-    video_urls = await brave_video_searcher.search(query, max_results=10)
-    print(f"Step 2: Received {len(video_urls)} URLs to filter: {video_urls}")
-
-    async def filter_video(url):
-        print(f"\n  --- Filtering URL: {url} ---")
-        loop = asyncio.get_event_loop()
+    print(f"Step 1: Searching Brave Videos for query: '{query}'")
+    
+    # Get video results from Brave API
+    video_results = await brave_video_searcher.search_detailed(query, max_results=15)
+    print(f"Step 2: Received {len(video_results)} video results to filter")
+    
+    async def filter_video(video_data: dict) -> str:
+        """Filter individual video based on length and relevance."""
+        url = video_data.get('url', '')
+        title = video_data.get('title', '')
+        duration = video_data.get('video', {}).get('duration', '0:00')
+        
+        print(f"\n  --- Filtering Video: {title} ---")
+        print(f"  URL: {url}")
+        print(f"  Duration: {duration}")
+        
+        # Parse duration and check length
+        duration_seconds = parse_duration_to_seconds(duration)
+        if duration_seconds == 0:
+            # Fallback to pytube if duration parsing failed
+            duration_seconds = get_video_length_pytube(url)
+        
+        print(f"  Duration in seconds: {duration_seconds}")
+        
+        # Filter by length (60 seconds to 1 hour)
+        if not (60 < duration_seconds < 3601):
+            print(f"  -> REJECTED: Duration ({duration_seconds}s) outside 60-3600s range")
+            return None
+        
+        # Check relevance using LLM
         try:
-            # Run synchronous I/O-bound functions in a thread pool executor
-            video_length = await loop.run_in_executor(None, get_video_length, url)
-            print(f"  Video Length: {video_length} seconds")
-            
-            # Filter by length first to avoid unnecessary API calls for title
-            if not (60 < video_length < 3601):
-                print(f"  -> REJECTED: Video length ({video_length}s) is outside the 60-3600s range.")
-                return None
-
-            video_id = await loop.run_in_executor(None, extract_video_id, url)
-            if not video_id:
-                print(f"  -> REJECTED: Could not extract video ID.")
-                return None
-            print(f"  Video ID: {video_id}")
-            
-            title = await loop.run_in_executor(None, get_youtube_title, video_id)
-            print(f"  Video Title: {title}")
-            
-            # Asynchronous relevance check using LLM
             relevance_check = await check_youtube_relevance(query, title)
             print(f"  Relevance Check (LLM): {relevance_check}")
             
             if relevance_check == 1:
-                print(f"  -> ACCEPTED: Video is relevant and within length limits.")
+                print(f"  -> ACCEPTED: Video is relevant and within length limits")
                 return url
             else:
-                print(f"  -> REJECTED: LLM determined the video is not relevant.")
+                print(f"  -> REJECTED: LLM determined video is not relevant")
                 return None
+                
         except Exception as e:
-            print(f"  -> ERROR: Failed to process video URL {url}: {e}")
+            print(f"  -> ERROR: Relevance check failed: {e}")
             return None
-
-    # Create and run filtering tasks concurrently
-    print(f"Step 3: Starting concurrent filtering of {len(video_urls)} videos...")
-    tasks = [filter_video(url) for url in video_urls]
-    results = await asyncio.gather(*tasks)
     
-    # Collect non-None results
-    filtered_urls = [url for url in results if url is not None]
+    # Filter videos concurrently
+    print(f"Step 3: Starting concurrent filtering of {len(video_results)} videos...")
+    tasks = [filter_video(video_data) for video_data in video_results]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    
+    # Collect successful results
+    filtered_urls = []
+    for result in results:
+        if isinstance(result, str) and result:  # Valid URL
+            filtered_urls.append(result)
     
     end_time = time.time()
     elapsed_time = end_time - start_time
-    print(f"Step 4: Filtering complete in {elapsed_time:.2f} seconds.")
-    print(f"Final list of filtered URLs ({len(filtered_urls)}): {filtered_urls}")
+    print(f"Step 4: Filtering complete in {elapsed_time:.2f} seconds")
+    print(f"Final filtered URLs ({len(filtered_urls)}): {filtered_urls}")
     print(f"--- END DEBUG: get_yt_data_async ---\n")
     
-    # Return the top 5 most relevant videos
+    # Return top 5 most relevant videos
     return filtered_urls[:5]
 
-
-def generate_final_summary(query, summaries):
-    start_time = time.time()
-
-    prompt = """
-    Given youtube transcripts {summaries}
-    Using only the provided youtube video transcripts, respond to the user's inquiries in detail without omitting any context. 
-    Provide relevant answers to the user's queries, adhering strictly to the content of the given transcripts.
-    Dont start answer with based on . Dont provide extra information just provide answer what user asked.
-
-    The user has asked the following question: {query}
-
-    The output should contain generated answer and news urls that used while generating the answer. 
-       
-    The output should be in json format:
-    "answer": summary generated based on user query and video summaries.
-    "links": provide all youtube links which are relevant to user query present in metadata.
-    Provide a structured final summary as described above.
+async def get_data(urls: list[str], db_pool: asyncpg.Pool) -> list[tuple]:
     """
-    llm = ChatOpenAI(temperature=0.5, model="gpt-4o-mini",streaming=True,stream_usage=True)
-    yt_prompt = PromptTemplate(template=prompt, input_variables=["query", "summaries"])
-    output_parser = JsonOutputParser()
-    ans_chain = yt_prompt | llm | output_parser
-
-    #return ans_chain
-    input_data = {
-        "query": query,
-        "summaries": summaries
-    }
-
-    with get_openai_callback() as cb:
-        final = ans_chain.invoke(input_data)
-
-    return {
-        "Response": final['answer'],
-        "links": final['links'],
-        "Total_Tokens": cb.total_tokens,
-        "Prompt_Tokens": cb.prompt_tokens,
-        "Completion_Tokens": cb.completion_tokens,
-    }
-
-async def yt_chat(query,session_id):
-    try:
-        start_time = time.time()
-        links = get_yt_data_async(query)
-        data = await get_data(links)
-        res = generate_final_summary(query, data)
-        end_time = time.time()
-        execution_time = end_time - start_time
-        print(res)
-        print(f"Execution Time: {execution_time} seconds")
-
-        return res
-    except Exception as e:
-        print(f"Error processing async task: {e}")
-        return {}
-
-
-# async def async_process(query,session_id):
-#     try:
-#         start_time = time.time()
-#         links = get_yt_data_async(query)
-#         print(links)
-#         data = await get_data(links)
-#         res = generate_final_summary(query, data)
-#         end_time = time.time()
-#         execution_time = end_time - start_time
-#         #print(res)
-#         print(f"Execution Time: {execution_time} seconds")
-
-#         return res
-#     except Exception as e:
-#         print(f"Error processing async task: {e}")
-#         return {}
-
-# if __name__ == "__main__":
-#     query = "what has been the impact of hindenburg claims on Sebi chief Buch on tha markets and Adani stock ?"
-#     session_id = "1508nnnlll"
+    Process multiple YouTube URLs and extract their data.
     
-#     result = asyncio.run(async_process(query, session_id))
-# #     #print(result)
-
-
-# get_length('https://www.youtube.com/watch?v=SIgSpSOrKfg')
-
-
-# asyncio.run(extract_youtube_video_data('123','https://www.youtube.com/watch?v=Fqg48GAtz9w')
-
-#https://www.youtube.com/watch?v=XPVXdwNtx6A
-# print(asyncio.run(get_video_transcript('XPVXdwNtx6A')))
+    Args:
+        urls: List of YouTube URLs
+        db_pool: Database connection pool
+        
+    Returns:
+        List of tuples containing (title, description, summary, url) for each video
+    """
+    if not urls:
+        return []
+    
+    print(f"DEBUG: Processing {len(urls)} YouTube videos...")
+    
+    # For Brave API, we need to get the video data first
+    # Since we only have URLs, we'll need to make individual calls or use a different approach
+    brave_api_key = os.getenv('BRAVE_API_KEY')
+    brave_video_searcher = BraveVideoSearch(brave_api_key)
+    
+    results = []
+    for url in urls:
+        try:
+            # Extract video ID to get basic info
+            video_id = extract_video_id(url)
+            if not video_id:
+                continue
+            
+            # Create basic video data structure
+            video_data = {
+                'url': url,
+                'title': f"Video {video_id}",  # Will be updated if we can get better title
+                'description': 'No description available',
+                'page_age': datetime.now().isoformat()
+            }
+            
+            # Process the video
+            result = await process_video_data(video_data, db_pool)
+            if result[0] is not None:  # If processing was successful
+                results.append(result)
+                
+        except Exception as e:
+            print(f"ERROR: Failed to process URL {url}: {e}")
+            continue
+    
+    print(f"DEBUG: Successfully processed {len(results)} videos")
+    return results

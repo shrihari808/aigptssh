@@ -28,7 +28,7 @@ from starlette.status import HTTP_403_FORBIDDEN
 from fastapi import FastAPI, HTTPException,Depends, Header,Query
 
 from config import llm_screener
-from streaming.yt_stream import get_video_length
+
 
 load_dotenv(override=True)
 
@@ -249,8 +249,8 @@ def extract_video_id(url):
 
 @router.post("/get_yt_summary_key")
 async def get_yt_summary(link_data: Link,ai_key_auth: str = Depends(authenticate_ai_key)):
-    if get_video_length(link_data.link) > 900:
-         raise HTTPException(status_code=400, detail="The video you're trying to upload exceeds the 15-minute limit. Please upload a shorter video.")
+    # if get_video_length(link_data.link) > 900:
+    #      raise HTTPException(status_code=400, detail="The video you're trying to upload exceeds the 15-minute limit. Please upload a shorter video.")
 
     with get_openai_callback() as cb:
 
