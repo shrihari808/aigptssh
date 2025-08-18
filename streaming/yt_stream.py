@@ -14,7 +14,6 @@ from langchain.chains import LLMChain
 from langchain import PromptTemplate
 import os
 import tiktoken
-from pytube import YouTube
 from api.brave_searcher import BraveVideoSearch
 from dotenv import load_dotenv
 from config import GPT4o_mini
@@ -27,13 +26,21 @@ psql_url = os.getenv('DATABASE_URL')
 
 # LLM chain for relevance checking
 yt_prompt_template = """
-Your task is to determine if a YouTube video title is relevant to a user question.
+Your task is to determine which of the following YouTube video titles are relevant to the user's question.
 
 User question: {q}
-YouTube title: {yt}
 
-Output the result in JSON format:
-{{"valid": 1 if the video is relevant to the question, otherwise 0}}
+YouTube titles:
+{yt_titles}
+
+Output the result in JSON format. The JSON should be a list of objects, where each object contains the original title and a "valid" key with a value of 1 if the video is relevant, or 0 if it is not.
+
+Example:
+[
+    {{"title": "title 1", "valid": 1}},
+    {{"title": "title 2", "valid": 0}},
+    {{"title": "title 3", "valid": 1}}
+]
 """
 
 yt_prompt = PromptTemplate(template=yt_prompt_template, input_variables=["q", "yt"])
@@ -260,15 +267,15 @@ async def process_video_data(video_data: dict) -> dict:
         print(f"ERROR: Failed to process video data for {url}: {e}")
         return None
 
-async def get_yt_data_async(query: str) -> list[str]:
+async def get_yt_data_async(query: str) -> list[dict]:
     """
-    Search for YouTube videos using Brave Video Search API and filter them.
+    Search for YouTube videos using Brave Video Search API and filter them in a batch.
     
     Args:
         query: Search query
         
     Returns:
-        List of filtered YouTube URLs
+        List of filtered YouTube video data dictionaries.
     """
     start_time = time.time()
     brave_api_key = os.getenv('BRAVE_API_KEY')
@@ -285,64 +292,48 @@ async def get_yt_data_async(query: str) -> list[str]:
     # Get video results from Brave API
     video_results = await brave_video_searcher.search_detailed(query, max_results=15)
     print(f"Step 2: Received {len(video_results)} video results to filter")
-    
-    async def filter_video(video_data: dict) -> dict: # <-- Returns dict now
-        """Filter individual video based on length and relevance."""
-        url = video_data.get('url', '')
-        title = video_data.get('title', '')
-        duration = video_data.get('video', {}).get('duration', '0:00')
-        
-        print(f"\n  --- Filtering Video: {title} ---")
-        print(f"  URL: {url}")
-        print(f"  Duration: {duration}")
-        
-        # Parse duration and check length
-        duration_seconds = parse_duration_to_seconds(duration)
-        if duration_seconds == 0:
-            print(f"  -> REJECTED: Could not determine video duration from Brave API.")
-            return None
 
-        print(f"  Duration in seconds: {duration_seconds}")
+    # Filter videos by duration first
+    valid_duration_videos = []
+    for video_data in video_results:
+        duration = video_data.get('video', {}).get('duration', '0:00')
+        duration_seconds = parse_duration_to_seconds(duration)
+        if 60 < duration_seconds < 3601:
+            valid_duration_videos.append(video_data)
+    
+    if not valid_duration_videos:
+        print("No videos found within the 60-3600s duration range.")
+        return []
+
+    # Batch LLM relevance check
+    titles_to_check = [v['title'] for v in valid_duration_videos]
+    
+    # Create a string of titles for the prompt
+    titles_str = "\n".join(f"- {title}" for title in titles_to_check)
+    
+    input_data = {"q": query, "yt_titles": titles_str}
+    
+    try:
+        relevance_results = await yt_chain.ainvoke(input_data)
         
-        # Filter by length (60 seconds to 1 hour)
-        if not (60 < duration_seconds < 3601):
-            print(f"  -> REJECTED: Duration ({duration_seconds}s) outside 60-3600s range")
-            return None
+        # Create a mapping of title to relevance
+        relevance_map = {item['title']: item['valid'] for item in relevance_results}
         
-        # Check relevance using LLM
-        try:
-            relevance_check = await check_youtube_relevance(query, title)
-            print(f"  Relevance Check (LLM): {relevance_check}")
-            
-            if relevance_check == 1:
-                print(f"  -> ACCEPTED: Video is relevant and within length limits")
-                return video_data # <-- Returns the whole dictionary
-            else:
-                print(f"  -> REJECTED: LLM determined video is not relevant")
-                return None
+        filtered_videos = []
+        for video in valid_duration_videos:
+            if relevance_map.get(video['title'], 0) == 1:
+                filtered_videos.append(video)
                 
-        except Exception as e:
-            print(f"  -> ERROR: Relevance check failed: {e}")
-            return None
-    
-    # Filter videos concurrently
-    print(f"Step 3: Starting concurrent filtering of {len(video_results)} videos...")
-    tasks = [filter_video(video_data) for video_data in video_results]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-    
-    # Collect successful results
-    filtered_videos = []
-    for result in results:
-        if isinstance(result, dict) and result:  # Valid video dictionary
-            filtered_videos.append(result)
-    
+    except Exception as e:
+        print(f"ERROR: Batch LLM relevance check failed: {e}")
+        return [] # Return empty if the check fails
+
     end_time = time.time()
     elapsed_time = end_time - start_time
     print(f"Step 4: Filtering complete in {elapsed_time:.2f} seconds")
     print(f"Final filtered videos ({len(filtered_videos)}): {[v['title'] for v in filtered_videos]}")
     print(f"--- END DEBUG: get_yt_data_async ---\n")
     
-    # Return top 5 most relevant videos
     return filtered_videos[:5]
 
 async def get_data(videos: list[dict], db_pool: asyncpg.Pool) -> list[dict]:
