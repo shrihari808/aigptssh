@@ -383,41 +383,45 @@ class NewsRagScoringService:
             return 0.4  # Default score for unknown dates
             
         try:
-            # Handle different date formats
-            if 'T' in publication_date_str:
-                # ISO format
-                published_date = datetime.fromisoformat(publication_date_str.replace('Z', '+00:00'))
-            else:
-                # Try to parse as integer (YYYYMMDD format)
-                if str(publication_date_str).isdigit():
-                    date_str = str(publication_date_str)
-                    if len(date_str) == 8:  # YYYYMMDD
-                        published_date = datetime.strptime(date_str, '%Y%m%d')
+            published_date = None
+            date_str_cleaned = str(publication_date_str).strip()
+
+            # Try parsing ISO 8601 format (which Brave API uses)
+            try:
+                # Handle timezone info like 'Z' or '+00:00'
+                published_date = datetime.fromisoformat(date_str_cleaned.replace('Z', '+00:00'))
+            except (ValueError, TypeError):
+                # Fallback for other common formats if the first fails
+                try:
+                    # Handle formats like 'YYYY-MM-DD HH:MM:SS' or just 'YYYY-MM-DD'
+                    published_date = datetime.strptime(date_str_cleaned.split('T')[0], '%Y-%m-%d')
+                except (ValueError, TypeError):
+                     # Handle YYYYMMDD integer format
+                    if date_str_cleaned.isdigit() and len(date_str_cleaned) == 8:
+                        published_date = datetime.strptime(date_str_cleaned, '%Y%m%d')
                     else:
-                        return 0.4
-                else:
-                    published_date = datetime.fromisoformat(publication_date_str)
+                        print(f"WARNING: Could not parse date string: '{publication_date_str}'")
+                        return 0.4 # Return default if all parsing fails
             
-            age_in_days = (datetime.now() - published_date).days
+            # Ensure the current time is timezone-aware if the parsed date is
+            now = datetime.now(published_date.tzinfo)
+            age_in_days = (now - published_date).days
             
+            if age_in_days < 0: age_in_days = 0 # Handle future dates just in case
+
             # Adjust decay rate based on query context
             query_lower = query.lower()
             if any(word in query_lower for word in ['latest', 'recent', 'today', 'current']):
-                half_life_days = 7  # Very recent preference
-            elif any(word in query_lower for word in ['earnings', 'results', 'quarterly']):
-                half_life_days = 30  # Quarterly reporting cycle
-            elif any(word in query_lower for word in ['policy', 'regulation', 'reform']):
-                half_life_days = 60  # Policy changes have longer relevance
+                half_life_days = 7
             elif any(word in query_lower for word in ['annual', 'yearly']):
-                half_life_days = 180  # Annual information
+                half_life_days = 180
             else:
-                half_life_days = 21  # Default 3-week half-life
+                half_life_days = 21
                 
             # Exponential decay function
             decay_constant = np.log(2) / half_life_days
             score = np.exp(-decay_constant * age_in_days)
             
-            # Ensure minimum score for very old content
             return max(0.1, min(1.0, score))
             
         except Exception as e:

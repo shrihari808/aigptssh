@@ -109,23 +109,6 @@ def parse_duration_to_seconds(duration_str: str) -> int:
     except (ValueError, AttributeError):
         return 0
 
-def get_video_length_pytube(url: str) -> int:
-    """
-    Get video length using pytube as fallback.
-    
-    Args:
-        url: YouTube URL
-        
-    Returns:
-        Video length in seconds, or 999999 if error
-    """
-    try:
-        yt = YouTube(url)
-        return yt.length if yt.length else 999999
-    except Exception as e:
-        print(f"WARNING: Could not get video length for {url}: {e}")
-        return 999999
-
 async def get_available_transcripts(video_id: str) -> list:
     """
     Get list of available transcripts for a video.
@@ -157,64 +140,60 @@ async def get_available_transcripts(video_id: str) -> list:
 
 async def get_video_transcript_with_fallback(video_id: str) -> str:
     """
-    Enhanced transcript retrieval with multiple language fallbacks and translation.
+    Corrected transcript retrieval that properly instantiates the API client
+    and handles the fetched transcript object correctly.
     
     Args:
         video_id: YouTube video ID
         
     Returns:
-        Summarized transcript or empty string if not available
+        The full transcript text in English or an empty string if not available.
     """
     try:
+        # 1. Correctly create an instance of the API client
         ytt_api = YouTubeTranscriptApi()
         
-        # First try to get transcript list to see what's available
+        # 2. Call the .list() method on the instance
         transcript_list = await asyncio.to_thread(ytt_api.list, video_id)
         
-        # Try to find the best transcript
         transcript = None
-        
-        # Priority order: English manual > English auto > Other manual > Other auto > Translated
+
+        # Priority 1: Find a direct English transcript
         try:
-            # Try English transcripts first
-            transcript = transcript_list.find_transcript(['en', 'en-US', 'en-GB'])
+            transcript = await asyncio.to_thread(transcript_list.find_transcript, ['en', 'en-US', 'en-GB'])
+            print(f"DEBUG: Found direct English transcript for video {video_id}.")
         except NoTranscriptFound:
-            try:
-                # Try any manually created transcript
-                transcript = transcript_list.find_manually_created_transcript(['de', 'es', 'fr', 'hi', 'ja', 'ko', 'pt', 'ru', 'zh'])
-            except NoTranscriptFound:
-                try:
-                    # Try any generated transcript
-                    transcript = transcript_list.find_generated_transcript(['de', 'es', 'fr', 'hi', 'ja', 'ko', 'pt', 'ru', 'zh'])
-                except NoTranscriptFound:
-                    # As last resort, try to translate the first available transcript
-                    for available_transcript in transcript_list:
-                        if available_transcript.is_translatable:
-                            transcript = available_transcript.translate('en')
-                            break
-        
+            print(f"DEBUG: No direct English transcript found for {video_id}. Checking for translatable options.")
+            # Priority 2: Find any other translatable transcript
+            for available_transcript in transcript_list:
+                if available_transcript.is_translatable:
+                    print(f"DEBUG: Found translatable '{available_transcript.language_code}' transcript. Translating to English.")
+                    transcript = await asyncio.to_thread(available_transcript.translate, 'en')
+                    break
+
         if not transcript:
-            print(f"WARNING: No suitable transcript found for video {video_id}")
+            print(f"WARNING: No suitable English or translatable transcript found for video {video_id}")
             return ""
+
+        # Fetch the transcript object
+        fetched_transcript_object = await asyncio.to_thread(transcript.fetch)
         
-        # Fetch the transcript
-        fetched_transcript = await asyncio.to_thread(transcript.fetch)
+        # 3. Convert the FetchedTranscript object to a raw list of dictionaries
+        fetched_transcript_snippets = fetched_transcript_object.to_raw_data()
         
-        # Convert to text
-        transcript_data = fetched_transcript.to_raw_data()
-        full_text = ' '.join([entry['text'] for entry in transcript_data])
-        
-        print(f"DEBUG: Successfully retrieved transcript for {video_id} in {fetched_transcript.language}")
-        
-        # Summarize the transcript
-        summary = await asyncio.to_thread(summarize_transcript, full_text)
-        return summary
-        
-    except (NoTranscriptFound, NoTranscriptAvailable, TranscriptsDisabled) as e:
-        print(f"WARNING: No transcript available for video {video_id}: {e}")
+        if isinstance(fetched_transcript_snippets, list):
+            full_text = ' '.join([entry['text'] for entry in fetched_transcript_snippets])
+            print(f"DEBUG: Successfully retrieved and processed transcript for {video_id}. Final language: English")
+            return full_text
+        else:
+            print(f"WARNING: Transcript for video {video_id} was not in the expected list format after fetching.")
+            return ""
+
+    except NoTranscriptFound:
+        print(f"WARNING: No transcripts of any kind available for video {video_id}.")
         return ""
     except Exception as e:
-        print(f"ERROR: Failed to get transcript for video {video_id}: {e}")
+        print(f"ERROR: An unexpected error occurred while fetching transcript for video {video_id}: {e}")
         return ""
 
 def count_tokens(text: str, model_name: str = "gpt-4o-mini") -> int:
@@ -236,181 +215,50 @@ def count_tokens(text: str, model_name: str = "gpt-4o-mini") -> int:
         print(f"ERROR: Could not count tokens: {e}")
         return 0
 
-def summarize_transcript_chunk(transcript: str) -> str:
+async def process_video_data(video_data: dict) -> dict:
     """
-    Summarize a single transcript chunk.
-    
-    Args:
-        transcript: Transcript text to summarize
-        
-    Returns:
-        Summary of the transcript
-    """
-    prompt = """
-    Based on the following video transcript, provide a structured summary focusing on key insights and critical information.
-    Organize the summary into a comprehensive paragraph covering all important points.
-    The summary should be detailed and around 800-1000 words.
-    
-    Transcript:
-    {transcript}
-    
-    Provide a structured summary as described above.
-    """
-
-    yt_prompt = PromptTemplate(template=prompt, input_variables=["transcript"])
-    chain = LLMChain(prompt=yt_prompt, llm=llm)
-
-    try:
-        input_data = {"transcript": transcript}
-        res = chain.invoke(input_data)
-        return res['text']
-    except Exception as e:
-        print(f"ERROR: Failed to summarize transcript: {e}")
-        return ""
-
-def summarize_transcript(transcript: str) -> str:
-    """
-    Summarize transcript, splitting into chunks if too long.
-    
-    Args:
-        transcript: Full transcript text
-        
-    Returns:
-        Complete summary
-    """
-    try:
-        token_count = count_tokens(transcript)
-        summary = ""
-
-        if token_count < 16000:
-            # Small enough to process in one go
-            summary = summarize_transcript_chunk(transcript)
-        else:
-            # Split into manageable chunks
-            text_splitter = TokenTextSplitter(chunk_size=16000, chunk_overlap=200)
-            chunks = text_splitter.split_text(transcript)
-            
-            for chunk in chunks:
-                chunk_summary = summarize_transcript_chunk(chunk)
-                summary += chunk_summary + "\n\n"
-        
-        return summary.strip()
-    except Exception as e:
-        print(f"ERROR: Failed to summarize transcript: {e}")
-        return ""
-
-async def insert_into_database(db_pool: asyncpg.Pool, source_url: str, image_url: str, 
-                              title: str, description: str, source_date: str, 
-                              youtube_summary: str) -> None:
-    """
-    Insert video data into database.
-    
-    Args:
-        db_pool: Database connection pool
-        source_url: YouTube video URL
-        image_url: Thumbnail URL
-        title: Video title
-        description: Video description
-        source_date: Publication date
-        youtube_summary: Summarized transcript
-    """
-    if not db_pool:
-        print("ERROR: Database pool not initialized.")
-        return
-        
-    try:
-        async with db_pool.acquire() as conn:
-            # Check if URL already exists
-            check_query = "SELECT 1 FROM source_data WHERE source_url = $1"
-            exists = await conn.fetchrow(check_query, source_url)
-            
-            if not exists:
-                insert_query = """
-                    INSERT INTO source_data (source_url, image_url, title, description, source_date, youtube_summary)
-                    VALUES ($1, $2, $3, $4, $5, $6)
-                """
-                await conn.execute(insert_query, source_url, image_url, title, description, source_date, youtube_summary)
-                print(f"DEBUG: Inserted video data for: {title}")
-            else:
-                print(f"DEBUG: Video already exists in database: {source_url}")
-                
-    except (Exception, asyncpg.Error) as error:
-        print(f"ERROR: Failed to insert data into database: {error}")
-
-async def get_summary_from_database(db_pool: asyncpg.Pool, source_url: str) -> str:
-    """
-    Get existing summary from database.
-    
-    Args:
-        db_pool: Database connection pool
-        source_url: YouTube video URL
-        
-    Returns:
-        Existing summary or None if not found
-    """
-    if not db_pool:
-        print("ERROR: Database pool not initialized.")
-        return None
-        
-    try:
-        async with db_pool.acquire() as conn:
-            select_query = "SELECT youtube_summary FROM source_data WHERE source_url = $1"
-            result = await conn.fetchrow(select_query, source_url)
-            return result['youtube_summary'] if result else None
-            
-    except (Exception, asyncpg.Error) as error:
-        print(f"ERROR: Failed to fetch data from database: {error}")
-        return None
-
-async def process_video_data(video_data: dict, db_pool: asyncpg.Pool) -> tuple:
-    """
-    Process a single video's data from Brave API results.
+    Processes a single video's data to fetch its full transcript and metadata.
     
     Args:
         video_data: Video data from Brave API
-        db_pool: Database connection pool
         
     Returns:
-        Tuple of (title, description, summary, url) or (None, None, None, None) if failed
+        A dictionary containing the transcript and metadata, or None if failed.
     """
     start_time = time.time()
     
     try:
         url = video_data.get('url', '')
         title = video_data.get('title', 'No Title Available')
-        description = video_data.get('description', 'No Description Available')
         
-        # Extract video ID
         video_id = extract_video_id(url)
         if not video_id:
             print(f"WARNING: Could not extract video ID from {url}")
-            return None, None, None, None
+            return None
         
-        # Check if we already have a summary in the database
-        summary = await get_summary_from_database(db_pool, url)
+        # Get the full transcript text
+        transcript_text = await get_video_transcript_with_fallback(video_id)
+        if not transcript_text:
+            print(f"WARNING: Could not get transcript for video {video_id}")
+            return None
         
-        if not summary:
-            # Get transcript and summarize using enhanced method
-            summary = await get_video_transcript_with_fallback(video_id)
-            if not summary:
-                print(f"WARNING: Could not get transcript for video {video_id}")
-                return None, None, None, None
-        
-        # Get additional metadata
-        source_date = video_data.get('page_age', datetime.now().isoformat())
-        thumbnail_url = video_data.get('thumbnail', {}).get('src')
-        
-        # Insert into database
-        await insert_into_database(db_pool, url, thumbnail_url, title, description, source_date, summary)
+        # Prepare metadata
+        metadata = {
+            'url': url,
+            'title': title,
+            'description': video_data.get('description', 'No Description Available'),
+            'publication_date': video_data.get('page_age', datetime.now().isoformat()),
+            'thumbnail_url': video_data.get('thumbnail', {}).get('src')
+        }
         
         end_time = time.time()
-        print(f"DEBUG: Processed video in {end_time - start_time:.2f}s: {title}")
+        print(f"DEBUG: Fetched transcript in {end_time - start_time:.2f}s: {title}")
         
-        return title, description, summary, url
+        return {"transcript": transcript_text, "metadata": metadata}
         
     except Exception as e:
-        print(f"ERROR: Failed to process video data: {e}")
-        return None, None, None, None
+        print(f"ERROR: Failed to process video data for {url}: {e}")
+        return None
 
 async def get_yt_data_async(query: str) -> list[str]:
     """
@@ -438,7 +286,7 @@ async def get_yt_data_async(query: str) -> list[str]:
     video_results = await brave_video_searcher.search_detailed(query, max_results=15)
     print(f"Step 2: Received {len(video_results)} video results to filter")
     
-    async def filter_video(video_data: dict) -> str:
+    async def filter_video(video_data: dict) -> dict: # <-- Returns dict now
         """Filter individual video based on length and relevance."""
         url = video_data.get('url', '')
         title = video_data.get('title', '')
@@ -451,9 +299,9 @@ async def get_yt_data_async(query: str) -> list[str]:
         # Parse duration and check length
         duration_seconds = parse_duration_to_seconds(duration)
         if duration_seconds == 0:
-            # Fallback to pytube if duration parsing failed
-            duration_seconds = get_video_length_pytube(url)
-        
+            print(f"  -> REJECTED: Could not determine video duration from Brave API.")
+            return None
+
         print(f"  Duration in seconds: {duration_seconds}")
         
         # Filter by length (60 seconds to 1 hour)
@@ -468,7 +316,7 @@ async def get_yt_data_async(query: str) -> list[str]:
             
             if relevance_check == 1:
                 print(f"  -> ACCEPTED: Video is relevant and within length limits")
-                return url
+                return video_data # <-- Returns the whole dictionary
             else:
                 print(f"  -> REJECTED: LLM determined video is not relevant")
                 return None
@@ -483,65 +331,42 @@ async def get_yt_data_async(query: str) -> list[str]:
     results = await asyncio.gather(*tasks, return_exceptions=True)
     
     # Collect successful results
-    filtered_urls = []
+    filtered_videos = []
     for result in results:
-        if isinstance(result, str) and result:  # Valid URL
-            filtered_urls.append(result)
+        if isinstance(result, dict) and result:  # Valid video dictionary
+            filtered_videos.append(result)
     
     end_time = time.time()
     elapsed_time = end_time - start_time
     print(f"Step 4: Filtering complete in {elapsed_time:.2f} seconds")
-    print(f"Final filtered URLs ({len(filtered_urls)}): {filtered_urls}")
+    print(f"Final filtered videos ({len(filtered_videos)}): {[v['title'] for v in filtered_videos]}")
     print(f"--- END DEBUG: get_yt_data_async ---\n")
     
     # Return top 5 most relevant videos
-    return filtered_urls[:5]
+    return filtered_videos[:5]
 
-async def get_data(urls: list[str], db_pool: asyncpg.Pool) -> list[tuple]:
+async def get_data(videos: list[dict], db_pool: asyncpg.Pool) -> list[dict]:
     """
-    Process multiple YouTube URLs and extract their data.
+    Process multiple YouTube videos to extract their transcripts and metadata.
+    This function now receives full video data, so it doesn't need to fetch it again.
     
     Args:
-        urls: List of YouTube URLs
-        db_pool: Database connection pool
+        videos: List of video data dictionaries from Brave Search.
+        db_pool: Database connection pool (kept for signature compatibility but not used here).
         
     Returns:
-        List of tuples containing (title, description, summary, url) for each video
+        List of dictionaries containing transcript and metadata for each video.
     """
-    if not urls:
+    if not videos:
         return []
     
-    print(f"DEBUG: Processing {len(urls)} YouTube videos...")
+    print(f"DEBUG: Processing {len(videos)} YouTube videos for transcripts...")
     
-    # For Brave API, we need to get the video data first
-    # Since we only have URLs, we'll need to make individual calls or use a different approach
-    brave_api_key = os.getenv('BRAVE_API_KEY')
-    brave_video_searcher = BraveVideoSearch(brave_api_key)
+    tasks = [process_video_data(video) for video in videos]
+    results = await asyncio.gather(*tasks)
     
-    results = []
-    for url in urls:
-        try:
-            # Extract video ID to get basic info
-            video_id = extract_video_id(url)
-            if not video_id:
-                continue
-            
-            # Create basic video data structure
-            video_data = {
-                'url': url,
-                'title': f"Video {video_id}",  # Will be updated if we can get better title
-                'description': 'No description available',
-                'page_age': datetime.now().isoformat()
-            }
-            
-            # Process the video
-            result = await process_video_data(video_data, db_pool)
-            if result[0] is not None:  # If processing was successful
-                results.append(result)
-                
-        except Exception as e:
-            print(f"ERROR: Failed to process URL {url}: {e}")
-            continue
+    # Filter out None results from failed processing
+    processed_videos = [res for res in results if res]
     
-    print(f"DEBUG: Successfully processed {len(results)} videos")
-    return results
+    print(f"DEBUG: Successfully fetched transcripts for {len(processed_videos)} videos")
+    return processed_videos

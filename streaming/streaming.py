@@ -1,4 +1,4 @@
-# /aigptcur/app_service/streaming/streaming.py
+# /aigptssh/streaming/streaming.py
 
 import os
 import json
@@ -12,6 +12,7 @@ from langchain_community.chat_models import ChatOpenAI
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.chains import create_retrieval_chain
 from langchain_core.output_parsers import JsonOutputParser
+from langchain_core.output_parsers import StrOutputParser
 from pinecone import PodSpec, Pinecone as PineconeClient
 import requests
 from pydantic import BaseModel
@@ -20,6 +21,7 @@ import re
 import asyncpg
 from langchain.retrievers import MergerRetriever
 from langchain.docstore.document import Document
+from langchain_core.documents import Document
 from datetime import datetime, timedelta
 from langchain_pinecone import Pinecone
 import google.generativeai as genai
@@ -57,6 +59,8 @@ from langchain_chroma import Chroma
 from streaming.reddit_stream import fetch_search_red, process_search_red
 from streaming.yt_stream import get_data, get_yt_data_async
 from api.news_rag.scoring_service import scoring_service
+from api.youtube_rag.youtube_vector_store import create_yt_vector_store_from_transcripts
+
 
 from dotenv import load_dotenv
 load_dotenv(override=True)
@@ -978,6 +982,41 @@ async def validate_query_only(query: str) -> dict:
             "tokens_used": 0
         }
 
+async def condense_context_for_llm(query: str, passages: list[dict]) -> str:
+    """
+    Uses a non-streaming LLM to quickly extract key points from passages,
+    creating a condensed context to reduce final streaming latency.
+    """
+    print("DEBUG: Condensing context for final answer synthesis...")
+    context_text = "\n\n---\n\n".join(
+        [f"Source: {p['metadata'].get('title', 'N/A')}\nContent: {p['text']}" for p in passages]
+    )
+
+    prompt = PromptTemplate.from_template(
+        """
+        You are a fact-extraction expert. Based on the user's query, extract the most critical facts, figures, and key points from the provided context into a concise bulleted list.
+
+        User Query: {query}
+
+        Context:
+        {context}
+
+        Key Points:
+        """
+    )
+    
+    # Use the non-streaming model for a fast, single-shot extraction
+    chain = prompt | GPT4o_mini | StrOutputParser()
+    
+    try:
+        condensed_context = await chain.ainvoke({"query": query, "context": context_text})
+        print("DEBUG: Context condensed successfully.")
+        return condensed_context
+    except Exception as e:
+        print(f"ERROR: Failed to condense context: {e}")
+        # Fallback to the original, larger context if condensation fails
+        return context_text
+
 @yt_rag.post("/yt_rag")
 async def yt_rag_brave(
     request: InRequest,
@@ -988,77 +1027,122 @@ async def yt_rag_brave(
     db_pool: asyncpg.Pool = Depends(get_db_pool)
 ):
     """
-    Handles YouTube-based RAG requests using only youtube-transcript-api and pytube.
-    Validates the user's query, fetches relevant YouTube video transcripts, 
-    generates a comprehensive summary, and streams the response back to the user.
+    Handles YouTube-based RAG requests using an embedding-based approach.
+    1. Searches for relevant videos.
+    2. Fetches transcripts.
+    3. Chunks and embeds transcripts into a vector store.
+    4. Retrieves relevant chunks.
+    5. Synthesizes an answer from the chunks.
     """
     original_query = request.query.strip()
     
-    # Perform a simple, fast validation on the query without reformulation
     validation_result = await validate_query_only(original_query)
-    
     valid = validation_result.get("valid", 0)
     validation_tokens = validation_result.get("tokens_used", 0)
     
     async def generate_chat_res():
-        """Generator function that streams the entire process."""
+        """Generator function that streams the entire RAG process."""
         if valid == 0:
             error_message = "The search query is not related to financial markets, companies, or economics. Please ask a relevant question."
             yield error_message.encode("utf-8")
             return
 
         final_links = []
-        data_for_summary = ""
-
+        
         try:
-            # Step 1: Get relevant YouTube video URLs using the original query
-            print(f"DEBUG: Starting YouTube search for query: '{original_query}'")
-            final_links = await get_yt_data_async(original_query)
+            # Step 1: Search & Filter Videos
+            yield create_progress_bar_string(10, "Searching for relevant videos...").encode("utf-8")
+            video_urls = await get_yt_data_async(original_query)
             
-            if not final_links:
-                yield "Could not find any relevant YouTube videos for your query.".encode("utf-8")
+            if not video_urls:
+                yield "\nCould not find any relevant YouTube videos for your query.".encode("utf-8")
+                return
+            final_links = video_urls
+            yield create_progress_bar_string(25, f"Found {len(video_urls)} videos. Fetching transcripts...").encode("utf-8")
+
+            # Step 2: Fetch Transcripts
+            video_transcripts = await get_data(video_urls, db_pool)
+            if not video_transcripts:
+                yield "\nFound videos, but could not retrieve their transcripts.".encode("utf-8")
+                return
+            yield create_progress_bar_string(50, "Processing and embedding video content...").encode("utf-8")
+
+            # Step 3: Chunk, Embed & Store in Vector DB
+            retriever = create_yt_vector_store_from_transcripts(video_transcripts)
+            if not retriever:
+                yield "\nFailed to process video content for analysis.".encode("utf-8")
+                return
+            yield create_progress_bar_string(75, "Finding the most relevant information...").encode("utf-8")
+            
+            # Step 4: Search Chunks for Relevance
+           # Step 4: Search Chunks for Relevance
+            relevant_chunks: list[Document] = await retriever.aget_relevant_documents(original_query)
+            if not relevant_chunks:
+                yield "\nCould not find specific information related to your query in the videos.".encode("utf-8")
+                return
+            yield create_progress_bar_string(80, "Ranking and scoring relevant information...").encode("utf-8")
+
+            # Step 5: Score and Rerank Chunks
+            passages_to_score = [
+                {"text": doc.page_content, "metadata": doc.metadata} for doc in relevant_chunks
+            ]
+            
+            reranked_passages = await scoring_service.score_and_rerank_passages(original_query, passages_to_score)
+            
+            if not reranked_passages:
+                yield "\nCould not determine the most relevant information from the videos.".encode("utf-8")
                 return
 
-            print(f"DEBUG: Found {len(final_links)} relevant videos")
+            # Use top 5 passages for condensation
+            top_passages = reranked_passages[:5]
+            yield create_progress_bar_string(85, "Extracting key facts...").encode("utf-8")
 
-            # Step 2: Fetch transcripts and metadata for the found videos
-            data_for_summary = await get_data(final_links, db_pool)
-            if not data_for_summary:
-                yield "Found videos, but could not retrieve their transcripts.".encode("utf-8")
-                return
-
-            print(f"DEBUG: Successfully processed {len(data_for_summary)} videos with transcripts")
+            # **NEW STEP**: Condense the context before final generation
+            condensed_context = await condense_context_for_llm(original_query, top_passages)
+            
+            # Create a mapping of source titles to URLs for the final prompt
+            source_map = {p['metadata'].get('title'): p['metadata'].get('url') for p in top_passages}
+            
+            yield create_progress_bar_string(90, "Synthesizing the final answer...").encode("utf-8")
 
         except Exception as e:
-            print(f"ERROR: YouTube processing pipeline failed: {e}")
-            yield "An error occurred while fetching video data.".encode("utf-8")
+            print(f"ERROR: YouTube RAG pipeline failed: {e}")
+            yield "\nAn error occurred while processing the videos.".encode("utf-8")
             return
 
-        # Step 3: Generate the final answer using the transcript data
+        # Step 6: Synthesize Answer using the condensed context
         prompt = """
-        Given the following YouTube video transcripts: {summaries}
+        You are a financial information assistant. Your task is to answer the user's question using ONLY the provided Key Points.
+
+        **Instructions:**
+        1.  **Synthesize a Narrative:** Convert the bulleted Key Points into a fluent, well-structured paragraph.
+        2.  **Strict Grounding:** Base your answer STRICTLY on the information in the Key Points. Do not add outside information.
+        3.  **Sources:** At the end of your response, create a markdown section titled "## Sources". Under this heading, list the video titles and URLs provided in the Source Map.
+
+        **User's question:** {query}
+
+        **Key Points Extracted from Videos:**
+        {context}
         
-        You are a financial information assistant. Your task is to answer the user's question in detail using ONLY the provided transcripts.
-        
-        Guidelines:
-        - Base your answer STRICTLY on the information within the transcripts. Do not invent or use outside knowledge.
-        - Cite your sources by adding a number like [1], [2], etc., after each piece of information you use.
-        - At the end of your response, create a "Sources" section and list all the YouTube links with their corresponding citation numbers.
-        - Provide a comprehensive and detailed response covering all relevant aspects from the transcripts.
-        
-        User's question: {query}
+        **Source Map (Titles and URLs):**
+        {source_map}
         """
         
-        yt_prompt = PromptTemplate(template=prompt, input_variables=["query", "summaries"])
+        yt_prompt = PromptTemplate(template=prompt, input_variables=["query", "context", "source_map"])
         chain = yt_prompt | llm_stream
 
-        # Step 4: Stream the final response to the user
+        # Step 6: Stream the final response
+        yield create_progress_bar_string(100, "Done!").encode("utf-8")
+        yield "\n\n".encode("utf-8") 
+        yield "#Thinking ...\n".encode("utf-8")
+        
         final_response = ""
         try:
             with get_openai_callback() as cb:
                 async for chunk in chain.astream({
-                    "summaries": str(data_for_summary), 
+                    "context": condensed_context, 
                     "query": original_query,
+                    "source_map": source_map
                 }):
                     content = chunk.content
                     if content:
@@ -1066,15 +1150,12 @@ async def yt_rag_brave(
                         yield content.encode("utf-8")
                         await asyncio.sleep(0.01)
 
-                # Calculate total tokens and update database records
                 total_tokens = validation_tokens + cb.total_tokens
                 await insert_credit_usage(user_id, plan_id, total_tokens / 1000, db_pool)
             
-            # Store links data
             links_data = {"links": final_links}
             await store_into_db(session_id, prompt_history_id, links_data, db_pool)
 
-            # Store conversation in chat history
             if final_response:
                 history_db = PostgresChatMessageHistory(str(session_id), psql_url)
                 history_db.add_user_message(original_query)
