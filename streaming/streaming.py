@@ -1077,7 +1077,6 @@ async def yt_rag_brave(
             yield create_progress_bar_string(75, "Finding the most relevant information...").encode("utf-8")
             
             # Step 4: Search Chunks for Relevance
-           # Step 4: Search Chunks for Relevance
             relevant_chunks: list[Document] = await retriever.aget_relevant_documents(original_query)
             if not relevant_chunks:
                 yield "\nCould not find specific information related to your query in the videos.".encode("utf-8")
@@ -1095,15 +1094,14 @@ async def yt_rag_brave(
                 yield "\nCould not determine the most relevant information from the videos.".encode("utf-8")
                 return
 
-            # Use top 5 passages for condensation
-            top_passages = reranked_passages[:5]
-            yield create_progress_bar_string(85, "Extracting key facts...").encode("utf-8")
+            top_passages = reranked_passages[:7]
+            yield create_progress_bar_string(85, "Creating final context...").encode("utf-8")
 
-            # **NEW STEP**: Condense the context before final generation
-            condensed_context = await condense_context_for_llm(original_query, top_passages)
+            # Create the full context directly without condensation
+            final_context = scoring_service.create_enhanced_context(top_passages)
             
             # Create a mapping of source titles to URLs for the final prompt
-            source_map = {p['metadata'].get('title'): p['metadata'].get('url') for p in top_passages}
+            source_map = {p['metadata'].get('title'): p['metadata'].get('url') for p in top_passages if p.get('metadata')}
             
             yield create_progress_bar_string(90, "Synthesizing the final answer...").encode("utf-8")
 
@@ -1112,18 +1110,19 @@ async def yt_rag_brave(
             yield "\nAn error occurred while processing the videos.".encode("utf-8")
             return
 
-        # Step 6: Synthesize Answer using the condensed context
+        # Step 6: Synthesize Answer using the full context
         prompt = """
-        You are a financial information assistant. Your task is to answer the user's question using ONLY the provided Key Points.
+        You are a financial information assistant. Your task is to answer the user's question using the provided context from YouTube video transcripts.
 
-        **Instructions:**
-        1.  **Synthesize a Narrative:** Convert the bulleted Key Points into a fluent, well-structured paragraph.
-        2.  **Strict Grounding:** Base your answer STRICTLY on the information in the Key Points. Do not add outside information.
-        3.  **Sources:** At the end of your response, create a markdown section titled "## Sources". Under this heading, list the video titles and URLs provided in the Source Map.
+        Guidelines:
+        - Base your answer STRICTLY on the information within the transcripts. Do not invent or use outside knowledge.
+        - Cite your sources by adding a number like [1], [2], etc., after each piece of information you use.
+        - At the end of your response, create a "Sources" section and list all the YouTube links with their corresponding citation numbers. Do not list the same source multiple times.
+        - Provide a comprehensive and detailed response covering all relevant aspects from the transcripts.
 
         **User's question:** {query}
 
-        **Key Points Extracted from Videos:**
+        **Context from Videos:**
         {context}
         
         **Source Map (Titles and URLs):**
@@ -1142,7 +1141,7 @@ async def yt_rag_brave(
         try:
             with get_openai_callback() as cb:
                 async for chunk in chain.astream({
-                    "context": condensed_context, 
+                    "context": final_context, 
                     "query": original_query,
                     "source_map": source_map
                 }):
