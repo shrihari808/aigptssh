@@ -197,7 +197,7 @@ websocket-client==1.8.0
 websockets==13.0.1
 wrapt==1.16.0
 yarl==1.11.0
-youtube-transcript-api==0.6.2
+youtube-transcript-api
 zipp==3.20.1
 nest-asyncio
 aiofiles
