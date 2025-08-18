@@ -335,7 +335,7 @@ async def get_yt_data_async(query: str) -> list[dict]:
     print(f"Final filtered videos ({len(filtered_videos)}): {[v['title'] for v in filtered_videos]}")
     print(f"--- END DEBUG: get_yt_data_async ---\n")
     
-    return filtered_videos[:5]
+    return filtered_videos[:10]
 
 async def get_data(videos: list[dict], db_pool: asyncpg.Pool) -> AsyncGenerator:
     """
