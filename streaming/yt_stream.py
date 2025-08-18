@@ -14,6 +14,7 @@ from langchain.chains import LLMChain
 from langchain import PromptTemplate
 import os
 import tiktoken
+from typing import AsyncGenerator
 from api.brave_searcher import BraveVideoSearch
 from dotenv import load_dotenv
 from config import GPT4o_mini
@@ -225,30 +226,30 @@ def count_tokens(text: str, model_name: str = "gpt-4o-mini") -> int:
 async def process_video_data(video_data: dict) -> dict:
     """
     Processes a single video's data to fetch its full transcript and metadata.
-    
+
     Args:
         video_data: Video data from Brave API
-        
+
     Returns:
         A dictionary containing the transcript and metadata, or None if failed.
     """
     start_time = time.time()
-    
+
     try:
         url = video_data.get('url', '')
         title = video_data.get('title', 'No Title Available')
-        
+
         video_id = extract_video_id(url)
         if not video_id:
             print(f"WARNING: Could not extract video ID from {url}")
             return None
-        
+
         # Get the full transcript text
         transcript_text = await get_video_transcript_with_fallback(video_id)
         if not transcript_text:
             print(f"WARNING: Could not get transcript for video {video_id}")
             return None
-        
+
         # Prepare metadata
         metadata = {
             'url': url,
@@ -257,12 +258,12 @@ async def process_video_data(video_data: dict) -> dict:
             'publication_date': video_data.get('page_age', datetime.now().isoformat()),
             'thumbnail_url': video_data.get('thumbnail', {}).get('src')
         }
-        
+
         end_time = time.time()
         print(f"DEBUG: Fetched transcript in {end_time - start_time:.2f}s: {title}")
-        
+
         return {"transcript": transcript_text, "metadata": metadata}
-        
+
     except Exception as e:
         print(f"ERROR: Failed to process video data for {url}: {e}")
         return None
@@ -336,28 +337,38 @@ async def get_yt_data_async(query: str) -> list[dict]:
     
     return filtered_videos[:5]
 
-async def get_data(videos: list[dict], db_pool: asyncpg.Pool) -> list[dict]:
+async def get_data(videos: list[dict], db_pool: asyncpg.Pool) -> AsyncGenerator:
     """
-    Process multiple YouTube videos to extract their transcripts and metadata.
-    This function now receives full video data, so it doesn't need to fetch it again.
+    Yields transcripts as they become available instead of waiting for all of them.
+    This function processes multiple YouTube videos concurrently.
     
     Args:
         videos: List of video data dictionaries from Brave Search.
-        db_pool: Database connection pool (kept for signature compatibility but not used here).
+        db_pool: Database connection pool.
         
-    Returns:
-        List of dictionaries containing transcript and metadata for each video.
+    Yields:
+        A dictionary containing transcript and metadata for each successfully processed video.
     """
     if not videos:
-        return []
+        return
+
+    print(f"DEBUG: Concurrently processing {len(videos)} YouTube videos for transcripts...")
+
+    async def fetch_with_timeout(video):
+        try:
+            # Set a 5-second timeout for processing each video
+            return await asyncio.wait_for(
+                process_video_data(video), 
+                timeout=5.0
+            )
+        except asyncio.TimeoutError:
+            print(f"Timeout fetching transcript for {video.get('title')}")
+            return None
+
+    tasks = [asyncio.create_task(fetch_with_timeout(v)) for v in videos]
     
-    print(f"DEBUG: Processing {len(videos)} YouTube videos for transcripts...")
-    
-    tasks = [process_video_data(video) for video in videos]
-    results = await asyncio.gather(*tasks)
-    
-    # Filter out None results from failed processing
-    processed_videos = [res for res in results if res]
-    
-    print(f"DEBUG: Successfully fetched transcripts for {len(processed_videos)} videos")
-    return processed_videos
+    # Yield results as they are completed
+    for task in asyncio.as_completed(tasks):
+        result = await task
+        if result:
+            yield result

@@ -1060,8 +1060,10 @@ async def yt_rag_brave(
             final_links = video_urls
             yield create_progress_bar_string(25, f"Found {len(video_urls)} videos. Fetching transcripts...").encode("utf-8")
 
-            # Step 2: Fetch Transcripts
-            video_transcripts = await get_data(video_urls, db_pool)
+            # Step 2: Fetch Transcripts asynchronously
+            video_transcripts = []
+            async for transcript_data in get_data(video_urls, db_pool):
+                video_transcripts.append(transcript_data)
             if not video_transcripts:
                 yield "\nFound videos, but could not retrieve their transcripts.".encode("utf-8")
                 return
