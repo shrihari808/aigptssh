@@ -12,7 +12,7 @@ from api.fundamentals_rag.fundamental_chat2 import agent_with_session
 from api.fundamentals_rag.corp import corp_agent_with_session
 # from api.fundamentals_rag.company_bio import company_agent_with_session
 from api.fundamentals_rag.screener import screen_stocks
-from api.reddit_chat import reddit_rag
+# from api.reddit_chat import reddit_rag
 from api.news_rag.news_rag import web_rag,cmots_only
 from api.youtube_rag.youtube_chat import yt_chat
 import os
@@ -128,9 +128,9 @@ async def chatbot_endpoint(input_data: InputText, session_id: str, market: str =
     if flag == "news_bing":
         response = await web_rag(input_data.input_text, session_id)
         return response
-    if flag == "reddit":
-        response = await reddit_rag(input_data.input_text,session_id)
-        return response
+    # if flag == "reddit":
+    #     response = await reddit_rag(input_data.input_text,session_id)
+    #     return response
     if flag == "youtube":
         response = await yt_chat(input_data.input_text,session_id)
         return response
