@@ -13,26 +13,10 @@ import asyncpg
 import pandas as pd
 from fastapi.responses import StreamingResponse
 from openai import OpenAI
-from azure.cognitiveservices.search.websearch import WebSearchClient
-from azure.cognitiveservices.search.websearch.models import SafeSearch
-from msrest.authentication import CognitiveServicesCredentials
-from langchain_openai import ChatOpenAI
-from langchain_pinecone import PineconeVectorStore
-from langchain_openai import OpenAIEmbeddings
-from langchain.prompts import (
-    PromptTemplate,
-    SystemMessagePromptTemplate,
-    HumanMessagePromptTemplate,
-    ChatPromptTemplate,
-)
-from langchain.schema.runnable import RunnablePassthrough
-from langchain_core.output_parsers import StrOutputParser
-from pinecone import Pinecone as PineconeClient, ServerlessSpec
-from langchain.docstore.document import Document
-import psycopg2
 import pandas as pd
-from psycopg2 import sql
-from config import DB_POOL # Import the DB_POOL
+from config import DB_POOL,BRAVE_API_KEY # Import the DB_POOL
+from api.brave_searcher import BraveRedditSearch
+from api.reddit_scraper import RedditScraper
 
 
 
@@ -146,67 +130,34 @@ def process_search_red1(search_results):
 
 
 import httpx
-async def fetch_search_red(query):
-    bing_api_key = os.getenv('BING_API_KEY')
-    subscription_key = bing_api_key
-    endpoint = "https://api.bing.microsoft.com/v7.0/search"
-    headers = {"Ocp-Apim-Subscription-Key": subscription_key}
-
-    params = {
-        "count": "10",
-        "cc": 'IND',
-        "q": f"site:reddit.com {query}",
-        "mkt": "en-IN",
-        "sortBy": "Date",
-    }
-
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url=endpoint, headers=headers, params=params)
-            response.raise_for_status()  # Raise exception for HTTP errors
-            search_results = response.json()
-
-            if search_results and isinstance(search_results, dict) and 'webPages' in search_results:
-                web_pages = search_results.get('webPages', {})
-                if 'value' in web_pages and web_pages['value']:
-                    return search_results
-                else:
-                    print("No 'value' found in 'webPages'")
-                    return None
-            else:
-                print("'webPages' not found in search_results or invalid structure")
-                return None
-    except httpx.HTTPError as e:
-        print(f"HTTP error occurred: {e}")
-        return None
+async def fetch_search_red(query: str, brave_api_key: str = BRAVE_API_KEY):
+    searcher = BraveRedditSearch(brave_api_key)
+    results = await searcher.search(query)
+    return results
 
 
-async def process_search_red(search_results):
-    if search_results is None:
+async def process_search_red(search_results: list[dict]):
+    if not search_results:
+        print("DEBUG: process_search_red received no search results.")
         return None, None, None
 
-    values = search_results.get('webPages', {}).get('value', [])
-    if not values:
-        return None, None, None
+    articles = []
+    links = []
+    for item in search_results:
+        articles.append(f"Title: {item.get('title', '')}\nSnippet: {item.get('description', '')}")
+        links.append(item.get('url'))
+    
+    print(f"DEBUG: Processed {len(articles)} articles and {len(links)} links from search results.")
+    
+    # Create a DataFrame for potential database insertion
+    df = pd.DataFrame([{
+        "title": item.get("title"),
+        "source_url": item.get("url"),
+        "description": item.get("description"),
+        "source_date": item.get("page_age"),
+    } for item in search_results])
 
-    news = [
-        {
-            "title": item.get("name"),
-            "source_url": item.get("url"),
-            "image_url": None,  # Explicitly set to None
-            "description": item.get("snippet"),
-            "source_date": item.get("dateLastCrawled"),
-        }
-        for item in values
-    ]
-
-    if news:
-        df = pd.DataFrame(news)
-        filtered_articles = [article["title"] + article["description"] for article in news]
-        links = [article["source_url"] for article in news]
-        return filtered_articles, df, links
-
-    return None, None, None
+    return articles, df, links
 
 
 async def insert_red(db):

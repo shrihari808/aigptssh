@@ -519,6 +519,45 @@ class BraveVideoSearch:
         print(f"--- END DEBUG: BraveVideoSearch.search_detailed ---\n")
         return video_results
 
+class BraveRedditSearch:
+    """
+    Class to handle Brave Search API interactions for Reddit.
+    """
+
+    BRAVE_API_BASE_URL = "https://api.search.brave.com/res/v1/web/search"
+
+    def __init__(self, brave_api_key: str):
+        if not brave_api_key:
+            raise ValueError("Brave API key is required for BraveRedditSearch.")
+        self.brave_api_key = brave_api_key
+        self.headers = {
+            "Accept": "application/json",
+            "X-Subscription-Token": self.brave_api_key
+        }
+
+    async def search(self, query: str, max_results: int = 10) -> list[dict]:
+        """
+        Performs a Reddit search using the Brave API.
+        """
+        print(f"DEBUG: Searching Brave for Reddit posts with query: '{query}'")
+        params = {
+            "q": f"site:reddit.com {query}",
+            "count": max_results,
+            "country": "in"
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(self.BRAVE_API_BASE_URL, headers=self.headers, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    results = data.get("web", {}).get("results", [])
+                    print(f"DEBUG: Brave search returned {len(results)} Reddit results.")
+                    return results
+                else:
+                    print(f"Brave Reddit Search API error: {response.status}")
+                    return []
+                
+                
 # --- Standalone Functions ---
 
 def is_valid_news_url(url: str) -> bool:

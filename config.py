@@ -11,9 +11,12 @@ try:
 except Exception as e:
     print(f"ERROR: Could not load .env file in config.py: {e}")
 
+REDDIT_CLIENT_ID = os.getenv("REDDIT_CLIENT_ID")
+REDDIT_CLIENT_SECRET = os.getenv("REDDIT_CLIENT_SECRET")
+REDDIT_USER_AGENT = os.getenv("REDDIT_USER_AGENT")
+
 from pinecone import ServerlessSpec, Pinecone
 from langchain_pinecone import PineconeVectorStore
-
 import chromadb
 import tiktoken
 import numpy as np

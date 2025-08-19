@@ -763,12 +763,32 @@ async def red_rag_bing(
     if valid != 0:
         try:
             # Fetch and process Reddit data
-            sr = await fetch_search_red(reformulated_query)
-            docs, df, links = await process_search_red(sr)
+            print("DEBUG: Fetching Reddit search results from Brave...")
+            brave_api_key = os.getenv('BRAVE_API_KEY')
+            sr = await fetch_search_red(reformulated_query, brave_api_key)
             
+            print("DEBUG: Processing Brave search results...")
+            articles, df, links = await process_search_red(sr)
+            
+            if links:
+                print(f"DEBUG: Found {len(links)} Reddit links to scrape.")
+                from api.reddit_scraper import RedditScraper
+                scraper = RedditScraper()
+                scraped_contents = []
+                for link in links[:3]: # Scrape top 3 for performance
+                    scraped_data = scraper.scrape_post(link)
+                    if scraped_data:
+                        # Combine title, post body, and comments for context
+                        full_text = f"Title: {scraped_data['title']}\nPost: {scraped_data['selftext']}\n"
+                        full_text += "\n".join([f"Comment by {c['author']}: {c['body']}" for c in scraped_data['comments']])
+                        scraped_contents.append(full_text)
+                
+                docs = "\n\n---\n\n".join(scraped_contents)
+                print(f"DEBUG: Total scraped content length: {len(docs)} characters.")
+
             if df is not None and not df.empty:
                 await insert_red(df, db_pool)
-                print(f"DEBUG: Processed {len(df)} Reddit posts")
+                print(f"DEBUG: Processed and stored {len(df)} Reddit posts in the database.")
                 
         except Exception as e:
             print(f"ERROR: Reddit processing failed: {e}")
