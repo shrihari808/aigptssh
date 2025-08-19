@@ -4,7 +4,8 @@ import time
 import asyncpg
 from langchain_community.callbacks import get_openai_callback
 from langchain_text_splitters import TokenTextSplitter
-from youtube_transcript_api import YouTubeTranscriptApi, NoTranscriptFound
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 from bs4 import BeautifulSoup
 import re
 from langchain_core.output_parsers import JsonOutputParser
@@ -18,8 +19,20 @@ from typing import AsyncGenerator
 from api.brave_searcher import BraveVideoSearch
 from dotenv import load_dotenv
 from config import GPT4o_mini
+import xml.etree.ElementTree as ET
 
 load_dotenv(override=True)
+
+# --- NEW: YouTube Data API Initialization ---
+YOUTUBE_API_KEY = os.getenv('YOUTUBE_API_KEY')
+if not YOUTUBE_API_KEY:
+    raise ValueError("YOUTUBE_API_KEY not found in environment variables.")
+
+try:
+    youtube_service = build('youtube', 'v3', developerKey=YOUTUBE_API_KEY)
+except Exception as e:
+    print(f"CRITICAL ERROR: Could not build YouTube service: {e}")
+    youtube_service = None
 
 # Initialize LLM
 llm = ChatOpenAI(temperature=0.5, model="gpt-4o-mini")
@@ -44,43 +57,15 @@ Example:
 ]
 """
 
-yt_prompt = PromptTemplate(template=yt_prompt_template, input_variables=["q", "yt"])
+yt_prompt = PromptTemplate(template=yt_prompt_template, input_variables=["q", "yt_titles"])
 yt_chain = yt_prompt | llm | JsonOutputParser()
 
 def yt_chat(query: str, session_id: str) -> dict:
     pass
 
-async def check_youtube_relevance(query: str, youtube_title: str) -> int:
-    """
-    Asynchronously checks if a YouTube title is relevant to the query using LLM.
-    
-    Args:
-        query: User's search query
-        youtube_title: Title of the YouTube video
-        
-    Returns:
-        1 if relevant, 0 if not relevant
-    """
-    if not youtube_title or youtube_title == "Video not found":
-        return 0
-        
-    input_data = {"q": query, "yt": youtube_title}
-    try:
-        res = await yt_chain.ainvoke(input_data)
-        return res.get('valid', 0)
-    except Exception as e:
-        print(f"ERROR: LLM relevance check failed: {e}")
-        return 0
-
 def extract_video_id(url: str) -> str:
     """
     Extract video ID from YouTube URL.
-    
-    Args:
-        url: YouTube URL
-        
-    Returns:
-        Video ID string or None if not found
     """
     patterns = [
         r'(?:v=|\/)([0-9A-Za-z_-]{11})',
@@ -97,12 +82,6 @@ def extract_video_id(url: str) -> str:
 def parse_duration_to_seconds(duration_str: str) -> int:
     """
     Parse duration string (e.g., "02:30", "1:15:30") to seconds.
-    
-    Args:
-        duration_str: Duration in format "MM:SS" or "HH:MM:SS"
-        
-    Returns:
-        Duration in seconds
     """
     try:
         parts = duration_str.split(':')
@@ -117,103 +96,99 @@ def parse_duration_to_seconds(duration_str: str) -> int:
     except (ValueError, AttributeError):
         return 0
 
-async def get_available_transcripts(video_id: str) -> list:
+def parse_xml_transcript(xml_content: str) -> str:
     """
-    Get list of available transcripts for a video.
-    
-    Args:
-        video_id: YouTube video ID
-        
-    Returns:
-        List of available transcript information
+    Parses XML formatted transcript to extract only the text content.
     """
     try:
-        ytt_api = YouTubeTranscriptApi()
-        transcript_list = await asyncio.to_thread(ytt_api.list, video_id)
-        
-        available_transcripts = []
-        for transcript in transcript_list:
-            available_transcripts.append({
-                'language': transcript.language,
-                'language_code': transcript.language_code,
-                'is_generated': transcript.is_generated,
-                'is_translatable': transcript.is_translatable
-            })
-        
-        return available_transcripts
-        
-    except Exception as e:
-        print(f"ERROR: Failed to list transcripts for video {video_id}: {e}")
-        return []
+        root = ET.fromstring(xml_content)
+        text_lines = [elem.text for elem in root.findall('text')]
+        return ' '.join(line.strip() for line in text_lines if line)
+    except ET.ParseError as e:
+        print(f"ERROR: Failed to parse XML transcript: {e}")
+        return ""
 
-async def get_video_transcript_with_fallback(video_id: str) -> str:
+
+async def check_english_caption_exists(video_id: str) -> bool:
     """
-    Corrected transcript retrieval that properly instantiates the API client
-    and handles the fetched transcript object correctly.
-    
-    Args:
-        video_id: YouTube video ID
-        
-    Returns:
-        The full transcript text in English or an empty string if not available.
+    Quickly checks if an English caption track exists for a video.
     """
+    if not youtube_service:
+        return False
     try:
-        # 1. Correctly create an instance of the API client
-        ytt_api = YouTubeTranscriptApi()
+        def fetch_captions():
+            return youtube_service.captions().list(
+                part='snippet',
+                videoId=video_id
+            ).execute()
         
-        # 2. Call the .list() method on the instance
-        transcript_list = await asyncio.to_thread(ytt_api.list, video_id)
+        captions_list_response = await asyncio.to_thread(fetch_captions)
         
-        transcript = None
+        for item in captions_list_response.get('items', []):
+            if item['snippet']['language'].lower().startswith('en'):
+                return True
+        return False
+    except Exception:
+        return False
 
-        # Priority 1: Find a direct English transcript
-        try:
-            transcript = await asyncio.to_thread(transcript_list.find_transcript, ['en', 'en-US', 'en-GB'])
-            print(f"DEBUG: Found direct English transcript for video {video_id}.")
-        except NoTranscriptFound:
-            print(f"DEBUG: No direct English transcript found for {video_id}. Checking for translatable options.")
-            # Priority 2: Find any other translatable transcript
-            for available_transcript in transcript_list:
-                if available_transcript.is_translatable:
-                    print(f"DEBUG: Found translatable '{available_transcript.language_code}' transcript. Translating to English.")
-                    transcript = await asyncio.to_thread(available_transcript.translate, 'en')
-                    break
+async def get_transcript_from_youtube_api(video_id: str) -> str:
+    """
+    Fetches video transcript using a hybrid approach to avoid OAuth2 requirement.
+    Uses the official API to list captions and direct download to fetch them.
+    """
+    if not youtube_service:
+        print("ERROR: YouTube service is not available.")
+        return ""
 
-        if not transcript:
-            print(f"WARNING: No suitable English or translatable transcript found for video {video_id}")
+    try:
+        # Step 1: Use official API to list available caption tracks
+        def list_captions():
+            return youtube_service.captions().list(part='snippet', videoId=video_id).execute()
+
+        caption_list_response = await asyncio.to_thread(list_captions)
+        
+        items = caption_list_response.get('items', [])
+        if not items:
+            print(f"WARNING: No caption tracks found for video {video_id}.")
             return ""
 
-        # Fetch the transcript object
-        fetched_transcript_object = await asyncio.to_thread(transcript.fetch)
+        # Step 2: Find the URL for the first available English transcript
+        caption_url = None
+        for item in items:
+            if item['snippet']['language'].lower().startswith('en'):
+                # Construct the direct download URL
+                caption_id = item['id']
+                caption_url = f"https://www.youtube.com/api/timedtext?v={video_id}&lang=en&name=&kind=asr&fmt=xml&id={caption_id}"
+                print(f"DEBUG: Found English caption track for video {video_id}.")
+                break
         
-        # 3. Convert the FetchedTranscript object to a raw list of dictionaries
-        fetched_transcript_snippets = fetched_transcript_object.to_raw_data()
-        
-        if isinstance(fetched_transcript_snippets, list):
-            full_text = ' '.join([entry['text'] for entry in fetched_transcript_snippets])
-            print(f"DEBUG: Successfully retrieved and processed transcript for {video_id}. Final language: English")
-            return full_text
-        else:
-            print(f"WARNING: Transcript for video {video_id} was not in the expected list format after fetching.")
+        if not caption_url:
+            print(f"WARNING: No suitable English transcript found for video {video_id}.")
             return ""
 
-    except NoTranscriptFound:
-        print(f"WARNING: No transcripts of any kind available for video {video_id}.")
+        # Step 3: Download the transcript directly using aiohttp
+        async with aiohttp.ClientSession() as session:
+            async with session.get(caption_url) as response:
+                if response.status == 200:
+                    xml_transcript = await response.text()
+                    transcript_text = parse_xml_transcript(xml_transcript)
+                    print(f"DEBUG: Successfully downloaded and parsed transcript for {video_id}.")
+                    return transcript_text
+                else:
+                    print(f"ERROR: Failed to download transcript for {video_id}. Status: {response.status}")
+                    return ""
+
+    except HttpError as e:
+        print(f"ERROR: YouTube API error for video {video_id}: {e}")
         return ""
     except Exception as e:
-        print(f"ERROR: An unexpected error occurred while fetching transcript for video {video_id}: {e}")
+        print(f"ERROR: An unexpected error occurred for video {video_id}: {e}")
         return ""
+
 
 def count_tokens(text: str, model_name: str = "gpt-4o-mini") -> int:
     """
     Count tokens in text using tiktoken.
-    
-    Args:
-        text: Text to count tokens for
-        model_name: Model name for encoding
-        
-    Returns:
-        Number of tokens
     """
     try:
         encoding = tiktoken.encoding_for_model(model_name)
@@ -226,12 +201,6 @@ def count_tokens(text: str, model_name: str = "gpt-4o-mini") -> int:
 async def process_video_data(video_data: dict) -> dict:
     """
     Processes a single video's data to fetch its full transcript and metadata.
-
-    Args:
-        video_data: Video data from Brave API
-
-    Returns:
-        A dictionary containing the transcript and metadata, or None if failed.
     """
     start_time = time.time()
 
@@ -244,10 +213,11 @@ async def process_video_data(video_data: dict) -> dict:
             print(f"WARNING: Could not extract video ID from {url}")
             return None
 
-        # Get the full transcript text
-        transcript_text = await get_video_transcript_with_fallback(video_id)
+        # Get the full transcript text using the new function
+        transcript_text = await get_transcript_from_youtube_api(video_id)
         if not transcript_text:
-            print(f"WARNING: Could not get transcript for video {video_id}")
+            # This is now expected for videos without English transcripts, so it's a normal skip.
+            print(f"INFO: Skipping video {video_id} as no usable transcript was found.")
             return None
 
         # Prepare metadata
@@ -270,19 +240,13 @@ async def process_video_data(video_data: dict) -> dict:
 
 async def get_yt_data_async(query: str) -> list[dict]:
     """
-    Search for YouTube videos using Brave Video Search API and filter them in a batch.
-    
-    Args:
-        query: Search query
-        
-    Returns:
-        List of filtered YouTube video data dictionaries.
+    Search for YouTube videos, pre-filters for English captions, and then filters by relevance.
     """
     start_time = time.time()
     brave_api_key = os.getenv('BRAVE_API_KEY')
     
     if not brave_api_key:
-        print("ERROR: BRAVE_API_KEY not found in environment variables.")
+        print("ERROR: BRAVE_API_KEY not found.")
         return []
     
     brave_video_searcher = BraveVideoSearch(brave_api_key)
@@ -290,48 +254,51 @@ async def get_yt_data_async(query: str) -> list[dict]:
     print(f"\n--- DEBUG: get_yt_data_async ---")
     print(f"Step 1: Searching Brave Videos for query: '{query}'")
     
-    # Get video results from Brave API
-    video_results = await brave_video_searcher.search_detailed(query, max_results=15)
-    print(f"Step 2: Received {len(video_results)} video results to filter")
+    video_results = await brave_video_searcher.search_detailed(query, max_results=20)
+    print(f"Step 2: Received {len(video_results)} potential videos.")
 
-    # Filter videos by duration first
-    valid_duration_videos = []
-    for video_data in video_results:
-        duration = video_data.get('video', {}).get('duration', '0:00')
-        duration_seconds = parse_duration_to_seconds(duration)
-        if 60 < duration_seconds < 3601:
-            valid_duration_videos.append(video_data)
+    # Filter by duration first
+    valid_duration_videos = [
+        v for v in video_results 
+        if 60 < parse_duration_to_seconds(v.get('video', {}).get('duration', '0:00')) < 3601
+    ]
+    print(f"Step 3: Found {len(valid_duration_videos)} videos within 1-60 minute duration.")
     
     if not valid_duration_videos:
-        print("No videos found within the 60-3600s duration range.")
         return []
 
-    # Batch LLM relevance check
-    titles_to_check = [v['title'] for v in valid_duration_videos]
+    # Pre-filter for English captions
+    print(f"Step 4: Pre-filtering for English caption availability...")
+    tasks = [check_english_caption_exists(extract_video_id(v['url'])) for v in valid_duration_videos]
+    caption_results = await asyncio.gather(*tasks)
     
-    # Create a string of titles for the prompt
+    videos_with_captions = [
+        video for video, has_caption in zip(valid_duration_videos, caption_results) if has_caption
+    ]
+    print(f"Step 5: Found {len(videos_with_captions)} videos with available English captions.")
+
+    if not videos_with_captions:
+        return []
+
+    # Batch LLM relevance check on the smaller, caption-verified list
+    titles_to_check = [v['title'] for v in videos_with_captions]
     titles_str = "\n".join(f"- {title}" for title in titles_to_check)
-    
     input_data = {"q": query, "yt_titles": titles_str}
     
     try:
         relevance_results = await yt_chain.ainvoke(input_data)
-        
-        # Create a mapping of title to relevance
         relevance_map = {item['title']: item['valid'] for item in relevance_results}
         
-        filtered_videos = []
-        for video in valid_duration_videos:
-            if relevance_map.get(video['title'], 0) == 1:
-                filtered_videos.append(video)
+        filtered_videos = [
+            video for video in videos_with_captions if relevance_map.get(video['title'], 0) == 1
+        ]
                 
     except Exception as e:
         print(f"ERROR: Batch LLM relevance check failed: {e}")
-        return [] # Return empty if the check fails
+        return []
 
     end_time = time.time()
-    elapsed_time = end_time - start_time
-    print(f"Step 4: Filtering complete in {elapsed_time:.2f} seconds")
+    print(f"Step 6: Filtering complete in {end_time - start_time:.2f} seconds.")
     print(f"Final filtered videos ({len(filtered_videos)}): {[v['title'] for v in filtered_videos]}")
     print(f"--- END DEBUG: get_yt_data_async ---\n")
     
@@ -340,14 +307,6 @@ async def get_yt_data_async(query: str) -> list[dict]:
 async def get_data(videos: list[dict], db_pool: asyncpg.Pool) -> AsyncGenerator:
     """
     Yields transcripts as they become available instead of waiting for all of them.
-    This function processes multiple YouTube videos concurrently.
-    
-    Args:
-        videos: List of video data dictionaries from Brave Search.
-        db_pool: Database connection pool.
-        
-    Yields:
-        A dictionary containing transcript and metadata for each successfully processed video.
     """
     if not videos:
         return
@@ -356,10 +315,10 @@ async def get_data(videos: list[dict], db_pool: asyncpg.Pool) -> AsyncGenerator:
 
     async def fetch_with_timeout(video):
         try:
-            # Set a 5-second timeout for processing each video
+            # Set a 10-second timeout for processing each video
             return await asyncio.wait_for(
                 process_video_data(video), 
-                timeout=5.0
+                timeout=10.0
             )
         except asyncio.TimeoutError:
             print(f"Timeout fetching transcript for {video.get('title')}")
