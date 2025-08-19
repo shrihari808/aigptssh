@@ -774,13 +774,19 @@ async def red_rag_bing(
                 return
 
             articles, df, links = await process_search_red(search_results)
-            final_links = links[:5] # Limit to top 5 links for scraping
+            
+            if not articles:
+                yield "\nCould not find any relevant Reddit discussions for your query.".encode("utf-8")
+                return
+
+            top_articles = articles[:5] # Limit to top 5 articles for scraping
+            final_links = [article['url'] for article in top_articles]
 
             yield create_progress_bar_string(25, f"Found {len(links)} discussions. Scraping top posts...").encode("utf-8")
 
             # Step 2: Scrape top Reddit posts
             scraper = RedditScraper()
-            scraped_data = [await scraper.scrape_post(link) for link in final_links]
+            scraped_data = [await scraper.scrape_post(article) for article in top_articles]
             
             if not any(scraped_data):
                 yield "\nFound Reddit discussions, but could not scrape their content.".encode("utf-8")
@@ -831,6 +837,7 @@ async def red_rag_bing(
         - Popular opinions and debates
         - Emerging trends mentioned by users
         - Different perspectives from the Reddit community
+        - Provide the source links with their citation numbers at the end of the response
         
         Use proper markdown formatting and cite relevant Reddit discussions.
         

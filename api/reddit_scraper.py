@@ -10,10 +10,14 @@ class RedditScraper:
             user_agent=REDDIT_USER_AGENT,
         )
 
-    async def scrape_post(self, url: str) -> dict:
+    async def scrape_post(self, article: dict) -> dict:
         """
         Scrapes a Reddit post, its comments, and replies asynchronously.
         """
+        url = article.get("url")
+        if not url:
+            return None
+            
         print(f"DEBUG: Scraping Reddit URL: {url}")
         try:
             submission = await self.reddit.submission(url=url)
@@ -31,7 +35,8 @@ class RedditScraper:
                 "score": submission.score,
                 "selftext": submission.selftext,
                 "comments": comments,
-                "url": url  # Add the URL to the scraped data
+                "url": url,  # Add the URL to the scraped data
+                "page_age": article.get("page_age") # Pass page_age through
             }
             print(f"DEBUG: Successfully scraped '{submission.title}'. Found {len(comments)} comments.")
             return scraped_data
