@@ -53,7 +53,8 @@ from api.news_rag.caching_service import (
 )
 from langchain_core.documents import Document
 from api.brave_searcher import BraveNews, get_brave_results
-from langchain_chroma import Chroma
+from api.reddit_scraper import RedditScraper
+from api.reddit_rag.reddit_vector_store import create_reddit_vector_store_from_scraped_data
 
 # --- Functions imported from other modules ---
 from streaming.reddit_stream import fetch_search_red, process_search_red
@@ -742,124 +743,140 @@ async def red_rag_bing(
     plan_id: int = Query(...),
     db_pool: asyncpg.Pool = Depends(get_db_pool)
 ):
-    """Optimized Reddit RAG endpoint."""
-    
-    query = request.query.strip()
-    today = datetime.now().strftime("%Y-%m-%d")
-    
-    # Get chat history and do combined preprocessing
-    chat_history = await get_chat_history_optimized(str(session_id), db_pool, limit=3)
-    preprocessing_result = await combined_preprocessing(query, chat_history, today)
-    
-    # Extract results
-    valid = preprocessing_result.get("valid", 0)
-    reformulated_query = preprocessing_result.get("reformulated_query", query)
-    is_followup = preprocessing_result.get("is_followup", False)
-    preprocessing_tokens = preprocessing_result.get("tokens_used", 0)
-    
-    docs = ""
-    links = []
-    
-    if valid != 0:
-        try:
-            # Fetch and process Reddit data
-            print("DEBUG: Fetching Reddit search results from Brave...")
-            brave_api_key = os.getenv('BRAVE_API_KEY')
-            sr = await fetch_search_red(reformulated_query, brave_api_key)
-            
-            print("DEBUG: Processing Brave search results...")
-            articles, df, links = await process_search_red(sr)
-            
-            if links:
-                print(f"DEBUG: Found {len(links)} Reddit links to scrape.")
-                from api.reddit_scraper import RedditScraper
-                scraper = RedditScraper()
-                scraped_contents = []
-                for link in links[:3]: # Scrape top 3 for performance
-                    scraped_data = scraper.scrape_post(link)
-                    if scraped_data:
-                        # Combine title, post body, and comments for context
-                        full_text = f"Title: {scraped_data['title']}\nPost: {scraped_data['selftext']}\n"
-                        full_text += "\n".join([f"Comment by {c['author']}: {c['body']}" for c in scraped_data['comments']])
-                        scraped_contents.append(full_text)
-                
-                docs = "\n\n---\n\n".join(scraped_contents)
-                print(f"DEBUG: Total scraped content length: {len(docs)} characters.")
-
-            if df is not None and not df.empty:
-                await insert_red(df, db_pool)
-                print(f"DEBUG: Processed and stored {len(df)} Reddit posts in the database.")
-                
-        except Exception as e:
-            print(f"ERROR: Reddit processing failed: {e}")
-            docs, links = "", []
-
-    res_prompt = """
-    Reddit articles: {context}
-    Chat history: {history}
-    Today date: {date}
-    
-    You are a financial information assistant specializing in Reddit discussions and community insights.
-    Using the provided Reddit articles and chat history, respond to the user's inquiries with detailed analysis.
-    
-    Focus on:
-    - Community sentiment and discussions
-    - Popular opinions and debates
-    - Emerging trends mentioned by users
-    - Different perspectives from the Reddit community
-    
-    Use proper markdown formatting and cite relevant Reddit discussions.
-    
-    The user has asked the following question: {input}        
+    """
+    Handles Reddit-based RAG requests with a full pipeline:
+    Search -> Scrape -> Chunk & Embed -> Retrieve -> Rerank -> Synthesize.
     """
     
-    R_prompt = PromptTemplate(
-        template=res_prompt, 
-        input_variables=["history", "context", "input", "date"]
-    )
-    ans_chain = R_prompt | llm_stream
+    original_query = request.query.strip()
+    
+    validation_result = await validate_query_only(original_query)
+    valid = validation_result.get("valid", 0)
+    validation_tokens = validation_result.get("tokens_used", 0)
 
-    async def generate_chat_res(history, docs, query, date):
+    async def generate_chat_res():
+        """Generator function that streams the entire RAG process."""
         if valid == 0:
-            error_message = "The search query is not related to Indian financial markets, companies, economics, or finance. Please ask questions about stocks, companies, market trends, financial news, or economic developments."
+            error_message = "The search query is not related to financial markets, companies, or economics. Please ask a relevant question."
             yield error_message.encode("utf-8")
             return
 
+        final_links = []
+        
+        try:
+            # Step 1: Search for Reddit posts
+            yield create_progress_bar_string(10, "Searching for relevant Reddit discussions...").encode("utf-8")
+            brave_api_key = os.getenv('BRAVE_API_KEY')
+            search_results = await fetch_search_red(original_query, brave_api_key)
+            
+            if not search_results:
+                yield "\nCould not find any relevant Reddit discussions for your query.".encode("utf-8")
+                return
+
+            articles, df, links = await process_search_red(search_results)
+            final_links = links[:5] # Limit to top 5 links for scraping
+
+            yield create_progress_bar_string(25, f"Found {len(links)} discussions. Scraping top posts...").encode("utf-8")
+
+            # Step 2: Scrape top Reddit posts
+            scraper = RedditScraper()
+            scraped_data = [scraper.scrape_post(link) for link in final_links]
+            
+            if not any(scraped_data):
+                yield "\nFound Reddit discussions, but could not scrape their content.".encode("utf-8")
+                return
+            yield create_progress_bar_string(50, "Processing and embedding Reddit content...").encode("utf-8")
+
+            # Step 3: Chunk, Embed & Store in Vector DB
+            retriever = create_reddit_vector_store_from_scraped_data(scraped_data)
+            if not retriever:
+                yield "\nFailed to process Reddit content for analysis.".encode("utf-8")
+                return
+            yield create_progress_bar_string(75, "Finding the most relevant information...").encode("utf-8")
+            
+            # Step 4: Search Chunks for Relevance
+            relevant_chunks: list[Document] = await retriever.aget_relevant_documents(original_query)
+            if not relevant_chunks:
+                yield "\nCould not find specific information related to your query in the Reddit posts.".encode("utf-8")
+                return
+            yield create_progress_bar_string(80, "Ranking and scoring relevant information...").encode("utf-8")
+
+            # Step 5: Score and Rerank Chunks
+            passages_to_score = [
+                {"text": doc.page_content, "metadata": doc.metadata} for doc in relevant_chunks
+            ]
+            
+            reranked_passages = await scoring_service.score_and_rerank_passages(original_query, passages_to_score)
+            
+            if not reranked_passages:
+                yield "\nCould not determine the most relevant information from the Reddit posts.".encode("utf-8")
+                return
+
+            top_passages = reranked_passages[:7]
+            final_context = scoring_service.create_enhanced_context(top_passages)
+            yield create_progress_bar_string(90, "Synthesizing the final answer...").encode("utf-8")
+
+        except Exception as e:
+            print(f"ERROR: Reddit RAG pipeline failed: {e}")
+            yield "\nAn error occurred while processing the Reddit discussions.".encode("utf-8")
+            return
+
+        # Step 6: Synthesize Answer
+        res_prompt = """
+        You are a financial information assistant specializing in Reddit discussions and community insights.
+        Using the provided Reddit articles and chat history, respond to the user's inquiries with detailed analysis.
+        
+        Focus on:
+        - Community sentiment and discussions
+        - Popular opinions and debates
+        - Emerging trends mentioned by users
+        - Different perspectives from the Reddit community
+        
+        Use proper markdown formatting and cite relevant Reddit discussions.
+        
+        The user has asked the following question: {input}  
+
+        Context from Reddit:
+        {context}      
+        """
+        
+        R_prompt = PromptTemplate(
+            template=res_prompt, 
+            input_variables=["context", "input"]
+        )
+        ans_chain = R_prompt | llm_stream
+
+        # Step 7: Stream the final response
+        yield create_progress_bar_string(100, "Done!").encode("utf-8")
+        yield "\n\n".encode("utf-8") 
+        yield "#Thinking ...\n".encode("utf-8")
+        
         final_response = ""
         try:
             with get_openai_callback() as cb:
-                async for event in ans_chain.astream_events(
-                    {"history": history, "context": docs, "input": query, "date": date}, 
-                    version="v1"
-                ):
-                    if event["event"] == "on_chat_model_stream":
-                        content = event["data"]["chunk"].content
-                        if content:
-                            final_response += content
-                            yield content.encode("utf-8")
-                            await asyncio.sleep(0.01)
+                async for chunk in ans_chain.astream({"context": final_context, "input": original_query}):
+                    content = chunk.content
+                    if content:
+                        final_response += content
+                        yield content.encode("utf-8")
+                        await asyncio.sleep(0.01)
 
-                # Calculate total tokens
-                total_tokens = preprocessing_tokens + cb.total_tokens
+                total_tokens = validation_tokens + cb.total_tokens
                 await insert_credit_usage(user_id, plan_id, total_tokens / 1000, db_pool)
-
-            # Store links and conversation
-            links_data = {"links": links}
+            
+            links_data = {"links": final_links}
             await store_into_db(session_id, prompt_history_id, links_data, db_pool)
 
             if final_response:
                 history_db = PostgresChatMessageHistory(str(session_id), psql_url)
-                history_db.add_user_message(reformulated_query if is_followup else query)
+                history_db.add_user_message(original_query)
                 history_db.add_ai_message(final_response)
 
         except Exception as e:
-            print(f"ERROR: An error occurred during streaming: {e}")
+            print(f"ERROR: An error occurred during final response streaming: {e}")
             yield b"An error occurred while generating the response."
-
-    return StreamingResponse(
-        generate_chat_res(chat_history, docs, reformulated_query, today), 
-        media_type="text/event-stream"
-    )
+            
+    return StreamingResponse(generate_chat_res(), media_type="text/event-stream")
 
 
 async def validate_query_only(query: str) -> dict:

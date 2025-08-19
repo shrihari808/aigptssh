@@ -1,3 +1,5 @@
+# /aigptssh/streaming/reddit_stream.py
+
 import os
 import json
 import asyncio
@@ -17,7 +19,7 @@ import pandas as pd
 from config import DB_POOL,BRAVE_API_KEY # Import the DB_POOL
 from api.brave_searcher import BraveRedditSearch
 from api.reddit_scraper import RedditScraper
-
+from api.reddit_rag.reddit_vector_store import create_reddit_vector_store_from_scraped_data
 
 
 from dotenv import load_dotenv
