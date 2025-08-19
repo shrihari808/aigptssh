@@ -145,19 +145,21 @@ async def process_search_red(search_results: list[dict]):
 
     articles = []
     links = []
+    # --- ADD THIS SNIPPET ---
     for item in search_results:
-        articles.append(f"Title: {item.get('title', '')}\nSnippet: {item.get('description', '')}")
+        articles.append({
+            "title": item.get("title", ""),
+            "description": item.get("description", ""),
+            "url": item.get("url"),
+            "page_age": item.get("page_age")  # Add page_age here
+        })
         links.append(item.get('url'))
-    
+    # --- END OF SNIPPET ---
+
     print(f"DEBUG: Processed {len(articles)} articles and {len(links)} links from search results.")
-    
+
     # Create a DataFrame for potential database insertion
-    df = pd.DataFrame([{
-        "title": item.get("title"),
-        "source_url": item.get("url"),
-        "description": item.get("description"),
-        "source_date": item.get("page_age"),
-    } for item in search_results])
+    df = pd.DataFrame(articles)
 
     return articles, df, links
 

@@ -1,23 +1,24 @@
-import praw
+# /aigptssh/api/reddit_scraper.py
+import asyncpraw
 from config import REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET, REDDIT_USER_AGENT
 
 class RedditScraper:
     def __init__(self):
-        self.reddit = praw.Reddit(
+        self.reddit = asyncpraw.Reddit(
             client_id=REDDIT_CLIENT_ID,
             client_secret=REDDIT_CLIENT_SECRET,
             user_agent=REDDIT_USER_AGENT,
         )
 
-    def scrape_post(self, url: str) -> dict:
+    async def scrape_post(self, url: str) -> dict:
         """
-        Scrapes a Reddit post, its comments, and replies.
+        Scrapes a Reddit post, its comments, and replies asynchronously.
         """
         print(f"DEBUG: Scraping Reddit URL: {url}")
         try:
-            submission = self.reddit.submission(url=url)
+            submission = await self.reddit.submission(url=url)
             comments = []
-            submission.comments.replace_more(limit=None)
+            await submission.comments.replace_more(limit=None)
             for comment in submission.comments.list():
                 comments.append({
                     "body": comment.body,
@@ -30,6 +31,7 @@ class RedditScraper:
                 "score": submission.score,
                 "selftext": submission.selftext,
                 "comments": comments,
+                "url": url  # Add the URL to the scraped data
             }
             print(f"DEBUG: Successfully scraped '{submission.title}'. Found {len(comments)} comments.")
             return scraped_data

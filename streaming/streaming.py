@@ -780,7 +780,7 @@ async def red_rag_bing(
 
             # Step 2: Scrape top Reddit posts
             scraper = RedditScraper()
-            scraped_data = [scraper.scrape_post(link) for link in final_links]
+            scraped_data = [await scraper.scrape_post(link) for link in final_links]
             
             if not any(scraped_data):
                 yield "\nFound Reddit discussions, but could not scrape their content.".encode("utf-8")
@@ -795,7 +795,7 @@ async def red_rag_bing(
             yield create_progress_bar_string(75, "Finding the most relevant information...").encode("utf-8")
             
             # Step 4: Search Chunks for Relevance
-            relevant_chunks: list[Document] = await retriever.aget_relevant_documents(original_query)
+            relevant_chunks: list[Document] = await retriever.ainvoke(original_query)
             if not relevant_chunks:
                 yield "\nCould not find specific information related to your query in the Reddit posts.".encode("utf-8")
                 return

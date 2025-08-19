@@ -32,11 +32,16 @@ def create_reddit_vector_store_from_scraped_data(scraped_data: list[dict]):
         if full_text:
             chunks = text_splitter.split_text(full_text)
             for i, chunk in enumerate(chunks):
+                # --- THIS IS THE CORRECTED PART ---
+                # Provide default values to .get() to prevent NoneType errors
                 chunk_metadata = {
-                    "title": post.get('title'),
-                    "score": post.get('score'),
+                    "title": post.get('title', "No Title"),
+                    "score": post.get('score', 0),
                     "chunk_num": i + 1,
+                    "link": post.get('url', ""),
+                    "publication_date": post.get('page_age', "") 
                 }
+                # --- END OF CORRECTION ---
 
                 doc = Document(
                     page_content=chunk,
