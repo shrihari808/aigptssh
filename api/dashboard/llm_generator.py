@@ -1,6 +1,6 @@
 import json
 import os
-from config import GPT4o_mini as llm # Use GPT4o_mini and alias it as llm
+from config import GPT4o_mini as llm
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 
@@ -9,19 +9,12 @@ class LLMGenerator:
     Uses an LLM to generate structured dashboard content based on pre-processed context.
     """
     def __init__(self, input_path):
-        """
-        Initializes the generator with the path to the context data file.
-        
-        Args:
-            input_path (str): The path to the 'dashboard_data.json' file.
-        """
         self.input_path = input_path
         self.data = self._load_data()
         if not self.data:
             raise ValueError("Failed to load or parse the input data file.")
 
     def _load_data(self):
-        """Loads the JSON data file containing the LLM contexts."""
         try:
             with open(self.input_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
@@ -29,43 +22,42 @@ class LLMGenerator:
             print(f"Error loading data from {self.input_path}: {e}")
             return None
 
-    def _generate_section(self, section_name, context, prompt_template, output_parser):
+    def _generate_section(self, section_name, context_docs, prompt_template, output_parser):
         """
-        Generates a single section of the dashboard content.
+        Generates a single section of the dashboard content from document objects.
         
         Args:
-            section_name (str): The name of the section (e.g., 'market_summary').
-            context (list): The list of context strings for this section.
+            section_name (str): The name of the section.
+            context_docs (list of dicts): The list of document objects with text and metadata.
             prompt_template (ChatPromptTemplate): The prompt template for the LLM.
-            output_parser (JsonOutputParser): The parser to structure the LLM's output.
+            output_parser (JsonOutputParser): The parser for the LLM's output.
         
         Returns:
-            dict: The generated content for the section, or an error message.
+            A tuple containing the generated content (dict) and a list of source URLs (list).
         """
         print(f"Generating content for section: {section_name}...")
-        if not context:
+        if not context_docs:
             print(f"No context available for {section_name}. Skipping.")
-            return {"error": f"No context provided for {section_name}."}
+            return {"error": f"No context provided for {section_name}."}, []
             
+        # Extract text for the LLM and URLs for sourcing
+        context_str = "\n\n---\n\n".join([doc['text'] for doc in context_docs])
+        source_urls = list(set([doc['metadata'].get('url') for doc in context_docs if doc['metadata'].get('url')]))
+        
         chain = prompt_template | llm | output_parser
         
         try:
-            # Join the context chunks into a single string
-            context_str = "\n\n---\n\n".join(context)
             response = chain.invoke({"context": context_str})
-            return response
+            return response, source_urls
         except Exception as e:
             print(f"An error occurred during LLM generation for {section_name}: {e}")
-            return {"error": "Failed to generate content from LLM."}
+            return {"error": "Failed to generate content from LLM."}, []
 
     def generate_dashboard_content(self):
-        """
-        Orchestrates the generation of all dashboard sections and combines them.
-        """
         final_output = {
             "last_updated_utc": self.data.get("last_updated_utc"),
-            "market_summary": [], # Changed to list for multiple points
-            "latest_news": [], # Added new section
+            "market_summary": {},
+            "latest_news": {},
             "sector_analysis": {},
             "standouts_analysis": {},
             "market_drivers": {}
@@ -73,15 +65,13 @@ class LLMGenerator:
         
         contexts = self.data.get("llm_contexts", {})
 
-        # --- Define Prompts and Parsers for each section ---
-
-        # 1. Market Summary (Multi-Point)
+        # 1. Market Summary
         summary_parser = JsonOutputParser()
         summary_prompt = ChatPromptTemplate.from_template(
             """Analyze the provided context about the Indian stock market. 
             Identify 5-6 distinct key themes or summary points for the day.
             For each point, create a title and a concise one-paragraph summary.
-            The output should be a JSON object containing a list of these summary points.
+            The output should be a JSON object containing a list called "summary_points".
             
             Context: {context}
             
@@ -89,15 +79,20 @@ class LLMGenerator:
             """,
             partial_variables={"format_instructions": summary_parser.get_format_instructions()},
         )
-        final_output["market_summary"] = self._generate_section(
+        summary_content, summary_sources = self._generate_section(
             "market_summary", contexts.get("indices_context"), summary_prompt, summary_parser
         )
+        final_output["market_summary"] = {
+            "summary_points": summary_content.get("summary_points", []),
+            "sources": summary_sources
+        }
 
-        # 2. Latest News Snippets
+        # 2. Latest News Snippets with Age
         news_parser = JsonOutputParser()
         news_prompt = ChatPromptTemplate.from_template(
-            """From the context, identify the 3 most recent and important news articles. 
-            Extract the title, a concise one-sentence snippet, and the full URL for each.
+            """From the context, identify the 3 most important news articles. 
+            For each, extract the title, a concise one-sentence snippet, the full URL, and the human-readable 'age'.
+            The output should be a JSON object containing a list called "articles".
             
             Context: {context}
             
@@ -105,9 +100,10 @@ class LLMGenerator:
             """,
             partial_variables={"format_instructions": news_parser.get_format_instructions()},
         )
-        final_output["latest_news"] = self._generate_section(
+        news_content, _ = self._generate_section(
             "latest_news", contexts.get("indices_context"), news_prompt, news_parser
         )
+        final_output["latest_news"] = news_content
 
         # 3. Sector Analysis
         sectors_parser = JsonOutputParser()
@@ -122,9 +118,10 @@ class LLMGenerator:
             """,
             partial_variables={"format_instructions": sectors_parser.get_format_instructions()},
         )
-        final_output["sector_analysis"] = self._generate_section(
+        sector_content, _ = self._generate_section(
             "sector_analysis", contexts.get("sectors_context"), sectors_prompt, sectors_parser
         )
+        final_output["sector_analysis"] = sector_content
 
         # 4. Standouts Analysis
         standouts_parser = JsonOutputParser()
@@ -138,9 +135,10 @@ class LLMGenerator:
             """,
             partial_variables={"format_instructions": standouts_parser.get_format_instructions()},
         )
-        final_output["standouts_analysis"] = self._generate_section(
+        standouts_content, _ = self._generate_section(
             "standouts_analysis", contexts.get("standouts_context"), standouts_prompt, standouts_parser
         )
+        final_output["standouts_analysis"] = standouts_content
 
         # 5. Market Drivers
         drivers_parser = JsonOutputParser()
@@ -154,9 +152,10 @@ class LLMGenerator:
             """,
             partial_variables={"format_instructions": drivers_parser.get_format_instructions()},
         )
-        final_output["market_drivers"] = self._generate_section(
+        drivers_content, _ = self._generate_section(
             "market_drivers", contexts.get("market_drivers_context"), drivers_prompt, drivers_parser
         )
+        final_output["market_drivers"] = drivers_content
 
         print("--- LLM Content Generation Complete ---")
         return final_output

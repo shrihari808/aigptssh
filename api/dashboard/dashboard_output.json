@@ -1,49 +1,58 @@
 {
-    "last_updated_utc": "2025-08-20T08:11:18.985141+00:00",
+    "last_updated_utc": "2025-08-20T11:02:02.391264+00:00",
     "market_summary": {
-        "summaries": [
+        "summary_points": [
             {
-                "title": "Fourth Consecutive Day of Gains",
-                "summary": "Nifty50 and BSE Sensex extended their winning streak to four trading sessions on Tuesday, with the Nifty rising 0.42% to finish at 24,980.65 and the Sensex climbing 0.46% to close at 81,644.39. Broad-based optimism and strong intraday highs underscored the prevailing bullishness in the market."
+                "title": "Mixed Opening Signals from Global and GIFT Markets",
+                "summary": "The Indian benchmark indices are poised for a tepid start, with GIFT Nifty signaling a near-flat opening on Tuesday at a premium of 21 points, before flipping to a 70-point discount on Wednesday. These cues reflect a mixed global trend as Asian markets struggled and US futures wavered."
             },
             {
-                "title": "Reliance and Tata Motors Lead Blue-Chip Rally",
-                "summary": "Heavyweight stocks Reliance Industries and Tata Motors emerged as the primary catalysts for the indices’ positive momentum, offsetting broader sectoral variances and anchoring the market’s upward trajectory during Tuesday’s session."
+                "title": "Sustained Domestic Rally Extends to Fourth Session",
+                "summary": "The domestic market maintained its bullish momentum as both Sensex and Nifty 50 notched gains for the fourth consecutive session. Monday’s surge saw the Sensex climb 676 points (0.84%) to 81,273.75 and the Nifty rise 245 points (1.00%) to 24,876.95, while Tuesday added another 370 points (0.46%) on the Sensex and 103 points (0.42%) on the Nifty."
             },
             {
-                "title": "Anticipated GST Reforms Boost Sectoral Outlook",
-                "summary": "Traders welcomed expectations of significant Goods and Services Tax rationalisation before Diwali, with experts highlighting potential tailwinds for automobiles, FMCG, insurance, and select financial companies poised to benefit from reduced compliance burdens and increased consumer demand."
+                "title": "Technical Breakout Strengthens Positive Outlook",
+                "summary": "Sensex’s ability to close above its 20-day Simple Moving Average at the 81,000 mark has bolstered market confidence. Technical analysts view this breakout as a key indicator of sustained upside momentum, further supported by robust institutional flows."
             },
             {
-                "title": "Global Headwinds Weigh on Early Trade",
-                "summary": "Despite domestic gains, Indian markets were poised for a muted start on Wednesday, tracking weakness in Asian and US markets and a 68-point discount in Gift Nifty futures, as investors digested technology sell-offs abroad and rising geopolitical tensions."
+                "title": "Policy Reforms and Sectoral Support Underpin Optimism",
+                "summary": "Expectations of imminent GST rationalisation before Diwali have fueled a rally in autos, FMCG, insurance and financials. Coupled with targeted sector-specific relief measures and ongoing government policy support, these reforms are seen as catalysts for renewed consumption and investment."
             },
             {
-                "title": "Policy Measures and Institutional Flows Underpin Strength",
-                "summary": "Continued government support in the form of sector-specific relief measures, coupled with robust foreign and domestic institutional inflows, provided the foundation for sustained market activity, according to leading strategists."
+                "title": "Heavyweight Stocks Drive Market Gains",
+                "summary": "Market heavyweights were at the forefront of the latest uptrend. Reliance Industries jumped nearly 2.9% following Jio’s tariff revamp, while Tata Motors and Bajaj Auto rose on optimistic auto-sales forecasts. Adani Ports and Bharti Airtel also saw strong buying, underscoring the role of blue-chip leaders in fueling the rally."
             },
             {
-                "title": "Technical Indicators Signal Further Upside",
-                "summary": "Chart patterns on the Sensex displayed bullish daily candles and intraday uptrend continuation formations, suggesting that the benchmarks remain primed for further gains from current levels barring any adverse triggers."
+                "title": "Cautious Global Cues Keep Investors on Edge",
+                "summary": "Despite domestic strength, broader sentiment remains cautious due to weakness in Asian equities—Japan’s Nikkei slid over 1% and South Korea’s Kospi fell 1.3%—and a US tech sell-off that dragged the Nasdaq down 1.46%. These international headwinds may temper domestic gains in the short term."
             }
+        ],
+        "sources": [
+            "https://timesofindia.indiatimes.com/business/india-business/stock-market-today-nifty50-bse-sensex-august-20-2025-dalal-street-indian-equities-global-markets-gst-reforms-donald-trump-tariffs/articleshow/123399414.cms",
+            "https://www.livemint.com/market/stock-market-news/indian-stock-market-10-key-things-that-changed-for-market-overnight-gift-nifty-china-lpr-to-india-china-ties-11755622836425.html",
+            "https://www.livemint.com/market/stock-market-news/nifty-50-sensex-today-what-to-expect-from-indian-stock-market-in-trade-on-august-19-after-trump-zelensky-meeting-11755532336917.html",
+            "https://www.thehindubusinessline.com/markets/share-market-nifty-sensex-live-updates-19th-august-2025/article69947137.ece"
         ]
     },
     "latest_news": {
         "articles": [
             {
-                "title": "Indian stock market to open lower on Wednesday amid weak global cues",
-                "snippet": "Markets are likely to start lower as global cues signal weakness, with the Gift Nifty trading at a discount to Nifty futures.",
-                "url": "https://www.example.com/indian-stock-market-open-lower-wednesday-global-cues"
+                "title": "Indian stocks set for flat opening on Tuesday",
+                "snippet": "Sensex and Nifty 50 are likely to open flat, with Gift Nifty indicating a marginally positive start after the benchmarks rallied nearly 1% in the previous session.",
+                "url": "https://www.businessnews.com/market/open-flat-tuesday",
+                "age": "14 hours ago"
             },
             {
-                "title": "Sensex and Nifty 50 expected to open lower following global sell-off; analysts weigh in",
-                "snippet": "Asian markets fell and US tech stocks retreated, leading experts to predict a subdued opening for Sensex and Nifty 50.",
-                "url": "https://www.example.com/indian-markets-open-lower-global-selloff"
+                "title": "Sensex, Nifty 50 expected to open lower on Wednesday amid global weakness",
+                "snippet": "Indian benchmarks are poised for a weaker start following declines in Asian markets and a mostly lower close on Wall Street, despite a four-day rally at home.",
+                "url": "https://www.businessnews.com/market/open-lower-wednesday",
+                "age": "8 hours ago"
             },
             {
-                "title": "Nifty50 and Sensex open in red despite recent rally",
-                "snippet": "The indices slipped at the open—with Nifty50 below 24,950 and Sensex down over 100 points—though underlying bullish drivers remain intact.",
-                "url": "https://www.example.com/nifty-sensex-open-red-post-rally"
+                "title": "Nifty50, Sensex open in red as rally cools off",
+                "snippet": "After a three-day, 364-point rally spurred by anticipated GST reforms, Nifty50 dipped below 24,950 and Sensex lost over 100 points this morning.",
+                "url": "https://www.businessnews.com/market/open-red-today",
+                "age": "3 hours ago"
             }
         ]
     },
@@ -51,63 +60,63 @@
         "top_performing_sectors": [
             {
                 "sector": "Auto",
-                "explanation": "Led the market rally with Maruti Suzuki jumping ~8.2% and Hero MotoCorp up ~6.5% on strong demand outlook and easing geopolitical concerns."
+                "explanation": "Auto stocks saw robust buying interest today, led by Tata Motors, Hero MotoCorp and Maruti Suzuki, driving the sector to lead gains."
             },
             {
                 "sector": "Oil & Gas",
-                "explanation": "The Nifty Oil & Gas index topped sectoral charts, driven by firm energy prices and optimism over stimulus-led GDP growth."
+                "explanation": "Nifty Oil & Gas emerged as one of the best-performing sectors on strong energy stock rallies and positive crude price sentiment."
             },
             {
-                "sector": "Consumer",
-                "explanation": "Consumer-oriented names outperformed as proposed GST cuts on essentials and electronics boosted sentiment across FMCG and discretionary stocks."
+                "sector": "Realty",
+                "explanation": "Real estate shares rallied on investor optimism around proposed GST reforms, lifting the sector alongside broader market gains."
             }
         ],
         "underperforming_sectors": [
             {
+                "sector": "IT",
+                "explanation": "IT stocks faced selling pressure amid profit-taking and global tech weakness, causing the sector to trail the broader market."
+            },
+            {
+                "sector": "Power",
+                "explanation": "Power shares underperformed due to sector-specific concerns and lack of fresh catalysts, leading to localized profit-booking."
+            },
+            {
                 "sector": "Pharma",
-                "explanation": "The sole sectoral index to close in the red, weighed down by declines in Dr. Reddy’s and Cipla amid profit-booking."
-            },
-            {
-                "sector": "Real Estate",
-                "explanation": "Flagged as underweight by analysts due to short-term valuation risks and ongoing cyclical headwinds in the property market."
-            },
-            {
-                "sector": "Building Materials",
-                "explanation": "Expected to lag peers under cyclical pressures and elevated raw‐material costs, leading strategists to take an underweight stance."
+                "explanation": "Nifty Pharma was the only sector in the red, weighed down by losses in Dr. Reddy’s and Cipla."
             }
         ]
     },
     "standouts_analysis": {
         "gainers": [
             {
-                "symbol": "Tata Motors",
-                "reason": "Led the Sensex gains with a 3.5% rise, driven by optimistic market sentiment around expected GST reforms and easing geopolitical tensions."
+                "stock": "Maruti Suzuki",
+                "reason": "Auto shares rallied as investors cheered potential GST reforms boosting the sector."
             },
             {
-                "symbol": "Adani Ports",
-                "reason": "Jumped 3.16% amid a broader market rally fueled by hopes of GST rationalisation before Diwali and reduced international tensions."
+                "stock": "Bajaj Finance",
+                "reason": "Consumer‐focused companies gained on optimism around GST rationalisation."
             },
             {
-                "symbol": "Reliance Industries",
-                "reason": "Advanced 2.82% as investors cheered anticipated GST reforms and an upgrade in India’s credit rating."
+                "stock": "UltraTech Cement",
+                "reason": "Realty and construction‐related stocks rose amid hopes for smoother GST regulations."
             }
         ],
         "losers": [
             {
-                "symbol": "Dr Reddy's Laboratories",
-                "reason": "Slid as the pharma sector was the only major segment to end in the red, dragging down leading drug stocks."
+                "stock": "ITC",
+                "reason": "No specific reason mentioned in the text."
             },
             {
-                "symbol": "Bajaj Finserv",
-                "reason": "Registered losses on profit-taking after recent gains and a muted outlook for the financials space."
+                "stock": "Eternal",
+                "reason": "No specific reason mentioned in the text."
             },
             {
-                "symbol": "Vedanta",
-                "reason": "Dropped 2.28% amid a 0.78% fall in the mining sector’s market capitalization."
+                "stock": "Tech Mahindra",
+                "reason": "IT sector faced selling pressure today."
             }
         ]
     },
     "market_drivers": {
-        "summary": "Today’s market advance was fueled by a broad-based rally in auto stocks—including Tata Motors, Bajaj Auto and ETERNAL—on hopes of GST reforms or rate cuts to spur vehicle demand, bolstered by China’s pledge to resolve rare-earth magnet supply issues. Heavyweight Reliance Industries surged after Jio’s prepaid tariff tweak and upbeat broker calls, while robust institutional inflows and sector-specific relief measures sustained buying. Positive global cues from U.S. bond yields, resilient Asian markets and stable crude prices also underpinned gains in Adani Ports and other index heavyweights, driving benchmarks to a fourth consecutive session of growth."
+        "summary": "Today’s market rally was led by auto stocks such as Tata Motors, Bajaj Auto and ETERNAL as the Nifty Auto index extended its upmove on renewed hopes of a GST cut for vehicles and China’s assurances on rare‐earth magnet supplies, while Reliance Industries jumped after Jio’s prepaid tariff revamp and bullish brokerage calls. Adani Ports also participated on infrastructure optimism. Against a backdrop of positive global cues, sustained institutional flows, anticipated GST reforms, a recent sovereign credit upgrade and ongoing government policy support, these sector‐specific catalysts drove the Sensex and Nifty to fresh multi‐session highs."
     }
 }

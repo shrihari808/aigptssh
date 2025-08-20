@@ -8,10 +8,10 @@ load_dotenv()
 
 class BraveDashboard:
     """
-    A class to fetch financial data for the Indian market using the Brave Search API,
+    A class to fetch financial data for the Indian market using the Brave News Search API,
     specifically tailored for a financial dashboard.
     """
-    BASE_URL = "https://api.search.brave.com/res/v1/web/search"
+    BASE_URL = "https://api.search.brave.com/res/v1/news/search"  # Switched to News API endpoint
     
     # Define specific queries for each data type
     QUERIES = {
@@ -29,22 +29,23 @@ class BraveDashboard:
             "X-Subscription-Token": self.api_key
         }
 
-    def _perform_search(self, query, count=20, offset=0, freshness=None):
+    def _perform_search(self, query, count=20, freshness="pd"):
         """
-        Performs a search request to the Brave API with pagination support.
+        Performs a search request to the Brave API.
+        Offset has been removed to simplify and align with the new fetching strategy.
         """
         params = {
             "q": query, 
             "count": count, 
-            "offset": offset,
             "country": "IN", 
-            "text_decorations": False
+            "text_decorations": False,
+            "freshness": freshness
         }
-        if freshness:
-            params["freshness"] = freshness
             
         try:
-            response = requests.get(self.BASE_URL, headers=self.headers, params=params)
+            # Note: The Web Search API is used for standouts as it provides better general results
+            url = self.BASE_URL if query == self.QUERIES["latest_news"] else "https://api.search.brave.com/res/v1/web/search"
+            response = requests.get(url, headers=self.headers, params=params)
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
@@ -53,42 +54,29 @@ class BraveDashboard:
 
     def get_latest_news(self, target_count=50):
         """
-        Fetches up to a target number of unique news articles by paginating through search results.
+        Fetches up to a target number of unique news articles in a single API call.
         """
-        print(f"Fetching up to {target_count} latest news articles...")
+        print(f"Fetching up to {target_count} latest news articles from News API...")
+        
+        # Make a single call to fetch the desired number of articles
+        results = self._perform_search(self.QUERIES["latest_news"], count=target_count, freshness="pd")
+        
+        if not results or not results.get("results"):
+            print("No news results found or API error.")
+            return []
+
         news_items = []
         urls_seen = set()
-        offset = 0
-        
-        while len(news_items) < target_count:
-            results = self._perform_search(self.QUERIES["latest_news"], count=20, offset=offset, freshness="pd")
-            
-            if not results or "web" not in results or not results["web"].get("results"):
-                print("No more results found or API error.")
-                break
-
-            for item in results["web"]["results"]:
-                url = item.get("url")
-                if url and url not in urls_seen:
-                    urls_seen.add(url)
-                    news_items.append({
-                        "title": item.get("title"),
-                        "url": url,
-                        "description": item.get("description"),
-                        "page_age": item.get("page_age") # Keep page age for recency check
-                    })
-                    if len(news_items) >= target_count:
-                        break
-            
-            # As per Brave docs, increment offset by 1 for next page
-            offset += 1 
-            
-            # Maximum offset is 9, so we can make at most 10 calls (0-9)
-            if offset > 9:
-                print("Reached maximum API offset. Stopping search.")
-                break
-            
-            time.sleep(1) # Be respectful to the API
+        for item in results["results"]:
+            url = item.get("url")
+            if url and url not in urls_seen:
+                urls_seen.add(url)
+                news_items.append({
+                    "title": item.get("title"),
+                    "url": url,
+                    "description": item.get("snippet"),
+                    "page_age": item.get("page_age") 
+                })
 
         print(f"Successfully fetched {len(news_items)} unique news articles.")
         return news_items
@@ -96,10 +84,11 @@ class BraveDashboard:
 
     def get_standouts(self):
         """
-        Fetches standout gainers and losers.
+        Fetches standout gainers and losers using the Web Search API for broader context.
         """
-        print("Fetching standout gainers and losers...")
+        print("Fetching standout gainers and losers from Web API...")
         gainers_results = self._perform_search(self.QUERIES["standout_gainers"], count=5)
+        time.sleep(1)  # Respect API rate limits
         losers_results = self._perform_search(self.QUERIES["standout_losers"], count=5)
 
         gainers = [item.get("title") for item in gainers_results.get("web", {}).get("results", [])] if gainers_results else []
@@ -113,9 +102,8 @@ class BraveDashboard:
         """
         print("Starting data acquisition from Brave Search API...")
         
-        # We no longer need a separate summary query; it will be derived from the news context.
         news = self.get_latest_news()
-        time.sleep(1) # Delay before next set of calls
+        time.sleep(1)
         
         standouts = self.get_standouts()
         
@@ -133,7 +121,7 @@ if __name__ == '__main__':
     
     print(f"\n--- Fetched {len(all_data['latest_news'])} News Articles ---")
     for i, news_item in enumerate(all_data['latest_news'][:3]): # Print first 3
-        print(f"{i+1}. Title: {news_item['title']}\n   Link: {news_item['url']}\n")
+        print(f"{i+1}. Title: {news_item['title']}\n   Link: {news_item['url']}\n   Age: {news_item['page_age']}\n")
         
     print("\n--- Market Standouts ---")
     print("Gainers:", all_data['standouts']['gainers'])

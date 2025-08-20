@@ -6,18 +6,15 @@ import hashlib
 class DashboardVectorStore:
     """
     Manages the ChromaDB vector store for the dashboard, including document
-    chunking, embedding, and storage.
+    chunking, embedding, and storage, while preserving rich metadata.
     """
     def __init__(self, collection_name="dashboard_news_content"):
         """
         Initializes the vector store and the ChromaDB collection.
         """
         print("Initializing DashboardVectorStore...")
-        # Using an in-memory ephemeral client for simplicity during development.
-        # For persistence, you can switch to chromadb.PersistentClient(path="/path/to/db")
         self.client = chromadb.Client()
         
-        # Using the default SentenceTransformer embedding function
         self.embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
             model_name="all-MiniLM-L6-v2"
         )
@@ -34,27 +31,35 @@ class DashboardVectorStore:
         )
         print(f"Vector store initialized. Collection '{collection_name}' is ready.")
 
-    def add_documents(self, documents):
+    def add_documents(self, articles):
         """
-        Chunks, embeds, and adds a list of scraped documents to the ChromaDB collection.
+        Chunks, embeds, and adds a list of scraped articles to the ChromaDB collection in batches.
+        Each chunk's metadata includes the source URL and page age. Null metadata
+        values are replaced with empty strings.
         
         Args:
-            documents (list of dicts): A list of documents from the scraper,
-                                       each with 'url' and 'content' keys.
+            articles (list of dicts): A list of articles, each with 'url', 'page_age',
+                                      'title', and 'content' keys.
         """
         all_chunks = []
         all_metadatas = []
         all_ids = []
 
-        for doc in documents:
-            content = doc.get("content")
-            url = doc.get("url")
+        for article in articles:
+            content = article.get("content")
+            url = article.get("url")
+            
             if content and url:
+                base_metadata = {key: value for key, value in article.items() if key != "content"}
+                
+                for key, value in base_metadata.items():
+                    if value is None:
+                        base_metadata[key] = ""
+
                 chunks = self.text_splitter.split_text(content)
                 for i, chunk in enumerate(chunks):
                     all_chunks.append(chunk)
-                    all_metadatas.append({"source": url})
-                    # Create a unique, deterministic ID for each chunk
+                    all_metadatas.append(base_metadata.copy())
                     chunk_id = hashlib.sha256(f"{url}-{i}".encode()).hexdigest()
                     all_ids.append(chunk_id)
         
@@ -62,14 +67,21 @@ class DashboardVectorStore:
             print("No content to add to the vector store.")
             return
 
-        print(f"Adding {len(all_chunks)} chunks to the vector store...")
-        # ChromaDB's add method handles embedding automatically via the collection's embedding function
-        self.collection.add(
-            documents=all_chunks,
-            metadatas=all_metadatas,
-            ids=all_ids
-        )
-        print("Successfully added documents to the vector store.")
+        # Add documents in batches to avoid exceeding the maximum batch size
+        batch_size = 166 
+        for i in range(0, len(all_chunks), batch_size):
+            batch_chunks = all_chunks[i:i + batch_size]
+            batch_metadatas = all_metadatas[i:i + batch_size]
+            batch_ids = all_ids[i:i + batch_size]
+            
+            print(f"Adding batch {i//batch_size + 1} with {len(batch_chunks)} chunks to the vector store...")
+            self.collection.add(
+                documents=batch_chunks,
+                metadatas=batch_metadatas,
+                ids=batch_ids
+            )
+            
+        print("Successfully added all documents to the vector store.")
 
     def query(self, query_text, n_results=20):
         """
