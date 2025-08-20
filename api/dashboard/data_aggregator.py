@@ -55,23 +55,22 @@ async def aggregate_and_process_data():
     # --- Generate contexts using vector search for analytical sections ---
     llm_contexts = {key: scoring_service.get_enhanced_context(query, k=5) for key, query in context_queries.items()}
     
-    # --- NEW LOGIC: Directly find the 3 newest articles for 'latest_news_context' ---
+    # --- MODIFICATION: Use news_articles directly to select the latest news ---
     print("--- Finding the 3 newest articles directly ---")
-    if scraped_articles:
-        # Sort all scraped articles by their 'page_age' timestamp, from newest to oldest
-        sorted_articles = sorted(scraped_articles, key=lambda x: get_age_in_seconds(x.get('page_age')), reverse=False)
+    if news_articles:
+        # Sort all news articles by their 'page_age' timestamp, from newest to oldest
+        sorted_articles = sorted(news_articles, key=lambda x: get_age_in_seconds(x.get('page_age')), reverse=False)
         
         # Get the top 3 newest articles
         newest_articles = sorted_articles[:3]
         
-        # Format them into the same context structure
+        # Format them into the same context structure, using description as text
         llm_contexts["latest_news_context"] = [
             {
-                "text": article.get("content", ""),
+                "text": article.get("description", ""), 
                 "metadata": {
                     "url": article.get("url"),
                     "page_age": article.get("page_age"),
-                    # Use the human-readable 'age' from the scoring service for consistency
                     "age": scoring_service._get_human_readable_age(article.get("page_age"))[1],
                     "title": article.get("title"),
                     "description": article.get("description")
@@ -107,8 +106,6 @@ async def aggregate_and_process_data():
     
     print("\n--- Pipeline Complete: Final dashboard output generated and saved. ---")
     return final_dashboard_content
-
-# (The rest of the file remains the same)
 
 def get_human_readable_age_in_seconds(age_str):
     if not age_str or not isinstance(age_str, str):

@@ -219,3 +219,4 @@ ecosystem.config.js
 api/dashboard/dashboard_data.json
 api/dashboard/dashboard_output.json
 api/dashboard/dashboard_history.db
+dashboard_data.json
