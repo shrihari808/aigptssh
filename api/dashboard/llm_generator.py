@@ -41,7 +41,6 @@ class LLMGenerator:
             print(f"No context available for {section_name}. Skipping.")
             return {"error": f"No context provided for {section_name}."}, []
             
-        # --- MODIFICATION START ---
         # Create a more detailed context string that includes metadata for each document.
         context_parts = []
         for doc in context_docs:
@@ -53,7 +52,6 @@ class LLMGenerator:
         
         context_str = "\n\n---\n\n".join(context_parts)
         source_urls = list(set([doc['metadata'].get('url') for doc in context_docs if doc['metadata'].get('url')]))
-        # --- MODIFICATION END ---
         
         chain = prompt_template | llm | output_parser
         
@@ -78,7 +76,6 @@ class LLMGenerator:
 
         # 1. Market Summary
         summary_parser = JsonOutputParser()
-        # --- MODIFICATION: Added 'age' to the prompt instructions ---
         summary_prompt = ChatPromptTemplate.from_template(
             """Analyze the provided context about the Indian stock market. 
             Identify 5-6 distinct key themes or summary points for the day.
@@ -99,20 +96,11 @@ class LLMGenerator:
             "sources": summary_sources
         }
 
-        # 2. Latest News Snippets with Age
-        latest_news_context = contexts.get("latest_news_context", [])
-        articles = []
-        if latest_news_context:
-            for doc in latest_news_context:
-                metadata = doc.get("metadata", {})
-                articles.append({
-                    "title": metadata.get("title", "No Title"),
-                    "snippet": metadata.get("description", ""),
-                    "url": metadata.get("url", ""),
-                    "age": metadata.get("age", "")
-                })
-        final_output["latest_news"] = {"articles": articles}
-
+        # 2. Latest News - Use pre-selected articles directly from data_aggregator
+        print("Using pre-selected latest news articles...")
+        latest_news_articles = self.data.get("latest_news_articles", [])
+        final_output["latest_news"] = {"articles": latest_news_articles}
+        print(f"Added {len(latest_news_articles)} pre-selected news articles to final output.")
 
         # 3. Sector Analysis
         sectors_parser = JsonOutputParser()

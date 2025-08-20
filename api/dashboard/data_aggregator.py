@@ -22,11 +22,85 @@ def get_age_in_seconds(iso_timestamp):
     if not iso_timestamp:
         return float('inf')
     try:
-        # Ensure the timestamp is timezone-aware for accurate comparison
-        dt_obj = datetime.fromisoformat(iso_timestamp.replace('Z', '+00:00'))
-        return (datetime.now(timezone.utc) - dt_obj).total_seconds()
-    except (ValueError, TypeError):
+        # Handle different timestamp formats from Brave API
+        if iso_timestamp.endswith('Z'):
+            # Format: "2025-08-20T10:23:38Z"
+            dt_obj = datetime.fromisoformat(iso_timestamp[:-1]).replace(tzinfo=timezone.utc)
+        elif '+' in iso_timestamp or iso_timestamp.count(':') > 2:
+            # Format with timezone: "2025-08-20T10:23:38+00:00"
+            dt_obj = datetime.fromisoformat(iso_timestamp)
+        else:
+            # Format without timezone: "2025-08-20T10:23:38"
+            dt_obj = datetime.fromisoformat(iso_timestamp).replace(tzinfo=timezone.utc)
+        
+        age_seconds = (datetime.now(timezone.utc) - dt_obj).total_seconds()
+        print(f"Debug: Timestamp '{iso_timestamp}' -> {age_seconds} seconds ago")
+        return age_seconds
+    except (ValueError, TypeError) as e:
+        print(f"Error parsing timestamp '{iso_timestamp}': {e}")
         return float('inf')
+
+def get_human_readable_age(seconds):
+    """Converts seconds to human readable age format."""
+    if seconds == float('inf'):
+        return "Unknown"
+    
+    days = int(seconds // 86400)
+    hours = int((seconds % 86400) // 3600)
+    minutes = int((seconds % 3600) // 60)
+    
+    if days > 0:
+        return f"{days} day{'s' if days > 1 else ''} ago"
+    elif hours > 0:
+        return f"{hours} hour{'s' if hours > 1 else ''} ago"
+    elif minutes > 0:
+        return f"{minutes} minute{'s' if minutes > 1 else ''} ago"
+    else:
+        return "Just now"
+
+def select_latest_news_articles(news_articles, count=3):
+    """
+    Selects the newest articles based on page_age and formats them for dashboard output.
+    """
+    if not news_articles:
+        return []
+    
+    print(f"Debug: Processing {len(news_articles)} articles for selection...")
+    for i, article in enumerate(news_articles[:5]):  # Debug first 5 articles
+        print(f"  Article {i+1}: '{article.get('title', 'No Title')[:60]}...'")
+        print(f"    page_age: {article.get('page_age')}")
+        print(f"    description: {article.get('description')}")
+        print(f"    url: {article.get('url')}")
+        print()
+    
+    # Sort articles by age (newest first)
+    sorted_articles = sorted(
+        news_articles, 
+        key=lambda x: get_age_in_seconds(x.get('page_age')), 
+        reverse=False  # False means newest first (smallest age value)
+    )
+    
+    # Get top N articles and format them
+    selected_articles = []
+    for article in sorted_articles[:count]:
+        age_seconds = get_age_in_seconds(article.get('page_age'))
+        
+        # Use description directly from Brave API
+        description = article.get("description", "")
+        if not description or description.strip() == "":
+            description = "No description available"
+        
+        formatted_article = {
+            "title": article.get("title", "No Title"),
+            "snippet": description,
+            "url": article.get("url", ""),
+            "age": get_human_readable_age(age_seconds)
+        }
+        
+        selected_articles.append(formatted_article)
+        print(f"Selected: {formatted_article['title']} (Age: {formatted_article['age']})")
+    
+    return selected_articles
 
 async def aggregate_and_process_data():
     """
@@ -55,33 +129,17 @@ async def aggregate_and_process_data():
     # --- Generate contexts using vector search for analytical sections ---
     llm_contexts = {key: scoring_service.get_enhanced_context(query, k=5) for key, query in context_queries.items()}
     
-    # --- MODIFICATION: Use news_articles directly to select the latest news ---
-    print("--- Finding the 3 newest articles directly ---")
-    if news_articles:
-        # Sort all news articles by their 'page_age' timestamp, from newest to oldest
-        sorted_articles = sorted(news_articles, key=lambda x: get_age_in_seconds(x.get('page_age')), reverse=False)
-        
-        # Get the top 3 newest articles
-        newest_articles = sorted_articles[:3]
-        
-        # Format them into the same context structure, using description as text
-        llm_contexts["latest_news_context"] = [
-            {
-                "text": article.get("description", ""), 
-                "metadata": {
-                    "url": article.get("url"),
-                    "page_age": article.get("page_age"),
-                    "age": scoring_service._get_human_readable_age(article.get("page_age"))[1],
-                    "title": article.get("title"),
-                    "description": article.get("description")
-                }
-            } for article in newest_articles
-        ]
-        print(f"Successfully identified the {len(newest_articles)} newest articles for the headlines section.")
+    # --- NEW: Direct latest news selection ---
+    print("--- Selecting the 3 newest articles directly ---")
+    latest_news_articles = select_latest_news_articles(news_articles, count=3)
+    print(f"Successfully selected {len(latest_news_articles)} newest articles for the headlines section.")
+    for i, article in enumerate(latest_news_articles, 1):
+        print(f"  {i}. {article['title']} ({article['age']})")
 
     processed_data = {
         "last_updated_utc": datetime.now(timezone.utc).isoformat(),
-        "llm_contexts": llm_contexts
+        "llm_contexts": llm_contexts,
+        "latest_news_articles": latest_news_articles  # Add this to pass to LLM generator
     }
     
     save_data_to_json(processed_data, DATA_JSON_PATH)

@@ -220,3 +220,5 @@ api/dashboard/dashboard_data.json
 api/dashboard/dashboard_output.json
 api/dashboard/dashboard_history.db
 dashboard_data.json
+*.db
+app_service/api/dashboard/dashboard_history.db

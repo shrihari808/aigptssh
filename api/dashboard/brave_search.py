@@ -71,11 +71,13 @@ class BraveDashboard:
             url = item.get("url")
             if url and url not in urls_seen:
                 urls_seen.add(url)
+                # Fixed mapping: preserve 'description' field as is
                 news_items.append({
                     "title": item.get("title"),
                     "url": url,
-                    "description": item.get("snippet"),
-                    "page_age": item.get("page_age") 
+                    "description": item.get("description"),  # Keep as 'description', don't rename to 'snippet'
+                    "page_age": item.get("page_age"),
+                    "age": item.get("age")  # Also preserve the human-readable age from Brave
                 })
 
         print(f"Successfully fetched {len(news_items)} unique news articles.")
@@ -121,7 +123,7 @@ if __name__ == '__main__':
     
     print(f"\n--- Fetched {len(all_data['latest_news'])} News Articles ---")
     for i, news_item in enumerate(all_data['latest_news'][:3]): # Print first 3
-        print(f"{i+1}. Title: {news_item['title']}\n   Link: {news_item['url']}\n   Age: {news_item['page_age']}\n")
+        print(f"{i+1}. Title: {news_item['title']}\n   Link: {news_item['url']}\n   Age: {news_item['page_age']}\n   Description: {news_item['description'][:100]}...\n")
         
     print("\n--- Market Standouts ---")
     print("Gainers:", all_data['standouts']['gainers'])
