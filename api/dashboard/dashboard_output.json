@@ -1,7 +1,27 @@
 {
-    "last_updated_utc": "2025-08-20T12:40:38.578005+00:00",
+    "last_updated_utc": "2025-08-20T13:04:26.068804+00:00",
     "market_summary": {
         "summary_points": [
+            {
+                "title": "Consecutive Session Surge",
+                "summary": "Indian benchmark indices extended their winning streak to five sessions, with the Nifty50 rising 69.90 points to 25,050.55 and the Sensex advancing 213.45 points to 81,857.84, reflecting robust investor sentiment and broad-based buying.",
+                "age": "1 hours ago"
+            },
+            {
+                "title": "IT Sector Steers Market Gains",
+                "summary": "Strong buying in the IT space drove much of Wednesday’s rally: Infosys jumped 3.88%, TCS gained 2.69%, and other software majors like Tech Mahindra and HCL Tech also posted healthy gains, underscoring the sector’s leadership in the current market upswing.",
+                "age": "1 hours ago"
+            },
+            {
+                "title": "IT Sector Champions Fifth Consecutive Rally",
+                "summary": "Indian benchmarks extended their winning streak for the fifth session, led by robust gains in Infosys (+3.88%) and TCS (+2.69%), which underpinned the Nifty50’s 0.28% advance and lifted the Sensex by 0.26% amid selective sectoral strength.",
+                "age": "1 hours ago"
+            },
+            {
+                "title": "Global Markets’ Divergent Cues Keep Investors on Edge",
+                "summary": "Asian bourses slipped on Japan’s trade data losses and US tech sell-offs, while European markets showed mixed performance earlier, leaving Indian indices sensitive to overseas developments and maintaining a cautious trading backdrop.",
+                "age": "1 hours ago"
+            },
             {
                 "title": "Multi-Session Rally Extends Momentum",
                 "summary": "Indian equity indices marked their fourth and fifth consecutive daily gains, with the Sensex adding around 0.5–1% in recent sessions and the Nifty breaching significant levels. This sustained uptrend reflects healthy market breadth and continued institutional inflows supporting overall momentum.",
@@ -11,32 +31,12 @@
                 "title": "IT Stocks and Heavyweights Drive Gains",
                 "summary": "Leadership came from the IT sector, with Infosys jumping nearly 3.9% and TCS rising 2.7%, while heavyweights such as Reliance Industries and Tata Motors also contributed robust gains. These key constituents propelled the Nifty50 and Sensex higher across multiple sessions.",
                 "age": "8 hours ago"
-            },
-            {
-                "title": "IT Sector Powers Benchmark Gains",
-                "summary": "IT heavyweight stocks led the charge, driving both Nifty50 and Sensex to fresh highs. Infosys surged 3.88% and TCS climbed 2.69%, while other tech bellwethers such as HCL Tech and Tech Mahindra also posted strong gains, offsetting declines in select financial and auto names.",
-                "age": "8 hours ago"
-            },
-            {
-                "title": "Cautious Opening Amid Mixed Global Cues",
-                "summary": "Indian benchmarks are poised to start trading with marginal changes after mixed global signals. Gift Nifty suggests a flat to slightly lower open, mirroring declines in Asian markets and profit-taking in US tech stocks. Investors remain wary ahead of domestic policy developments and key economic data releases.",
-                "age": "10 hours ago"
-            },
-            {
-                "title": "Policy Reforms and Institutional Flows Bolster Confidence",
-                "summary": "Optimism is underpinned by anticipated GST reforms, a recent sovereign rating upgrade, and tailored sector-specific measures, alongside healthy institutional flows. These factors are expected to reinforce market stability and sustain investor confidence in the near term.",
-                "age": "10 hours ago"
-            },
-            {
-                "title": "Rally Streak Extends into Fifth Day",
-                "summary": "The domestic equity market extended its uptrend for a fourth consecutive session, with Sensex climbing 370.64 points (0.46%) to 81,644.39 and Nifty 50 rising 103.70 points (0.42%) to 24,980.65. Positive domestic momentum is supported by sector‐specific relief measures, policy support and strong institutional flows, underpinned by robust buying across key stocks.",
-                "age": "10 hours ago"
             }
         ],
         "sources": [
-            "https://www.livemint.com/market/stock-market-news/nifty-50-sensex-today-what-to-expect-from-indian-stock-market-in-trade-on-august-19-after-trump-zelensky-meeting-11755532336917.html",
             "https://www.thehindubusinessline.com/markets/share-market-nifty-sensex-live-updates-19th-august-2025/article69947137.ece",
             "https://timesofindia.indiatimes.com/business/india-business/stock-market-today-nifty50-bse-sensex-august-20-2025-dalal-street-indian-equities-global-markets-gst-reforms-donald-trump-tariffs/articleshow/123399414.cms",
+            "https://www.livemint.com/market/stock-market-news/nifty-50-sensex-today-what-to-expect-from-indian-stock-market-in-trade-on-august-19-after-trump-zelensky-meeting-11755532336917.html",
             "https://www.livemint.com/market/stock-market-news/indian-stock-market-10-key-things-that-changed-for-market-overnight-gift-nifty-china-lpr-to-india-china-ties-11755622836425.html"
         ]
     },
@@ -55,10 +55,10 @@
                 "age": "1 hour ago"
             },
             {
-                "title": "Sensex and Nifty 50 expected to open lower on Wednesday",
-                "snippet": "Weakness in Asian and US markets suggests a lower open for Indian equity benchmarks after four straight sessions of gains.",
-                "url": "https://www.example.com/markets/sensex-nifty-lower-wednesday",
-                "age": "2 hours ago"
+                "title": "Stock market today: Nifty50 ends above 25,000; BSE Sensex up over 200 points - Times of India",
+                "snippet": null,
+                "url": "https://timesofindia.indiatimes.com/business/india-business/stock-market-today-nifty50-bse-sensex-august-20-2025-dalal-street-indian-equities-global-markets-gst-reforms-donald-trump-tariffs/articleshow/123399414.cms",
+                "age": "1 hours ago"
             }
         ]
     },
@@ -66,63 +66,63 @@
         "top_performing_sectors": [
             {
                 "sector": "Auto",
-                "explanation": "Auto stocks saw strong buying interest, with heavyweight names like Maruti Suzuki, Hero MotoCorp and Tata Motors driving sector gains."
+                "explanation": "Auto stocks saw robust buying interest, with names like Maruti Suzuki and Hero MotoCorp leading gains amid broader market optimism."
             },
             {
                 "sector": "Oil & Gas",
-                "explanation": "The Nifty Oil & Gas index led gains amid robust energy stock buying and easing concerns over higher crude prices."
+                "explanation": "The Nifty Oil & Gas index led the rally as energy counters surged on positive demand outlook and bullish global cues."
             },
             {
-                "sector": "Consumer Durables",
-                "explanation": "Consumer durables shares rallied on optimism around proposed GST reforms and sustained consumer demand."
+                "sector": "Realty",
+                "explanation": "Realty shares outperformed in anticipation of GST reforms, driving strong investor interest in the segment."
             }
         ],
         "underperforming_sectors": [
             {
                 "sector": "IT",
-                "explanation": "IT stocks faced selling pressure and profit-booking in names like Tech Mahindra and HCL Tech, dragging the sector lower."
+                "explanation": "IT stocks came under selling pressure after recent profit-taking, despite mixed performances among large-cap names."
             },
             {
                 "sector": "Power",
-                "explanation": "Power sector stocks underperformed as investors booked profits following recent advances."
+                "explanation": "Power shares lagged the broader market, weighed down by sector-specific headwinds and reduced buying appetite."
             },
             {
                 "sector": "Pharma",
-                "explanation": "Pharma was the only sector in negative territory, weighed down by declines in Dr. Reddy’s and Cipla."
+                "explanation": "Pharma was the only Nifty sector to close in the red, reflecting sectoral weakness and profit-booking."
             }
         ]
     },
     "standouts_analysis": {
-        "gainers": [
+        "top_gainers": [
             {
                 "stock": "Maruti Suzuki",
-                "reason": "Led auto‐sector buying amid optimism over proposed GST reforms."
+                "reason": "Rallied on auto‐sector buying as investors cheered planned GST reforms."
             },
             {
                 "stock": "Bajaj Finance",
-                "reason": "Rallied as investors cheered anticipated GST rationalisation benefiting financial stocks."
+                "reason": "Advanced amid broader market gains driven by optimism over GST reform proposals."
             },
             {
                 "stock": "UltraTech Cement",
-                "reason": "Climbed on strong realty‐sector support following GST reform hopes."
+                "reason": "Jumped on realty‐sector strength following positive sentiment around GST changes."
             }
         ],
-        "losers": [
+        "top_losers": [
             {
                 "stock": "ITC",
-                "reason": "Underperformed amid selling pressure in consumer‐durables and broader sectoral rotation."
+                "reason": "No specific catalyst was mentioned for its decline."
             },
             {
                 "stock": "Eternal",
-                "reason": "Slipped as IT‐sector names faced profit‐taking."
+                "reason": "Slumped on selling pressure in power and IT sectors."
             },
             {
                 "stock": "Tech Mahindra",
-                "reason": "Declined on mixed sentiment in the IT space despite overall market gains."
+                "reason": "Weighed down by broad sectoral selling pressure in the IT space."
             }
         ]
     },
     "market_drivers": {
-        "summary": "Indian equities extended gains, buoyed by a sharp rally in auto stocks—led by Ola Electric, Bajaj Auto, Hero MotoCorp and Maruti Suzuki—on speculation of a GST cut on vehicles and Chinese assurances over rare earth magnet supplies; a strong uptick in Reliance Industries following Jio’s prepaid tariff revamp and positive brokerage calls; expectations of broader GST reforms and a sovereign rating upgrade; robust institutional inflows underpinned by sector‐specific policy support; and positive global cues together sustained buying momentum across benchmarks."
+        "summary": "India’s equity markets rose for the fourth straight session as optimism over impending GST reforms, including a likely cut in vehicle levies, combined with robust institutional flows and supportive global cues to lift sentiment. Auto stocks led the charge – with Bajaj Auto, Tata Motors, Hero MotoCorp, Maruti Suzuki and Ola Electric jumping on reports of possible GST rate cuts and China’s assurance on rare‐earth magnet supplies – while Reliance Industries gained over 2% after Jio announced prepaid tariff changes and broker upgrades. A recent sovereign credit rating upgrade, healthy FII inflows and select global market rallies further underpinned broad‐based buying, driving both mid- and small-caps higher alongside index heavyweights."
     }
 }

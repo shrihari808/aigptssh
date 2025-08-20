@@ -216,3 +216,6 @@ timelogs.txt
 misc.md
 devlogs.txt
 ecosystem.config.js
+api/dashboard/dashboard_data.json
+api/dashboard/dashboard_output.json
+api/dashboard/dashboard_history.db

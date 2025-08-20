@@ -100,22 +100,19 @@ class LLMGenerator:
         }
 
         # 2. Latest News Snippets with Age
-        news_parser = JsonOutputParser()
-        news_prompt = ChatPromptTemplate.from_template(
-            """From the context, identify the 3 most important news articles. 
-            For each, extract the title, a concise one-sentence snippet, the full URL from the 'Source URL' field, and the human-readable 'age' from the 'Source Age' field.
-            The output should be a JSON object containing a list called "articles".
-            
-            Context: {context}
-            
-            {format_instructions}
-            """,
-            partial_variables={"format_instructions": news_parser.get_format_instructions()},
-        )
-        news_content, _ = self._generate_section(
-            "latest_news", contexts.get("indices_context"), news_prompt, news_parser
-        )
-        final_output["latest_news"] = news_content
+        latest_news_context = contexts.get("latest_news_context", [])
+        articles = []
+        if latest_news_context:
+            for doc in latest_news_context:
+                metadata = doc.get("metadata", {})
+                articles.append({
+                    "title": metadata.get("title", "No Title"),
+                    "snippet": metadata.get("description", ""),
+                    "url": metadata.get("url", ""),
+                    "age": metadata.get("age", "")
+                })
+        final_output["latest_news"] = {"articles": articles}
+
 
         # 3. Sector Analysis
         sectors_parser = JsonOutputParser()

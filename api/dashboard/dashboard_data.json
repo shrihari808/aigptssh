@@ -1,5 +1,5 @@
 {
-    "last_updated_utc": "2025-08-20T12:40:38.578005+00:00",
+    "last_updated_utc": "2025-08-20T13:04:26.068804+00:00",
     "llm_contexts": {
         "indices_context": [
             {
@@ -11,7 +11,18 @@
                     "url": "https://www.livemint.com/market/stock-market-news/nifty-50-sensex-today-what-to-expect-from-indian-stock-market-in-trade-on-august-19-after-trump-zelensky-meeting-11755532336917.html",
                     "age": "1 day ago"
                 },
-                "final_score": 3.9458665396970645
+                "final_score": 3.944338622723971
+            },
+            {
+                "text": "Stock market today: Indian equity benchmark indices,\nNifty50 and\nBSE Sensex, ended Wednesday in green, for the fifth consecutive positive session, primarily driven by substantial IT sector gains.\nThe NSE Nifty recorded a rise of 69.90 points or 0.28 per cent, finishing at 25,050.55. The BSE Sensex closed at 81,857.84, up by 213.45 points or 0.26 per cent, after reaching an intraday high of 81,985.62, marking a 341.23-point or 0.41 per cent increase.\nAmongst Sensex components, Infosys led with a 3.88 per cent increase, whilst Tata Consultancy Services rose by 2.69 per cent. Other notable gainers included Hindustan Unilever, NTPC, Tata Steel, Tech Mahindra, Eternal and HCL Tech.\nOn the declining side were Bharat Electronics, Bajaj Finance, Tata Motors and Trent.\nAsian markets showed mixed results, with declines in South Korea's Kospi and Japan's Nikkei 225, whilst Shanghai's SSE Composite and Hong Kong's Hang Seng advanced.\nEuropean markets displayed varied performance.",
+                "metadata": {
+                    "description": "",
+                    "page_age": "2025-08-20T11:22:00",
+                    "title": "Stock market today: Nifty50 ends above 25,000; BSE Sensex up over 200 points - Times of India",
+                    "url": "https://timesofindia.indiatimes.com/business/india-business/stock-market-today-nifty50-bse-sensex-august-20-2025-dalal-street-indian-equities-global-markets-gst-reforms-donald-trump-tariffs/articleshow/123399414.cms",
+                    "age": "1 hours ago"
+                },
+                "final_score": 3.7230691771013156
             },
             {
                 "text": "Indian stock market: The domestic equity market benchmark indices, Sensex and Nifty 50, are expected to open lower on Wednesday, following weakness in global markets.\nAsian markets fell, while the US stock market ended mostly lower, weighed down by selling in tech stocks.\nOn Tuesday, the Indian stock market extended its rally as the benchmark indices ended higher for the fourth consecutive session.\nThe Sensex gained 370.64 points, or 0.46%, to close at 81,644.39, while the Nifty 50 settled 103.70 points, or 0.42%, higher at 24,980.65.\n“Positive momentum is likely to continue, supported by sector-specific relief measures, ongoing government policy support, and robust institutional flows. These factors are expected to sustain market activity and drive confidence across key sectors over the near term,” said Siddhartha Khemka - Head Of Research, Wealth Management, Motilal Oswal Financial Services Ltd.\nHere are key global market cues for Sensex today:",
@@ -22,18 +33,7 @@
                     "url": "https://www.livemint.com/market/stock-market-news/indian-stock-market-10-key-things-that-changed-for-market-overnight-gift-nifty-china-lpr-to-india-china-ties-11755622836425.html",
                     "age": "10 hours ago"
                 },
-                "final_score": 3.598365360158623
-            },
-            {
-                "text": "Stock market today: Indian equity benchmark indices,\nNifty50 and\nBSE Sensex, ended Wednesday in green, for the fifth consecutive positive session, primarily driven by substantial IT sector gains.\nThe NSE Nifty recorded a rise of 69.90 points or 0.28 per cent, finishing at 25,050.55. The BSE Sensex closed at 81,857.84, up by 213.45 points or 0.26 per cent, after reaching an intraday high of 81,985.62, marking a 341.23-point or 0.41 per cent increase.\nAmongst Sensex components, Infosys led with a 3.88 per cent increase, whilst Tata Consultancy Services rose by 2.69 per cent. Other notable gainers included Hindustan Unilever, NTPC, Tata Steel, Tech Mahindra, Eternal and HCL Tech.\nOn the declining side were Bharat Electronics, Bajaj Finance, Tata Motors and Trent.\nAsian markets showed mixed results, with declines in South Korea's Kospi and Japan's Nikkei 225, whilst Shanghai's SSE Composite and Hong Kong's Hang Seng advanced.\nEuropean markets displayed varied performance.",
-                "metadata": {
-                    "description": "",
-                    "page_age": "2025-08-20T03:57:00",
-                    "title": "Stock market today: Nifty50 opens in red; BSE Sensex down over 100 points - Times of India",
-                    "url": "https://timesofindia.indiatimes.com/business/india-business/stock-market-today-nifty50-bse-sensex-august-20-2025-dalal-street-indian-equities-global-markets-gst-reforms-donald-trump-tariffs/articleshow/123399414.cms",
-                    "age": "8 hours ago"
-                },
-                "final_score": 3.5720389651071036
+                "final_score": 3.5921951648798287
             },
             {
                 "text": "“Today, Indian equity markets closed on a positive note, extending their upward momentum despite cautious global cues. The BSE Sensex gained over 370 pts to finish near 81,644, while the NSE Nifty 50 touched the crucial 25,000 mark and closed 24,980. Broader indices outperformed, with midcap and smallcap indices closed in green, reflecting robust sentiment beyond blue chips.” “Today’s rally was propelled by strong buying in heavyweights such as Reliance Industries, Tata Motors, Adani Ports, and Bharti Airtel. Reliance, in particular, surged over 2.89% after Jio announced a revamp in its tariff structure, while Tata Motors and Bajaj Auto advanced on the back of upbeat auto sales outlook and easing concerns around global supply chains. Optimism also stemmed from anticipated GST reforms and a recent sovereign credit rating upgrade, which fuelled expectations of higher capital inflows and policy stability. Positive cues from select global markets, despite a mixed trend in Asia, further",
@@ -44,7 +44,7 @@
                     "url": "https://www.thehindubusinessline.com/markets/share-market-nifty-sensex-live-updates-19th-august-2025/article69947137.ece",
                     "age": "1 day ago"
                 },
-                "final_score": 3.0644780803522096
+                "final_score": 3.061939607853934
             },
             {
                 "text": "Here are key global market cues for Sensex today:\nAsian markets traded lower on Wednesday, tracking overnight losses on Wall Street, and as investors weighed Japan’s trade data. Japan’s Nikkei 225 fell 1.32%, while the Topix declined 0.31%. South Korea’s Kospi dropped 1.26% and the Kosdaq fell 1.77%. Hong Kong’s Hang Seng index futures indicated a weaker opening.\nGift Nifty was trading around 24,963 level, a discount of nearly 70 points from the Nifty futures’ previous close, indicating a weak start for the Indian stock market indices.\nUS stock market ended lower on Tuesday, weighed down by selling tech stocks.\nThe Dow Jones Industrial Average rose 10.45 points, roughly flat, to 44,922.27, while the S&P 500 declined 37.78 points, or 0.59%, to 6,411.37. The Nasdaq Composite closed 314.82 points, or 1.46%, lower at 21,314.95.",
@@ -55,7 +55,7 @@
                     "url": "https://www.livemint.com/market/stock-market-news/indian-stock-market-10-key-things-that-changed-for-market-overnight-gift-nifty-china-lpr-to-india-china-ties-11755622836425.html",
                     "age": "10 hours ago"
                 },
-                "final_score": 2.9837954577385792
+                "final_score": 2.977625500878364
             }
         ],
         "sectors_context": [
@@ -68,18 +68,29 @@
                     "url": "https://www.equitymaster.com/indian-share-markets/08/18/2025/Sensex-Today-Rallies-676-Points--Nifty-Above-24850--3-Reasons-Why-Indian-Share-Markets-Are-Rising",
                     "age": "1 day ago"
                 },
-                "final_score": 2.1252408317672513
+                "final_score": 2.123361833325067
             },
             {
                 "text": "Stock market today: Indian equity benchmark indices,\nNifty50 and\nBSE Sensex, ended Wednesday in green, for the fifth consecutive positive session, primarily driven by substantial IT sector gains.\nThe NSE Nifty recorded a rise of 69.90 points or 0.28 per cent, finishing at 25,050.55. The BSE Sensex closed at 81,857.84, up by 213.45 points or 0.26 per cent, after reaching an intraday high of 81,985.62, marking a 341.23-point or 0.41 per cent increase.\nAmongst Sensex components, Infosys led with a 3.88 per cent increase, whilst Tata Consultancy Services rose by 2.69 per cent. Other notable gainers included Hindustan Unilever, NTPC, Tata Steel, Tech Mahindra, Eternal and HCL Tech.\nOn the declining side were Bharat Electronics, Bajaj Finance, Tata Motors and Trent.\nAsian markets showed mixed results, with declines in South Korea's Kospi and Japan's Nikkei 225, whilst Shanghai's SSE Composite and Hong Kong's Hang Seng advanced.\nEuropean markets displayed varied performance.",
                 "metadata": {
                     "description": "",
-                    "page_age": "2025-08-20T03:57:00",
-                    "title": "Stock market today: Nifty50 opens in red; BSE Sensex down over 100 points - Times of India",
+                    "page_age": "2025-08-20T11:22:00",
+                    "title": "Stock market today: Nifty50 ends above 25,000; BSE Sensex up over 200 points - Times of India",
                     "url": "https://timesofindia.indiatimes.com/business/india-business/stock-market-today-nifty50-bse-sensex-august-20-2025-dalal-street-indian-equities-global-markets-gst-reforms-donald-trump-tariffs/articleshow/123399414.cms",
-                    "age": "8 hours ago"
+                    "age": "1 hours ago"
                 },
-                "final_score": 1.9686638807619303
+                "final_score": 2.1196927703262833
+            },
+            {
+                "text": "After a stellar performance for most of 2024, Indian equities have sharply underperformed their emerging market peers. However, with Goods and Services Tax (GST) rationalisation, a ratings upgrade, and bets on rising consumption, can Dalal Street stage a turnaround?\nIndia’s underperformance against emerging markets and Asian peers has lasted 12 months, noted international brokerage Jefferies. “India has just suffered its biggest period of underperformance over the past 12 months in a global emerging market context in the past 15 years.”\nAs a result, the MSCI India (in USD) has underperformed the MSCI Emerging Markets by 18 percentage points since mid-April and by 24 percentage points over the past 12 months.\nNevertheless, analysts are optimistic on turnaround hopes. With the GST rationalisation efforts, brokerages expect the lacklustre earnings trajectory to improve as consumption picks up.",
+                "metadata": {
+                    "description": "",
+                    "page_age": "2025-08-19T08:39:56",
+                    "title": "India trails EMs by widest margin in 15 years. Can the tide turn?",
+                    "url": "https://moneycontrol.com/news/business/markets/mc-analysis-india-trails-ems-by-widest-margin-in-15-years-can-the-tide-turn-13466434.html",
+                    "age": "1 day ago"
+                },
+                "final_score": 1.9733965045624295
             },
             {
                 "text": "Sectoral indices are trading mixed today with stocks in auto sector and media sector witnessed buying. Meanwhile, stocks in power sector and IT sector witnessed selling pressure.\nNow track the biggest movers of the stock market using stocks to watch today section. This should help you keep updated with the latest developments...\nThe rupee is trading at Rs 87.3 against the US$.\nGold prices for the latest contract on MCX are trading 0.3% higher at Rs 100,498 per 10 grams.\nMeanwhile, silver prices were trading 0.1% higher at Rs 115,241 per 1 kg.\nHere are four reasons why Indian share markets are rising:\nUS President Donald Trump met Russian President Vladimir Putin, leaning towards Russia's stance on prioritizing a peace deal in Ukraine.\nTrump will meet Ukrainian President Volodymyr Zelenskiy and European leaders to discuss security guarantees for Kyiv. The meeting eased oil price concerns, but potential US tariffs on India may impact trade talks before August 27.",
@@ -90,7 +101,7 @@
                     "url": "https://www.equitymaster.com/indian-share-markets/08/18/2025/Sensex-Today-Rallies-676-Points--Nifty-Above-24850--3-Reasons-Why-Indian-Share-Markets-Are-Rising",
                     "age": "1 day ago"
                 },
-                "final_score": 1.1322715572463773
+                "final_score": 1.130392558804193
             },
             {
                 "text": "Among the Nifty constituents, Tata Motors, Adani Ports, and Hero MotoCorp emerged as the top gainers, showcasing robust buying interest. On the flip side, Dr. Reddy’s Laboratories and Cipla were among the notable laggards. Sectorally, the market breadth was overwhelmingly positive. Barring Nifty Pharma, all other sectoral indices ended the day with gains. Nifty Oil & Gas and Nifty Auto led the charge, reflecting strength in energy and automobile counters.\nThe rally wasn’t limited to the large-cap space. Broader markets outperformed, with both Nifty Midcap 100 and Nifty Smallcap 100 indices witnessing a sharp surge, underlining strong participation from retail and institutional investors alike. Market breadth remained firmly in favour of the bulls. Out of the Nifty 500 universe, 359 stocks closed in the green, pushing the advance-decline ratio significantly in favour of the advancers — a clear sign of widespread optimism across the board.\nNifty View",
@@ -101,18 +112,7 @@
                     "url": "https://www.moneycontrol.com/news/business/markets/stock-market-live-sensex-nifty-50-share-price-gift-nifty-latest-updates-19-08-2025-liveblog-13465060.html",
                     "age": "1 day ago"
                 },
-                "final_score": 0.9162309748267539
-            },
-            {
-                "text": "Indian stock market: The domestic equity market benchmark indices, Sensex and Nifty 50, are expected to open lower on Wednesday, following weakness in global markets.\nAsian markets fell, while the US stock market ended mostly lower, weighed down by selling in tech stocks.\nOn Tuesday, the Indian stock market extended its rally as the benchmark indices ended higher for the fourth consecutive session.\nThe Sensex gained 370.64 points, or 0.46%, to close at 81,644.39, while the Nifty 50 settled 103.70 points, or 0.42%, higher at 24,980.65.\n“Positive momentum is likely to continue, supported by sector-specific relief measures, ongoing government policy support, and robust institutional flows. These factors are expected to sustain market activity and drive confidence across key sectors over the near term,” said Siddhartha Khemka - Head Of Research, Wealth Management, Motilal Oswal Financial Services Ltd.\nHere are key global market cues for Sensex today:",
-                "metadata": {
-                    "description": "",
-                    "page_age": "2025-08-20T02:10:05",
-                    "title": "Indian stock market: 10 key things that changed for market overnight - Gift Nifty, China LPR to India-China ties | Stock Market News",
-                    "url": "https://www.livemint.com/market/stock-market-news/indian-stock-market-10-key-things-that-changed-for-market-overnight-gift-nifty-china-lpr-to-india-china-ties-11755622836425.html",
-                    "age": "10 hours ago"
-                },
-                "final_score": 0.6606194780662038
+                "final_score": 0.9136797487967289
             }
         ],
         "standouts_context": [
@@ -125,7 +125,7 @@
                     "url": "https://www.equitymaster.com/indian-share-markets/08/18/2025/Sensex-Today-Rallies-676-Points--Nifty-Above-24850--3-Reasons-Why-Indian-Share-Markets-Are-Rising",
                     "age": "1 day ago"
                 },
-                "final_score": 3.1252253785666118
+                "final_score": 3.123346420457797
             },
             {
                 "text": "Biggest Nifty gainers included Tata Motors, Adani Ports, Reliance Industries, Hero MotoCorp, Bajaj Auto, while losers were Dr Reddy's Laboratories, Cipla, Hindalco Industries, Bajaj Finserv, M&M. Among sectors, except pharma, all other sectoral indices ended in the green with telecom, FMCG, media, auto, oil & gas up 1% each. The BSE midcap and smallcap indices rose 1 percent each.\n-330\nAugust 19, 2025· 16:22 IST\nMarket Close | Sensex rises 371 points, Nifty above 24950\nIndian equity indices ended on strong note with Nifty around 25,000 on August 19. At close, the Sensex was up 370.64 points or 0.46 percent at 81,644.39, and the Nifty was up 103.70 points or 0.42 percent at 24,980.65.\nWe wrap up today's edition of the Moneycontrol live market blog, and will be back tomorrow morning with all the latest updates and alerts. Please visit https://www.moneycontrol.com/markets/global-indices for all the global market action.\n-330\nAugust 19, 2025· 16:20 IST",
@@ -136,18 +136,18 @@
                     "url": "https://www.moneycontrol.com/news/business/markets/stock-market-live-sensex-nifty-50-share-price-gift-nifty-latest-updates-19-08-2025-liveblog-13465060.html",
                     "age": "1 day ago"
                 },
-                "final_score": 2.9777377396152658
+                "final_score": 2.9751865665867228
             },
             {
                 "text": "Stock market today: Indian equity benchmark indices,\nNifty50 and\nBSE Sensex, ended Wednesday in green, for the fifth consecutive positive session, primarily driven by substantial IT sector gains.\nThe NSE Nifty recorded a rise of 69.90 points or 0.28 per cent, finishing at 25,050.55. The BSE Sensex closed at 81,857.84, up by 213.45 points or 0.26 per cent, after reaching an intraday high of 81,985.62, marking a 341.23-point or 0.41 per cent increase.\nAmongst Sensex components, Infosys led with a 3.88 per cent increase, whilst Tata Consultancy Services rose by 2.69 per cent. Other notable gainers included Hindustan Unilever, NTPC, Tata Steel, Tech Mahindra, Eternal and HCL Tech.\nOn the declining side were Bharat Electronics, Bajaj Finance, Tata Motors and Trent.\nAsian markets showed mixed results, with declines in South Korea's Kospi and Japan's Nikkei 225, whilst Shanghai's SSE Composite and Hong Kong's Hang Seng advanced.\nEuropean markets displayed varied performance.",
                 "metadata": {
                     "description": "",
-                    "page_age": "2025-08-20T03:57:00",
-                    "title": "Stock market today: Nifty50 opens in red; BSE Sensex down over 100 points - Times of India",
+                    "page_age": "2025-08-20T11:22:00",
+                    "title": "Stock market today: Nifty50 ends above 25,000; BSE Sensex up over 200 points - Times of India",
                     "url": "https://timesofindia.indiatimes.com/business/india-business/stock-market-today-nifty50-bse-sensex-august-20-2025-dalal-street-indian-equities-global-markets-gst-reforms-donald-trump-tariffs/articleshow/123399414.cms",
-                    "age": "8 hours ago"
+                    "age": "1 hours ago"
                 },
-                "final_score": 1.55125603736035
+                "final_score": 1.7022833815163592
             },
             {
                 "text": "- 09:32 | August 19, 2025\nNifty today: Top gainers of Nifty 50\nReliance (+2.03%), Bharti Airtel (+1.83%), Hero Motocorp (+0.81%), Adani Ports (+0.80%), Eicher Motors (+0.66%)\nTop losers:\nShriram Finance (-1.32%), Nestle (-0.93%), M&M (-0.90%), BEL (-0.86%), Hindalco (-0.84%)\n- 09:31 | August 19, 2025\nCommodities market update: Crude oil futures fall amid improved Russian supply outlook\n- 09:26 | August 19, 2025\nStock in focus: SPML Infra wins ₹1,073 crore order for water supply project under Amrut 2.0 in Indore; shares rise 1.5%\nSPML Infra secures Rs. 1,073 Crore Order for Water Supply Project under Amrut 2.0 for Indore City\nShares up 1.5% to ₹302.50.\n- 09:25 | August 19, 2025\nStock in focus: Inox Wind sells ₹175 crore stake in Inox Renewable Solutions at ₹7,400 crore valuation; shares rise 1.65%\nInox Wind sells stake worth Rs 175 crores in Inox Renewable Solutions at a valuation of Rs 7,400 crore\nShares up 1.65% on the NSE to ₹142.30\n- 09:25 | August 19, 2025",
@@ -158,7 +158,7 @@
                     "url": "https://www.thehindubusinessline.com/markets/share-market-nifty-sensex-live-updates-19th-august-2025/article69947137.ece",
                     "age": "1 day ago"
                 },
-                "final_score": 1.14762374458316
+                "final_score": 1.1450846184802146
             },
             {
                 "text": "-330\nAugust 19, 2025· 15:43 IST\nVinod Nair, Head of Research, Geojit Investments\nThe national market continued the renewed momentum, buoyed by expectations of GST rationalisation and a recent upgrade in India's credit rating. Additional optimism came from signs of easing geopolitical tensions between Russia and Ukraine, shifting the near-term outlook from consolidation to a more constructive stance. However, the uptrend may face resistance until greater clarity emerges on US-India trade negotiations.\nNotably, small- and mid-cap stocks outperformed, with auto stocks leading gains, driven by hopes that China may address supply concerns related to rare earth magnets.\n-330\nAugust 19, 2025· 15:41 IST\nGainers & Losers: Top stocks that moved the most on August 19\nFrom Reliance Industries to cotton stocks, here are the top stocks that moved the most on August 19...Read More\n-330\nAugust 19, 2025· 15:31 IST\nCurrency Check | Rupee closes 39 paise higher",
@@ -169,7 +169,7 @@
                     "url": "https://www.moneycontrol.com/news/business/markets/stock-market-live-sensex-nifty-50-share-price-gift-nifty-latest-updates-19-08-2025-liveblog-13465060.html",
                     "age": "1 day ago"
                 },
-                "final_score": 0.6087842731998604
+                "final_score": 0.6062331019328094
             }
         ],
         "market_drivers_context": [
@@ -182,7 +182,7 @@
                     "url": "https://www.moneycontrol.com/news/business/markets/sensex-rises-450-pts-nifty-reclaims-25-000-ril-auto-stocks-rally-among-key-factors-behind-market-rise-13466537.html",
                     "age": "1 day ago"
                 },
-                "final_score": 0.9365683415930536
+                "final_score": 0.9340458373593328
             },
             {
                 "text": "“Positive momentum is likely to continue, supported by sector-specific relief measures, ongoing government policy support, and robust institutional flows. These factors are expected to sustain market activity and drive confidence across key sectors over the near term,” said Siddhartha Khemka - Head Of Research, Wealth Management, Motilal Oswal Financial Services Ltd.",
@@ -191,9 +191,9 @@
                     "page_age": "2025-08-20T05:50:00",
                     "title": "Fluctuation in Indian Stok Market - The Times of India",
                     "url": "https://timesofindia.indiatimes.com/fluctuation-in-indian-stok-market/liveblog/123400954.cms",
-                    "age": "6 hours ago"
+                    "age": "7 hours ago"
                 },
-                "final_score": -0.4006719824455563
+                "final_score": -0.40829684931308113
             },
             {
                 "text": "The equity benchmark indices rose for the fourth straight session on Tuesday, supported by gains in auto shares and index heavyweight Reliance Industries amid positive global cues.\nSensex edged higher by 370.64 points or 0.46 percent to settle at 81,644.39. During the day, it jumped 482.13 points or 0.59 percent to 81,755.88. The Nifty climbed 103.70 points or 0.42 per cent to 24,980.65.\nTata Motors, Reliance Industries, Adani Ports and Special Economic Zone, Bajaj Auto and ETERNAL were among the major gainers, rising up to 4 percent.\nKey factors driving the market:",
@@ -204,7 +204,7 @@
                     "url": "https://www.moneycontrol.com/news/business/markets/sensex-rises-450-pts-nifty-reclaims-25-000-ril-auto-stocks-rally-among-key-factors-behind-market-rise-13466537.html",
                     "age": "1 day ago"
                 },
-                "final_score": -1.5744278230893118
+                "final_score": -1.5769503255320552
             },
             {
                 "text": "Stock market today: The Nifty 50 index climbed back above the 25,000 level on Monday, August 18, for the first time since July 25, as a series of positive developments over the weekend helped counter concerns about a possible 25 per cent tariff on Indian imports by the Trump administration.\nMeanwhile, BSE index Sensex also soared nearly 1,100 points, rallying to 81,678.77 in Monday's trading session.\nMarket experts said that Prime Minister Narendra Modi’s statement on potential cuts in goods and services tax (GST) has boosted sentiment, especially in consumption-driven sectors. Analysts believe that automobiles, financials, consumer durables, and domestic-oriented industries connected to infrastructure spending stand to gain the most.",
@@ -215,7 +215,7 @@
                     "url": "https://www.livemint.com/market/stock-market-news/indian-stock-market-nifty-tops-25-000-level-is-this-rally-sustainable-in-near-term-11755496079038.html",
                     "age": "1 day ago"
                 },
-                "final_score": -2.056008962505517
+                "final_score": -2.05787888784194
             },
             {
                 "text": "“Today, Indian equity markets closed on a positive note, extending their upward momentum despite cautious global cues. The BSE Sensex gained over 370 pts to finish near 81,644, while the NSE Nifty 50 touched the crucial 25,000 mark and closed 24,980. Broader indices outperformed, with midcap and smallcap indices closed in green, reflecting robust sentiment beyond blue chips.” “Today’s rally was propelled by strong buying in heavyweights such as Reliance Industries, Tata Motors, Adani Ports, and Bharti Airtel. Reliance, in particular, surged over 2.89% after Jio announced a revamp in its tariff structure, while Tata Motors and Bajaj Auto advanced on the back of upbeat auto sales outlook and easing concerns around global supply chains. Optimism also stemmed from anticipated GST reforms and a recent sovereign credit rating upgrade, which fuelled expectations of higher capital inflows and policy stability. Positive cues from select global markets, despite a mixed trend in Asia, further",
@@ -226,7 +226,7 @@
                     "url": "https://www.thehindubusinessline.com/markets/share-market-nifty-sensex-live-updates-19th-august-2025/article69947137.ece",
                     "age": "1 day ago"
                 },
-                "final_score": -2.293891214620905
+                "final_score": -2.2964303252577443
             }
         ],
         "latest_news_context": [
@@ -244,9 +244,9 @@
                 "text": "Stock market today: Indian equity benchmark indices,\nNifty50 and\nBSE Sensex, ended Wednesday in green, for the fifth consecutive positive session, primarily driven by substantial IT sector gains.\nThe NSE Nifty recorded a rise of 69.90 points or 0.28 per cent, finishing at 25,050.55. The BSE Sensex closed at 81,857.84, up by 213.45 points or 0.26 per cent, after reaching an intraday high of 81,985.62, marking a 341.23-point or 0.41 per cent increase.\nAmongst Sensex components, Infosys led with a 3.88 per cent increase, whilst Tata Consultancy Services rose by 2.69 per cent. Other notable gainers included Hindustan Unilever, NTPC, Tata Steel, Tech Mahindra, Eternal and HCL Tech.\nOn the declining side were Bharat Electronics, Bajaj Finance, Tata Motors and Trent.\nAsian markets showed mixed results, with declines in South Korea's Kospi and Japan's Nikkei 225, whilst Shanghai's SSE Composite and Hong Kong's Hang Seng advanced.\nEuropean markets displayed varied performance.\nTuesday saw US markets predominantly finish lower.\nMarket participants focused on upcoming remarks from US Federal Reserve Chair Jerome Powell at the Jackson Hole Symposium and the recent Fed meeting minutes.\nTuesday marked the fourth straight day of gains for the Sensex, which rose by 370.64 points or 0.46 per cent to 81,644.39, whilst the Nifty increased by 103.70 points or 0.42 per cent to 24,980.65.\nExchange data showed Foreign Institutional Investors (FIIs) sold equities worth Rs 634.26 crore on Tuesday.\nThe global oil benchmark Brent crude increased by 1.14 per cent to USD 66.54 per barrel.\n(Disclaimer: Recommendations and views on the stock market and other asset classes given by experts are their own. These opinions do not represent the views of The Times of India)",
                 "metadata": {
                     "url": "https://timesofindia.indiatimes.com/business/india-business/stock-market-today-nifty50-bse-sensex-august-20-2025-dalal-street-indian-equities-global-markets-gst-reforms-donald-trump-tariffs/articleshow/123399414.cms",
-                    "page_age": "2025-08-20T03:57:00",
-                    "age": "8 hours ago",
-                    "title": "Stock market today: Nifty50 opens in red; BSE Sensex down over 100 points - Times of India",
+                    "page_age": "2025-08-20T11:22:00",
+                    "age": "1 hours ago",
+                    "title": "Stock market today: Nifty50 ends above 25,000; BSE Sensex up over 200 points - Times of India",
                     "description": null
                 }
             },
