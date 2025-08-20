@@ -213,3 +213,4 @@ sacremoses
 youtube-transcript-api
 typing
 asyncpraw
+apscheduler

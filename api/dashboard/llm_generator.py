@@ -1,3 +1,4 @@
+# aigptssh/api/dashboard/llm_generator.py
 import json
 import os
 from config import GPT4o_mini as llm
@@ -40,9 +41,19 @@ class LLMGenerator:
             print(f"No context available for {section_name}. Skipping.")
             return {"error": f"No context provided for {section_name}."}, []
             
-        # Extract text for the LLM and URLs for sourcing
-        context_str = "\n\n---\n\n".join([doc['text'] for doc in context_docs])
+        # --- MODIFICATION START ---
+        # Create a more detailed context string that includes metadata for each document.
+        context_parts = []
+        for doc in context_docs:
+            metadata = doc.get('metadata', {})
+            text = doc.get('text', '')
+            url = metadata.get('url', 'N/A')
+            age = metadata.get('age', 'N/A')
+            context_parts.append(f"Source URL: {url}\nSource Age: {age}\nContent: {text}")
+        
+        context_str = "\n\n---\n\n".join(context_parts)
         source_urls = list(set([doc['metadata'].get('url') for doc in context_docs if doc['metadata'].get('url')]))
+        # --- MODIFICATION END ---
         
         chain = prompt_template | llm | output_parser
         
@@ -67,10 +78,11 @@ class LLMGenerator:
 
         # 1. Market Summary
         summary_parser = JsonOutputParser()
+        # --- MODIFICATION: Added 'age' to the prompt instructions ---
         summary_prompt = ChatPromptTemplate.from_template(
             """Analyze the provided context about the Indian stock market. 
             Identify 5-6 distinct key themes or summary points for the day.
-            For each point, create a title and a concise one-paragraph summary.
+            For each point, create a title, a concise one-paragraph summary, and determine a representative 'age' based on the Source Age of the content you used.
             The output should be a JSON object containing a list called "summary_points".
             
             Context: {context}
@@ -91,7 +103,7 @@ class LLMGenerator:
         news_parser = JsonOutputParser()
         news_prompt = ChatPromptTemplate.from_template(
             """From the context, identify the 3 most important news articles. 
-            For each, extract the title, a concise one-sentence snippet, the full URL, and the human-readable 'age'.
+            For each, extract the title, a concise one-sentence snippet, the full URL from the 'Source URL' field, and the human-readable 'age' from the 'Source Age' field.
             The output should be a JSON object containing a list called "articles".
             
             Context: {context}
