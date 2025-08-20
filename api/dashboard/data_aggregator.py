@@ -66,14 +66,14 @@ async def aggregate_and_process_data():
     print("--- Data Aggregation and Processing Complete ---")
     return processed_data
 
-def save_data_to_json(data):
+def save_data_to_json(data, output_path):
     """
-    Saves the provided data dictionary to a JSON file.
+    Saves the provided data dictionary to a JSON file at the specified path.
     """
     try:
-        with open(JSON_OUTPUT_PATH, 'w', encoding='utf-8') as f:
+        with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
-        print(f"Successfully saved data to {JSON_OUTPUT_PATH}")
+        print(f"Successfully saved data to {output_path}")
     except IOError as e:
         print(f"Error saving data to JSON file: {e}")
 
@@ -81,7 +81,7 @@ def save_data_to_json(data):
 if __name__ == '__main__':
     # Run the async main function
     final_data = asyncio.run(aggregate_and_process_data())
-    save_data_to_json(final_data)
+    save_data_to_json(final_data, JSON_OUTPUT_PATH)
     
     print("\n--- Final Processed Data Snippet ---")
     print("Generated contexts for:", list(final_data["llm_contexts"].keys()))

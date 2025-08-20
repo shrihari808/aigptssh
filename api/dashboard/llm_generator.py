@@ -1,6 +1,6 @@
 import json
 import os
-from config import llm  # Assuming llm is initialized in config.py
+from config import GPT4o_mini as llm # Use GPT4o_mini and alias it as llm
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 
@@ -34,7 +34,7 @@ class LLMGenerator:
         Generates a single section of the dashboard content.
         
         Args:
-            section_name (str): The name of the section (e.g., 'indices_summary').
+            section_name (str): The name of the section (e.g., 'market_summary').
             context (list): The list of context strings for this section.
             prompt_template (ChatPromptTemplate): The prompt template for the LLM.
             output_parser (JsonOutputParser): The parser to structure the LLM's output.
@@ -51,7 +51,7 @@ class LLMGenerator:
         
         try:
             # Join the context chunks into a single string
-            context_str = "\n".join(context)
+            context_str = "\n\n---\n\n".join(context)
             response = chain.invoke({"context": context_str})
             return response
         except Exception as e:
@@ -64,7 +64,8 @@ class LLMGenerator:
         """
         final_output = {
             "last_updated_utc": self.data.get("last_updated_utc"),
-            "market_summary": {},
+            "market_summary": [], # Changed to list for multiple points
+            "latest_news": [], # Added new section
             "sector_analysis": {},
             "standouts_analysis": {},
             "market_drivers": {}
@@ -74,24 +75,41 @@ class LLMGenerator:
 
         # --- Define Prompts and Parsers for each section ---
 
-        # 1. Market Indices Summary
-        indices_parser = JsonOutputParser()
-        indices_prompt = ChatPromptTemplate.from_template(
-            """Analyze the provided context about the Indian stock market's performance.
-            Generate a concise, one-paragraph summary focusing on the key indices like NIFTY 50 and Sensex.
-            Mention their closing levels, points change, and percentage change.
+        # 1. Market Summary (Multi-Point)
+        summary_parser = JsonOutputParser()
+        summary_prompt = ChatPromptTemplate.from_template(
+            """Analyze the provided context about the Indian stock market. 
+            Identify 5-6 distinct key themes or summary points for the day.
+            For each point, create a title and a concise one-paragraph summary.
+            The output should be a JSON object containing a list of these summary points.
             
             Context: {context}
             
             {format_instructions}
             """,
-            partial_variables={"format_instructions": indices_parser.get_format_instructions()},
+            partial_variables={"format_instructions": summary_parser.get_format_instructions()},
         )
         final_output["market_summary"] = self._generate_section(
-            "indices_summary", contexts.get("indices_context"), indices_prompt, indices_parser
+            "market_summary", contexts.get("indices_context"), summary_prompt, summary_parser
         )
 
-        # 2. Sector Analysis
+        # 2. Latest News Snippets
+        news_parser = JsonOutputParser()
+        news_prompt = ChatPromptTemplate.from_template(
+            """From the context, identify the 3 most recent and important news articles. 
+            Extract the title, a concise one-sentence snippet, and the full URL for each.
+            
+            Context: {context}
+            
+            {format_instructions}
+            """,
+            partial_variables={"format_instructions": news_parser.get_format_instructions()},
+        )
+        final_output["latest_news"] = self._generate_section(
+            "latest_news", contexts.get("indices_context"), news_prompt, news_parser
+        )
+
+        # 3. Sector Analysis
         sectors_parser = JsonOutputParser()
         sectors_prompt = ChatPromptTemplate.from_template(
             """Based on the context, identify and summarize the performance of key sectors.
@@ -108,8 +126,37 @@ class LLMGenerator:
             "sector_analysis", contexts.get("sectors_context"), sectors_prompt, sectors_parser
         )
 
-        # ... Add similar blocks for 'standouts_analysis' and 'market_drivers' ...
+        # 4. Standouts Analysis
+        standouts_parser = JsonOutputParser()
+        standouts_prompt = ChatPromptTemplate.from_template(
+            """From the provided context, identify the top 2-3 standout stock gainers and top 2-3 standout stock losers for the day.
+            For each stock, provide a brief, one-sentence reason for its performance if mentioned in the text.
+
+            Context: {context}
+
+            {format_instructions}
+            """,
+            partial_variables={"format_instructions": standouts_parser.get_format_instructions()},
+        )
+        final_output["standouts_analysis"] = self._generate_section(
+            "standouts_analysis", contexts.get("standouts_context"), standouts_prompt, standouts_parser
+        )
+
+        # 5. Market Drivers
+        drivers_parser = JsonOutputParser()
+        drivers_prompt = ChatPromptTemplate.from_template(
+            """Analyze the context to determine the key drivers behind today's market performance.
+            Summarize the main factors in a single narrative paragraph. Mention elements like GST reforms, global cues, institutional flows, or specific company news that influenced the market.
+
+            Context: {context}
+
+            {format_instructions}
+            """,
+            partial_variables={"format_instructions": drivers_parser.get_format_instructions()},
+        )
+        final_output["market_drivers"] = self._generate_section(
+            "market_drivers", contexts.get("market_drivers_context"), drivers_prompt, drivers_parser
+        )
 
         print("--- LLM Content Generation Complete ---")
         return final_output
-
