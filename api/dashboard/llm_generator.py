@@ -165,19 +165,24 @@ class PortfolioLLMGenerator(LLMGenerator):
         }
         
         contexts = self.data.get("llm_contexts", {})
+        portfolio = self.data.get("portfolio", [])
 
-        # 1. Market Summary (tailored to the portfolio) - CORRECTED PROMPT
+        # 1. Market Summary (tailored to the portfolio)
         summary_parser = JsonOutputParser()
         summary_prompt = ChatPromptTemplate.from_template(
-            """Analyze the provided context about the user's portfolio stocks. 
-            Identify 3-4 distinct key themes or summary points. If the context is empty or sparse, state that there is "No significant news impacting the portfolio today."
-            For each point, create a title and a concise one-paragraph summary.
-            
+            """Analyze the provided context to generate a market summary for the following portfolio: {portfolio}.
+            Identify 3-4 distinct key themes or summary points.
+            For each point, create a title, a concise one-paragraph summary, and a representative 'age' based on the source content.
+            The final output MUST be a JSON object containing a single key "summary_points", which is a list of these points.
+
             Context: {context}
             
             {format_instructions}
             """,
-            partial_variables={"format_instructions": summary_parser.get_format_instructions()},
+            partial_variables={
+                "format_instructions": summary_parser.get_format_instructions(),
+                "portfolio": ", ".join(portfolio)
+             },
         )
         summary_content, summary_sources = self._generate_section(
             "market_summary", contexts.get("indices_context"), summary_prompt, summary_parser
@@ -190,6 +195,7 @@ class PortfolioLLMGenerator(LLMGenerator):
         # 2. Latest News
         latest_news_articles = self.data.get("latest_news_articles", [])
         final_output["latest_news"] = {"articles": latest_news_articles}
+
 
         # 3. Key Issues (New Multi-Step and Diversified Logic)
         key_issues_content = self._generate_key_issues(

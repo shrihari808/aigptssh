@@ -103,7 +103,7 @@ async def aggregate_and_process_portfolio_data(portfolio: list[str]):
     
     context_queries = {
         "key_issues_context": portfolio_query,
-        "indices_context": f"Summarize the performance of the portfolio: {', '.join(portfolio)} today.",
+        "indices_context": f"Provide a summary of the latest news and key events for the stocks: {', '.join(portfolio)}.",
         "market_drivers_context": f"What were the main reasons and key driving factors for the stocks in this portfolio: {', '.join(portfolio)}?"
     }
     
@@ -211,7 +211,7 @@ if __name__ == '__main__':
         """
         A main function to manually test the portfolio snapshot generation and save the outputs to JSON files.
         """
-        test_portfolio = ["Infosys", "TCS", "HDFCBANK"]
+        test_portfolio = ["Bharti Airtel", "Asian paints", "Tata motors", "Bharti Airtel"]
         print(f"--- Manual Test: Generating snapshot for portfolio: {test_portfolio} ---")
 
         portfolio_data_path = os.path.join(OUTPUT_DIR, 'portfolio_data.json')
