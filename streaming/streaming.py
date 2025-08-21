@@ -1,5 +1,3 @@
-# /aigptssh/streaming/streaming.py
-
 import os
 import json
 import tiktoken
@@ -61,6 +59,7 @@ from streaming.reddit_stream import fetch_search_red, process_search_red
 from streaming.yt_stream import get_data, get_yt_data_async
 from api.news_rag.scoring_service import scoring_service
 from api.youtube_rag.youtube_vector_store import create_yt_vector_store_from_transcripts
+from api.security import api_key_auth
 
 
 from dotenv import load_dotenv
@@ -98,7 +97,7 @@ async def quick_scrape_and_process(query: str, db_pool: asyncpg.Pool, num_urls: 
         articles, df = await get_brave_results(query, max_pages=1, max_sources=num_urls)
         if not articles:
             return []
-        
+
         if df is not None and not df.empty:
             asyncio.create_task(insert_post1(df, db_pool))
 
@@ -111,7 +110,7 @@ async def quick_scrape_and_process(query: str, db_pool: asyncpg.Pool, num_urls: 
                 "snippet": a.get('description')
             }
         } for a in articles]
-        
+
         print(f"DEBUG: Tier 1 - Quick scrape completed with {len(passages)} passages.")
         return passages
     except Exception as e:
@@ -124,21 +123,21 @@ def diversify_results(passages: list[dict], max_per_source: int = 2) -> list[dic
     """
     source_counts = {}
     diversified_list = []
-    
+
     # Sort passages by score to process the best ones first
     passages.sort(key=lambda x: x.get('final_combined_score', 0), reverse=True)
-    
+
     for passage in passages:
         # Try multiple ways to get the source URL
         source_link = None
         metadata = passage.get("metadata", {})
-        
+
         # Check different possible URL fields
-        source_link = (metadata.get("link") or 
-                      metadata.get("source_url") or 
-                      metadata.get("url") or 
+        source_link = (metadata.get("link") or
+                      metadata.get("source_url") or
+                      metadata.get("url") or
                       "unknown")
-        
+
         try:
             if source_link and source_link != "unknown":
                 from urllib.parse import urlparse
@@ -150,9 +149,9 @@ def diversify_results(passages: list[dict], max_per_source: int = 2) -> list[dic
 
         # Enhanced logic: prefer first chunks from each source
         chunk_position = passage.get('chunk_position', 0)
-        
+
         current_count = source_counts.get(domain, 0)
-        
+
         # Prioritize first chunks and limit per source
         should_include = False
         if current_count < max_per_source:
@@ -160,11 +159,11 @@ def diversify_results(passages: list[dict], max_per_source: int = 2) -> list[dic
                 should_include = True
             elif chunk_position <= 2:  # Only include early chunks for additional items
                 should_include = True
-        
+
         if should_include:
             diversified_list.append(passage)
             source_counts[domain] = current_count + 1
-            
+
     print(f"DEBUG: Diversified passages from {len(passages)} to {len(diversified_list)}")
     print(f"DEBUG: Sources included: {list(source_counts.keys())}")
     return diversified_list
@@ -197,15 +196,15 @@ async def get_chat_history_optimized(session_id: str, db_pool: asyncpg.Pool, lim
             s_id = str(session_id)
             # Get only the last few messages, ordered by timestamp desc
             rows = await conn.fetch("""
-                SELECT message FROM message_store 
-                WHERE session_id = $1 
-                ORDER BY id DESC 
+                SELECT message FROM message_store
+                WHERE session_id = $1
+                ORDER BY id DESC
                 LIMIT $2
             """, s_id, limit)
-            
+
             if not rows:
                 return []
-            
+
             # Parse messages and reverse to get chronological order
             messages = []
             for row in reversed(rows):  # Reverse to get chronological order
@@ -217,9 +216,9 @@ async def get_chat_history_optimized(session_id: str, db_pool: asyncpg.Pool, lim
                 except (json.JSONDecodeError, KeyError) as e:
                     print(f"Warning: Could not parse message: {e}")
                     continue
-            
+
             return messages
-            
+
     except Exception as e:
         print(f"Error retrieving chat history: {e}")
         return []
@@ -231,37 +230,37 @@ def extract_date_robust(query: str, today: str) -> tuple[str, str]:
     """
     query_lower = query.lower().strip()
     cleaned_query = query
-    
+
     try:
         today_dt = datetime.strptime(today, "%Y-%m-%d")
     except ValueError:
         today_dt = datetime.now()
-    
+
     # Pattern matching with extraction
     date_patterns = [
         # Relative dates
         (r'\btoday\b', 0, 'today'),
         (r'\byesterday\b', -1, 'yesterday'),
         (r'\btomorrow\b', 1, 'tomorrow'),
-        
+
         # Recent/latest patterns
         (r'\b(recent|latest|current)\b.*\bnews\b', -7, 'recent'),
         (r'\b(recent|latest|trending)\b', -1, 'trending'),
-        
+
         # Specific time periods
         (r'\blast\s+(\d+)\s+days?\b', lambda m: -int(m.group(1)), 'last_days'),
         (r'\b(\d+)\s+days?\s+ago\b', lambda m: -int(m.group(1)), 'days_ago'),
         (r'\blast\s+week\b', -7, 'last_week'),
         (r'\blast\s+month\b', -30, 'last_month'),
-        
+
         # Specific date formats
         (r'\b(\d{4})-(\d{1,2})-(\d{1,2})\b', 'specific_date', 'iso_date'),
         (r'\b(\d{1,2})/(\d{1,2})/(\d{4})\b', 'specific_date', 'us_date'),
         (r'\b(\d{1,2})-(\d{1,2})-(\d{4})\b', 'specific_date', 'dash_date'),
     ]
-    
+
     extracted_date = "None"
-    
+
     for pattern, offset_or_handler, pattern_type in date_patterns:
         match = re.search(pattern, query_lower)
         if match:
@@ -271,39 +270,39 @@ def extract_date_robust(query: str, today: str) -> tuple[str, str]:
                     year, month, day = int(match.group(1)), int(match.group(2)), int(match.group(3))
                 elif pattern_type in ['us_date', 'dash_date']:
                     month, day, year = int(match.group(1)), int(match.group(2)), int(match.group(3))
-                
+
                 try:
                     specific_date = datetime(year, month, day)
                     extracted_date = specific_date.strftime("%Y%m%d")
                 except ValueError:
                     continue  # Invalid date, try next pattern
-            
+
             elif callable(offset_or_handler):
                 # Handle dynamic offsets (e.g., "last 5 days")
                 days_offset = offset_or_handler(match)
                 target_date = today_dt + timedelta(days=days_offset)
                 extracted_date = target_date.strftime("%Y%m%d")
-            
+
             else:
                 # Handle fixed offsets
                 target_date = today_dt + timedelta(days=offset_or_handler)
                 extracted_date = target_date.strftime("%Y%m%d")
-            
+
             # Clean the matched pattern from query
             cleaned_query = re.sub(pattern, '', query, flags=re.IGNORECASE).strip()
             cleaned_query = re.sub(r'\s+', ' ', cleaned_query)  # Remove extra spaces
-            
+
             break  # Use first match found
-    
+
     # Special handling for quarterly/annual requests
     if re.search(r'\b(quarter|quarterly|q[1-4]|annual|yearly)\b', query_lower):
         extracted_date = "None"
-    
+
     # If no date found but asking about "news" without time context, assume recent
     if extracted_date == "None" and re.search(r'\bnews\b', query_lower) and not re.search(r'\b(upcoming|future|next|will)\b', query_lower):
         target_date = today_dt + timedelta(days=-3)  # Last 3 days for general news
         extracted_date = target_date.strftime("%Y%m%d")
-        
+
     return extracted_date, cleaned_query
 
 def is_followup_question(query: str, chat_history: list[str]) -> bool:
@@ -312,52 +311,52 @@ def is_followup_question(query: str, chat_history: list[str]) -> bool:
     """
     if not chat_history:
         return False
-        
+
     query_lower = query.lower().strip()
-    
+
     # Clear indicators of follow-up questions
     followup_indicators = [
         # Pronouns and references
         r'\b(it|this|that|they|them|its|their)\b',
         r'\b(the company|the stock|the news)\b',
         r'\b(what about|how about|tell me more)\b',
-        
+
         # Continuation words
         r'\b(also|additionally|furthermore|moreover)\b',
         r'\b(and what|what else|anything else)\b',
-        
+
         # Comparative references
         r'\b(compared to|versus|vs\.?|difference)\b',
         r'\b(better than|worse than|similar to)\b',
-        
+
         # Context-dependent questions
         r'\b(why|how|when|where|who)\b.*\b(this|that|it)\b',
         r'\bwhat.*\b(impact|effect|result|outcome)\b',
-        
+
         # Short questions that likely need context
         r'^\b(yes|no|ok|sure|thanks?|please)\b',
         r'^\w{1,3}\?$',  # Very short questions like "Why?", "How?"
     ]
-    
+
     # Check for follow-up indicators
     for indicator in followup_indicators:
         if re.search(indicator, query_lower):
             return True
-    
+
     # If query is very short and chat history exists, likely a follow-up
     if len(query_lower.split()) <= 3 and chat_history:
         return True
-        
+
     # Check if query contains company/stock names mentioned in recent history
     recent_history = ' '.join(chat_history[-2:]).lower()  # Last 2 messages
     query_words = set(query_lower.split())
     history_words = set(recent_history.split())
-    
+
     # If significant word overlap, might be follow-up
     overlap = query_words.intersection(history_words)
     if len(overlap) >= 2:  # At least 2 common words
         return True
-        
+
     return False
 
 # --- Combined LLM Processing Function ---
@@ -367,13 +366,13 @@ async def combined_preprocessing(query: str, chat_history: list[str], today: str
     Combined LLM call that handles validation, memory contextualization, and processing.
     Only uses memory chain for follow-up questions.
     """
-    
+
     # First, do robust date extraction (no LLM needed)
     extracted_date, cleaned_query = extract_date_robust(query, today)
-    
+
     # Check if this is a follow-up question
     is_followup = is_followup_question(query, chat_history)
-    
+
     # Prepare the combined prompt
     if is_followup and chat_history:
         # For follow-up questions, include memory contextualization
@@ -387,7 +386,7 @@ Recent Chat History: {chat_history}
 Today's Date: {today}
 
 Tasks:
-1. VALIDATE: Is this query related to Indian stock market, finance, economics, elections, or companies? 
+1. VALIDATE: Is this query related to Indian stock market, finance, economics, elections, or companies?
 2. REFORMULATE: Create a standalone question that incorporates relevant context from chat history
 3. CLEAN: Ensure the reformulated query is complete and grammatically correct
 
@@ -405,13 +404,13 @@ Guidelines:
 - Make the reformulated query understandable without chat history
 - For validation: 1=valid financial query, 0=not related to finance/markets
 """
-        
+
         input_data = {
             "query": query,
             "chat_history": chat_history[-3:],  # Last 3 messages only
             "today": today
         }
-    
+
     else:
         # For standalone questions, skip memory contextualization
         combined_prompt = """
@@ -434,41 +433,41 @@ Return JSON format:
 
 Guidelines:
 - If asking for "latest news" about any company, consider valid
-- If asking about "current news" or "trending news", consider valid  
+- If asking about "current news" or "trending news", consider valid
 - For validation: 1=valid financial query, 0=not related to finance/markets
 - Keep reformulated_query same as original for standalone questions
 """
-        
+
         input_data = {
             "query": query,
             "today": today
         }
-    
+
     # Create the LLM chain
     prompt_template = PromptTemplate(
         template=combined_prompt,
         input_variables=list(input_data.keys())
     )
-    
+
     chain = prompt_template | GPT4o_mini | JsonOutputParser()
-    
+
     try:
         # Single LLM call to handle everything
         with get_openai_callback() as cb:
             result = await chain.ainvoke(input_data)
-        
+
         # Add our robust date extraction and token count
         result["extracted_date"] = extracted_date
         result["cleaned_query"] = cleaned_query
         result["tokens_used"] = cb.total_tokens
-        
+
         print(f"DEBUG: Combined preprocessing completed in single LLM call")
         print(f"DEBUG: Valid: {result.get('valid')}, Follow-up: {result.get('is_followup')}")
         print(f"DEBUG: Date extracted: {extracted_date}")
         print(f"DEBUG: Tokens used: {cb.total_tokens}")
-        
+
         return result
-        
+
     except Exception as e:
         print(f"ERROR in combined_preprocessing: {e}")
         # Fallback response
@@ -488,7 +487,7 @@ async def insert_post1(df: pd.DataFrame, db_pool: asyncpg.Pool):
     """Optimized bulk insert with better error handling."""
     if df.empty:
         return
-        
+
     async with db_pool.acquire() as conn:
         async with conn.transaction():
             # Batch check for existing URLs
@@ -498,7 +497,7 @@ async def insert_post1(df: pd.DataFrame, db_pool: asyncpg.Pool):
                 urls_to_check
             )
             existing_urls_set = {row['source_url'] for row in existing_urls}
-            
+
             # Prepare new rows for bulk insert
             new_rows = []
             for _, row in df.iterrows():
@@ -507,7 +506,7 @@ async def insert_post1(df: pd.DataFrame, db_pool: asyncpg.Pool):
                         row['source_url'], row.get('image_url'), row['heading'],
                         row['title'], row['description'], row['source_date']
                     ))
-            
+
             if new_rows:
                 await conn.executemany("""
                     INSERT INTO source_data (source_url, image_url, heading, title, description, source_date)
@@ -519,7 +518,7 @@ async def insert_red(df: pd.DataFrame, db_pool: asyncpg.Pool):
     """Optimized Reddit data insertion."""
     if df.empty:
         return
-        
+
     async with db_pool.acquire() as conn:
         async with conn.transaction():
             for _, row in df.iterrows():
@@ -585,7 +584,8 @@ async def web_rag_mix(
     prompt_history_id: int = Query(...),
     user_id: int = Query(...),
     plan_id: int = Query(...),
-    db_pool: asyncpg.Pool = Depends(get_db_pool)
+    db_pool: asyncpg.Pool = Depends(get_db_pool),
+    api_key: str = Depends(api_key_auth)
 ):
     """
     REPLACED: Final version with corrected session management.
@@ -598,7 +598,7 @@ async def web_rag_mix(
     brave_api_key = os.getenv('BRAVE_API_KEY')
     if not brave_api_key:
         raise HTTPException(status_code=500, detail="Brave API key not configured.")
-    
+
     brave_searcher = BraveNews(brave_api_key)
 
     # /aigptssh/streaming/streaming.py
@@ -608,15 +608,15 @@ async def web_rag_mix(
         cached_passages = []
         if use_caching:
             yield create_progress_bar_string(5, "Checking cache for context...").encode("utf-8")
-            
+
             # Check if it's a follow-up question that could benefit from cache
             if is_followup_question(query, chat_history):
                 # Query the session-specific cache
                 cached_docs_with_scores = query_session_cache(str(session_id), query)
-                
+
                 # Assess sufficiency of cached documents
                 sufficiency_score = scoring_service.assess_context_sufficiency(query, cached_docs_with_scores)
-                
+
                 # A threshold of 0.4 is a good starting point
                 if sufficiency_score > 0.4:
                     print("DEBUG: Sufficient context found in cache. Bypassing web scrape.")
@@ -627,7 +627,7 @@ async def web_rag_mix(
                             "metadata": doc.metadata,
                             "final_combined_score": score # Use similarity score as the ranking metric
                         })
-        
+
         if cached_passages:
             # If cache was sufficient, use the cached passages directly
             final_passages = cached_passages
@@ -636,31 +636,31 @@ async def web_rag_mix(
             # --- Fallback to Web Scraping Logic (if cache is not used, empty, or insufficient) ---
             async with aiohttp.ClientSession(**brave_searcher.session_config) as session:
                 yield create_progress_bar_string(10, "Searching for sources...").encode("utf-8")
-                
+
                 initial_sources = await brave_searcher.search_and_scrape(session, query, max_sources=30)
                 if not initial_sources:
                     yield "\nCould not find any initial sources.".encode("utf-8")
                     return
-                
+
                 yield create_progress_bar_string(20, f"Found {len(initial_sources)} sources...").encode("utf-8")
                 sources_to_scrape = initial_sources[:10]
-                
+
                 scraped_sources = []
                 total_to_scrape = len(sources_to_scrape)
                 start_progress, end_progress = 20, 70
-                
+
                 for i, source in enumerate(sources_to_scrape):
                     progress = start_progress + int(((i + 1) / total_to_scrape) * (end_progress - start_progress))
                     title = source.get('title', 'Untitled Source')[:45]
                     yield create_progress_bar_string(progress, f"Analyzing: {title}...").encode("utf-8")
-                    
+
                     scraped = await brave_searcher.scrape_top_urls(session, [source])
                     if scraped:
                         scraped_sources.extend(scraped)
                     await asyncio.sleep(0.1)
 
                 yield create_progress_bar_string(80, "Ranking context...").encode("utf-8")
-                
+
                 final_passages = await scoring_service.rerank_content_chunks(query, scraped_sources, top_n=7)
                 if not final_passages:
                     yield "\nCould not extract sufficient detailed information.".encode("utf-8")
@@ -680,31 +680,31 @@ async def web_rag_mix(
             """
             You are a financial markets expert. Provide a detailed, well-structured final answer using the comprehensive context provided.
             Use markdown for readability and cite the source links where appropriate. Provide the source links with their citation numbers at the end of the response.
-            
+
             Comprehensive Context:
             {context}
-            
-            Chat History: 
+
+            Chat History:
             {history}
-            
+
             User Question: {input}
-            
+
             Final Detailed Answer:
             """
         )
         final_chain = final_prompt | llm_stream
-        
+
         yield create_progress_bar_string(100, "Done!").encode("utf-8")
-        yield "\n\n".encode("utf-8") 
+        yield "\n\n".encode("utf-8")
         yield "#Thinking ...\n".encode("utf-8")
-        
+
         final_response_text = ""
         with get_openai_callback() as cb:
             async for chunk in final_chain.astream({"context": final_context, "history": chat_history, "input": query}):
                 if chunk.content:
                     final_response_text += chunk.content
                     yield chunk.content.encode("utf-8")
-            
+
             # --- Final Database Operations ---
             if not cached_passages: # Only process for dataframe if it was a fresh scrape
                 df_to_insert = brave_searcher._process_for_dataframe(scraped_sources)
@@ -714,7 +714,7 @@ async def web_rag_mix(
             total_tokens = cb.total_tokens
             asyncio.create_task(insert_credit_usage(user_id, plan_id, total_tokens / 1000, db_pool))
             asyncio.create_task(store_into_db(session_id, prompt_history_id, {"links": final_links}, db_pool))
-            
+
             if final_response_text:
                 history_db = PostgresChatMessageHistory(str(session_id), psql_url)
                 history_db.add_user_message(query)
@@ -729,7 +729,8 @@ async def cmots_only(
     prompt_history_id: int = Query(...),
     user_id: int = Query(...),
     plan_id: int = Query(...),
-    db_pool: asyncpg.Pool = Depends(get_db_pool)
+    db_pool: asyncpg.Pool = Depends(get_db_pool),
+    api_key: str = Depends(api_key_auth)
 ):
     """Optimized CMOTS RAG endpoint."""
     pass
@@ -741,15 +742,16 @@ async def red_rag_bing(
     prompt_history_id: int = Query(...),
     user_id: int = Query(...),
     plan_id: int = Query(...),
-    db_pool: asyncpg.Pool = Depends(get_db_pool)
+    db_pool: asyncpg.Pool = Depends(get_db_pool),
+    api_key: str = Depends(api_key_auth)
 ):
     """
     Handles Reddit-based RAG requests with a full pipeline:
     Search -> Scrape -> Chunk & Embed -> Retrieve -> Rerank -> Synthesize.
     """
-    
+
     original_query = request.query.strip()
-    
+
     validation_result = await validate_query_only(original_query)
     valid = validation_result.get("valid", 0)
     validation_tokens = validation_result.get("tokens_used", 0)
@@ -762,19 +764,19 @@ async def red_rag_bing(
             return
 
         final_links = []
-        
+
         try:
             # Step 1: Search for Reddit posts
             yield create_progress_bar_string(10, "Searching for relevant Reddit discussions...").encode("utf-8")
             brave_api_key = os.getenv('BRAVE_API_KEY')
             search_results = await fetch_search_red(original_query, brave_api_key)
-            
+
             if not search_results:
                 yield "\nCould not find any relevant Reddit discussions for your query.".encode("utf-8")
                 return
 
             articles, df, links = await process_search_red(search_results)
-            
+
             if not articles:
                 yield "\nCould not find any relevant Reddit discussions for your query.".encode("utf-8")
                 return
@@ -787,7 +789,7 @@ async def red_rag_bing(
             # Step 2: Scrape top Reddit posts
             scraper = RedditScraper()
             scraped_data = [await scraper.scrape_post(article) for article in top_articles]
-            
+
             if not any(scraped_data):
                 yield "\nFound Reddit discussions, but could not scrape their content.".encode("utf-8")
                 return
@@ -799,7 +801,7 @@ async def red_rag_bing(
                 yield "\nFailed to process Reddit content for analysis.".encode("utf-8")
                 return
             yield create_progress_bar_string(75, "Finding the most relevant information...").encode("utf-8")
-            
+
             # Step 4: Search Chunks for Relevance
             relevant_chunks: list[Document] = await retriever.ainvoke(original_query)
             if not relevant_chunks:
@@ -811,9 +813,9 @@ async def red_rag_bing(
             passages_to_score = [
                 {"text": doc.page_content, "metadata": doc.metadata} for doc in relevant_chunks
             ]
-            
+
             reranked_passages = await scoring_service.score_and_rerank_passages(original_query, passages_to_score)
-            
+
             if not reranked_passages:
                 yield "\nCould not determine the most relevant information from the Reddit posts.".encode("utf-8")
                 return
@@ -831,33 +833,33 @@ async def red_rag_bing(
         res_prompt = """
         You are a financial information assistant specializing in Reddit discussions and community insights.
         Using the provided Reddit articles and chat history, respond to the user's inquiries with detailed analysis.
-        
+
         Focus on:
         - Community sentiment and discussions
         - Popular opinions and debates
         - Emerging trends mentioned by users
         - Different perspectives from the Reddit community
         - Provide the source links with their citation numbers at the end of the response
-        
+
         Use proper markdown formatting and cite relevant Reddit discussions.
-        
-        The user has asked the following question: {input}  
+
+        The user has asked the following question: {input}
 
         Context from Reddit:
-        {context}      
+        {context}
         """
-        
+
         R_prompt = PromptTemplate(
-            template=res_prompt, 
+            template=res_prompt,
             input_variables=["context", "input"]
         )
         ans_chain = R_prompt | llm_stream
 
         # Step 7: Stream the final response
         yield create_progress_bar_string(100, "Done!").encode("utf-8")
-        yield "\n\n".encode("utf-8") 
+        yield "\n\n".encode("utf-8")
         yield "#Thinking ...\n".encode("utf-8")
-        
+
         final_response = ""
         try:
             with get_openai_callback() as cb:
@@ -870,7 +872,7 @@ async def red_rag_bing(
 
                 total_tokens = validation_tokens + cb.total_tokens
                 await insert_credit_usage(user_id, plan_id, total_tokens / 1000, db_pool)
-            
+
             links_data = {"links": final_links}
             await store_into_db(session_id, prompt_history_id, links_data, db_pool)
 
@@ -882,7 +884,7 @@ async def red_rag_bing(
         except Exception as e:
             print(f"ERROR: An error occurred during final response streaming: {e}")
             yield b"An error occurred while generating the response."
-            
+
     return StreamingResponse(generate_chat_res(), media_type="text/event-stream")
 
 
@@ -909,18 +911,18 @@ async def validate_query_only(query: str) -> dict:
     }}
     """
     input_data = {"query": query}
-    
+
     prompt_template = PromptTemplate(template=prompt_template_str, input_variables=["query"])
     chain = prompt_template | GPT4o_mini | JsonOutputParser()
 
     try:
         with get_openai_callback() as cb:
             result = await chain.ainvoke(input_data)
-        
+
         result["tokens_used"] = cb.total_tokens
         print(f"DEBUG: Validation-only check complete. Valid: {result.get('valid')}")
         return result
-        
+
     except Exception as e:
         print(f"ERROR in validate_query_only: {e}")
         # Fallback to a safe default to allow the query to proceed
@@ -951,10 +953,10 @@ async def condense_context_for_llm(query: str, passages: list[dict]) -> str:
         Key Points:
         """
     )
-    
+
     # Use the non-streaming model for a fast, single-shot extraction
     chain = prompt | GPT4o_mini | StrOutputParser()
-    
+
     try:
         condensed_context = await chain.ainvoke({"query": query, "context": context_text})
         print("DEBUG: Context condensed successfully.")
@@ -971,7 +973,8 @@ async def yt_rag_brave(
     prompt_history_id: int = Query(...),
     user_id: int = Query(...),
     plan_id: int = Query(...),
-    db_pool: asyncpg.Pool = Depends(get_db_pool)
+    db_pool: asyncpg.Pool = Depends(get_db_pool),
+    api_key: str = Depends(api_key_auth)
 ):
     """
     Handles YouTube-based RAG requests using an embedding-based approach.
@@ -982,11 +985,11 @@ async def yt_rag_brave(
     5. Synthesizes an answer from the chunks.
     """
     original_query = request.query.strip()
-    
+
     validation_result = await validate_query_only(original_query)
     valid = validation_result.get("valid", 0)
     validation_tokens = validation_result.get("tokens_used", 0)
-    
+
     async def generate_chat_res():
         """Generator function that streams the entire RAG process."""
         if valid == 0:
@@ -995,12 +998,12 @@ async def yt_rag_brave(
             return
 
         final_links = []
-        
+
         try:
             # Step 1: Search & Filter Videos
             yield create_progress_bar_string(10, "Searching for relevant videos...").encode("utf-8")
             video_urls = await get_yt_data_async(original_query)
-            
+
             if not video_urls:
                 yield "\nCould not find any relevant YouTube videos for your query.".encode("utf-8")
                 return
@@ -1022,7 +1025,7 @@ async def yt_rag_brave(
                 yield "\nFailed to process video content for analysis.".encode("utf-8")
                 return
             yield create_progress_bar_string(75, "Finding the most relevant information...").encode("utf-8")
-            
+
             # Step 4: Search Chunks for Relevance
             relevant_chunks: list[Document] = await retriever.aget_relevant_documents(original_query)
             if not relevant_chunks:
@@ -1034,9 +1037,9 @@ async def yt_rag_brave(
             passages_to_score = [
                 {"text": doc.page_content, "metadata": doc.metadata} for doc in relevant_chunks
             ]
-            
+
             reranked_passages = await scoring_service.score_and_rerank_passages(original_query, passages_to_score)
-            
+
             if not reranked_passages:
                 yield "\nCould not determine the most relevant information from the videos.".encode("utf-8")
                 return
@@ -1046,10 +1049,10 @@ async def yt_rag_brave(
 
             # Create the full context directly without condensation
             final_context = scoring_service.create_enhanced_context(top_passages)
-            
+
             # Create a mapping of source titles to URLs for the final prompt
             source_map = {p['metadata'].get('title'): p['metadata'].get('url') for p in top_passages if p.get('metadata')}
-            
+
             yield create_progress_bar_string(90, "Synthesizing the final answer...").encode("utf-8")
 
         except Exception as e:
@@ -1071,24 +1074,24 @@ async def yt_rag_brave(
 
         **Context from Videos:**
         {context}
-        
+
         **Source Map (Titles and URLs):**
         {source_map}
         """
-        
+
         yt_prompt = PromptTemplate(template=prompt, input_variables=["query", "context", "source_map"])
         chain = yt_prompt | llm_stream
 
         # Step 6: Stream the final response
         yield create_progress_bar_string(100, "Done!").encode("utf-8")
-        yield "\n\n".encode("utf-8") 
+        yield "\n\n".encode("utf-8")
         yield "#Thinking ...\n".encode("utf-8")
-        
+
         final_response = ""
         try:
             with get_openai_callback() as cb:
                 async for chunk in chain.astream({
-                    "context": final_context, 
+                    "context": final_context,
                     "query": original_query,
                     "source_map": source_map
                 }):
@@ -1100,7 +1103,7 @@ async def yt_rag_brave(
 
                 total_tokens = validation_tokens + cb.total_tokens
                 await insert_credit_usage(user_id, plan_id, total_tokens / 1000, db_pool)
-            
+
             links_data = {"links": final_links}
             await store_into_db(session_id, prompt_history_id, links_data, db_pool)
 
@@ -1112,5 +1115,5 @@ async def yt_rag_brave(
         except Exception as e:
             print(f"ERROR: An error occurred during final response streaming: {e}")
             yield b"An error occurred while generating the response."
-            
+
     return StreamingResponse(generate_chat_res(), media_type="text/event-stream")

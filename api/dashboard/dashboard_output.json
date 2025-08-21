@@ -1,128 +1,121 @@
 {
-    "last_updated_utc": "2025-08-21T05:30:08.047891+00:00",
+    "last_updated_utc": "2025-08-21T12:15:27.744633+00:00",
     "market_summary": {
         "summary_points": [
             {
-                "title": "Green Opening for Indian Benchmarks",
-                "summary": "Nifty50 and BSE Sensex kicked off Thursday’s session firmly in positive territory, with Nifty around the 25,100 mark and Sensex up over 150 points. By 9:16 AM, Nifty50 was trading at 25,094.95 (up 0.18%) while Sensex stood at 82,033.46 (up 0.21%), reflecting broad-based buying interest in early deals.",
-                "age": "1 hours ago"
+                "title": "Muted Opening Anticipated",
+                "summary": "Indian benchmark indices Sensex and Nifty 50 are expected to start flat on Thursday, as Gift Nifty trades marginally above Nifty futures and global market cues remain mixed, pointing to a cautious opening.",
+                "age": "10 hours"
             },
             {
-                "title": "Five-Day Winning Streak Extends",
-                "summary": "The domestic equity market notched its fifth straight session of gains, with Sensex climbing 213.45 points (0.26%) to 81,857.84 and Nifty50 rising 69.90 points (0.28%) to close at 25,050.55. Investors continued to build on the earlier four-day rally, pushing key indices higher on sustained momentum.",
-                "age": "3 hours ago"
+                "title": "Benchmarks Extend Winning Streak",
+                "summary": "Equity markets logged a fifth consecutive session of gains, with the Sensex climbing over 213 points to 81,857.84 and the Nifty 50 topping the 25,000 mark, closing at 25,050.55 on sustained bullish sentiment.",
+                "age": "10 hours"
             },
             {
-                "title": "Technical Indicators Signal Further Upside",
-                "summary": "Chart patterns are pointing to continued strength, as Sensex formed a bullish daily candle and an intraday uptrend continuation formation. These technical signals suggest that the market could sustain its upward trajectory in the near term, barring fresh negative triggers.",
-                "age": "1 day ago"
+                "title": "IT and Pharma Drive Gains, FMCG Sees Profit Booking",
+                "summary": "Sectoral trends saw strong performances in IT and pharma stocks lifting the Nifty above 25,100, while FMCG names witnessed profit-taking after recent rallies, reflecting varied investor focus across segments.",
+                "age": "3 hours"
             },
             {
-                "title": "Mixed Global Cues Create Flat-to-Lower Bias",
-                "summary": "Asian markets traded mixed and US equities ended mostly lower after the release of Federal Reserve meeting minutes, dragging Gift Nifty into a modest premium of about 2 points from Nifty futures. These uneven global cues point to a cautious start, with Indian benchmarks expected to open flat or slightly lower.",
-                "age": "3 hours ago"
+                "title": "Global Cues Mixed After Fed Minutes",
+                "summary": "Asian markets traded unevenly and US equities slipped following the release of Fed meeting minutes, leading Indian markets to monitor overseas developments closely for guidance on interest rates and liquidity.",
+                "age": "10 hours"
             },
             {
-                "title": "Government Policy and Consumption Drive Optimism",
-                "summary": "Market analysts remain upbeat on the near-term outlook, citing recent government policy initiatives and a pickup in consumer demand as key catalysts. Policy support measures are expected to sustain corporate earnings visibility and bolster overall investor confidence.",
-                "age": "1 hours ago"
+                "title": "Domestic Institutional Buying Cushions Market",
+                "summary": "Robust inflows from domestic institutions countered heavy foreign institutional investor selling, helping sustain market momentum and underpinning the recent rally in key indices.",
+                "age": "3 hours"
             },
             {
-                "title": "Sectoral Relief and Institutional Flows Bolster Confidence",
-                "summary": "Positive momentum is further underpinned by sector-specific relief measures and robust institutional flows into equities. These factors are aiding market activity across key sectors and lending additional support to the rally.",
-                "age": "1 day ago"
+                "title": "Key Stock Movers: Infosys, TCS Lead; Select Names Lag",
+                "summary": "Among Sensex components, Infosys and TCS powered ahead with gains near 3–4%, while counters like Bharat Electronics and Bajaj Finance underperformed, highlighting divergent stock-specific flows.",
+                "age": "1 day"
             }
         ],
         "sources": [
             "https://www.livemint.com/market/stock-market-news/indian-stock-market-10-key-things-that-changed-for-market-overnight-gift-nifty-us-fed-meeting-minutes-to-gold-prices-11755708562879.html",
-            "https://timesofindia.indiatimes.com/business/india-business/stock-market-today-nifty50-bse-sensex-august-21-2025-dalal-street-indian-equities-global-markets/articleshow/123422168.cms",
             "https://www.livemint.com/market/stock-market-news/indian-stock-market-10-key-things-that-changed-for-market-overnight-gift-nifty-china-lpr-to-india-china-ties-11755622836425.html",
-            "https://www.livemint.com/market/stock-market-news/nifty-50-sensex-today-what-to-expect-from-indian-stock-market-in-trade-on-august-20-11755622555211.html"
+            "https://www.livemint.com/market/stock-market-news/nifty-50-sensex-today-what-to-expect-from-indian-stock-market-in-trade-on-august-21-11755708261409.html",
+            "https://timesofindia.indiatimes.com/business/india-business/stock-market-today-nifty50-bse-sensex-august-20-2025-dalal-street-indian-equities-global-markets-gst-reforms-donald-trump-tariffs/articleshow/123399414.cms",
+            "https://www.analyticsinsight.net/stocks/stock-market-today-sensex-rises-281-points-it-and-pharma-stocks-shine"
         ]
     },
     "latest_news": {
         "articles": [
             {
-                "title": "Stock market today: Nifty50 opens in green; BSE Sensex up over 150 points, crosses 82,000 - Times of India",
-                "snippet": "India Business News: Stock market today: Nifty50 and BSE Sensex, the Indian equity benchmark indices, opened in green on Thursday. While Nifty50 was near 25,100, BSE Sense",
-                "url": "https://timesofindia.indiatimes.com/business/india-business/stock-market-today-nifty50-bse-sensex-august-21-2025-dalal-street-indian-equities-global-markets/articleshow/123422168.cms",
+                "title": "Stock Market LIVE Updates: Nifty at 25,100, Sensex up 275 pts; Dr Reddy's, Bajaj Finance, Cipla top gainers",
+                "snippet": "Currently, the stock is trading 8.09 percent below its 52-week high and 27.79 percent above its 52-week low. Market capitalisation stands at Rs 1,929,189.30 crore. ... The company has received a long-term supply order for transmission gears for premium motorcycles from a globally renowned Indian ...",
+                "url": "https://www.moneycontrol.com/news/business/markets/stock-market-live-sensex-nifty-50-share-price-gift-nifty-latest-updates-21-08-2025-liveblog-13473600.html",
                 "age": "1 hour ago"
             },
             {
-                "title": "15 stocks will be in focus in August 21 trade, know why? - The Hindu BusinessLine",
-                "snippet": "Clean Science and Technology promoters to sell 24% stake, Bharti Hexacom to sell mobile towers, UltraTech Cement divests stake.",
-                "url": "https://thehindubusinessline.com/markets/why-these-15-stocks-will-remain-in-focus-in-todays-trade-august-21-2025/article69958740.ece",
+                "title": "Stock Market Highlights: Sensex rises for 6th day, settles 142 pts higher, Nifty above 25,050; Cipla rises 3%, DRL 2% - The Economic Times",
+                "snippet": "Markets extended gains for the fifth straight session on Wednesday. In today’s trade, stocks such as IndusInd Bank, India Cements, Godrej Properties, Clean Science, and Exide Industries will be in focus on the back of key news developments. ... GIFT Nifty on the NSE IX traded higher by 3.5 points, or 0.01 per cent, at 25,083.50, signaling that Dalal Street was headed for a muted start on Thursday. ... Indian ...",
+                "url": "https://economictimes.indiatimes.com/markets/stocks/live-blog/bse-sensex-today-live-nifty-stock-market-updates-21-august-2025/liveblog/123421031.cms?from=mdr",
                 "age": "2 hours ago"
             },
             {
-                "title": "Indian stock market: 10 key things that changed for market overnight - Gift Nifty, US Fed meeting minutes to gold prices | Stock Market News",
-                "snippet": "Catch all the Business News , Market News , Breaking News Events and Latest News Updates on Live Mint. Download The Mint News App to get Daily Market Updates. Business NewsMarketsStock MarketsIndian stock market: 10 key things that changed for market overnight - Gift Nifty, US Fed meeting minutes ...",
-                "url": "https://www.livemint.com/market/stock-market-news/indian-stock-market-10-key-things-that-changed-for-market-overnight-gift-nifty-us-fed-meeting-minutes-to-gold-prices-11755708562879.html",
+                "title": "Stock Market Today: Sensex Rises 281 Points, IT and Pharma Stocks Shine",
+                "snippet": "Indian stock market today see indices rallying as Nifty 50 holds above 25,100 with IT sector leadership.",
+                "url": "https://www.analyticsinsight.net/stocks/stock-market-today-sensex-rises-281-points-it-and-pharma-stocks-shine",
                 "age": "3 hours ago"
             }
         ]
     },
     "sector_analysis": {
-        "top_performers": [
+        "top_performing_sectors": [
             {
-                "sector": "Information Technology",
-                "explanation": "IT stocks led the rally with Infosys up 3.78% and TCS up 2.64%, reflecting strong quarterly outlooks and ongoing digital‐transformation spends."
+                "sector": "Information Technology (IT)",
+                "explanation": "The Nifty IT index rose 0.34% to 35,811.05, led by gains in TCS and Infosys, making IT the primary driver of today’s rally."
             },
             {
-                "sector": "FMCG",
-                "explanation": "FMCG stocks saw broad‐based buying on the back of resilient consumer sentiment and healthy rural demand."
+                "sector": "Financials",
+                "explanation": "The Nifty Bank index climbed 0.24% to 55,833.95, with Bajaj Finance and Bajaj Finserv each gaining over 1%, reflecting renewed investor interest in the banking space."
             },
             {
-                "sector": "Real Estate",
-                "explanation": "Realty names contributed meaningfully to gains amid an ongoing upcycle and positive housing market dynamics."
+                "sector": "Pharmaceuticals",
+                "explanation": "Pharma stocks contributed strongly, with Dr. Reddy’s Laboratories jumping 2.28% to lead the Nifty 50 gainers."
             }
         ],
-        "underperformers": [
+        "underperforming_sectors": [
             {
-                "sector": "Global Technology",
-                "explanation": "US tech stocks endured selling pressure after the Fed minutes, dragging down global technology indices."
-            },
-            {
-                "sector": "Asian equities ex-India",
-                "explanation": "Most Asian markets traded lower, reflecting regional growth concerns and dampening sentiment."
-            },
-            {
-                "sector": "Metals & Mining",
-                "explanation": "Metals and mining stocks were absent from domestic gains, likely feeling the impact of mixed global growth cues."
+                "sector": "FMCG",
+                "explanation": "After a three-day rally on GST reform hopes, FMCG names like Dabur India and Tata Consumer faced profit booking and fell over 1%."
             }
         ]
     },
     "standouts_analysis": {
         "gainers": [
             {
-                "stock": "Emami",
-                "reason": "gained nearly 4% as the FMCG index rose on strong consumer sentiment and extended its rally for a third day"
-            },
-            {
-                "stock": "Britannia",
-                "reason": "jumped over 3.6% amid robust FMCG sector momentum as the index climbed around 1%"
+                "stock": "Shanti Gold International",
+                "reason": "Shares surged nearly 11% after a remarkable 174% jump in Q1 net profit to Rs. 25 crore."
             },
             {
                 "stock": "Infosys",
-                "reason": "rose sharply, leading the IT rally on robust sector momentum and a favourable quarterly outlook driven by continued digital-transformation spends"
+                "reason": "Led the IT rally with a 3.88% gain, driven by strong sector performance."
+            },
+            {
+                "stock": "Tata Consultancy Services",
+                "reason": "Jumped 2.69% as broader technology stocks shone on resilient IT demand."
             }
         ],
         "losers": [
             {
-                "stock": "Shriram Finance",
-                "reason": "reason for its decline was not specified in the provided text"
+                "stock": "Bharat Electronics",
+                "reason": "No specific reason mentioned in the text."
             },
             {
                 "stock": "Bajaj Finance",
-                "reason": "reason for its decline was not specified in the provided text"
+                "reason": "No specific reason mentioned in the text."
             },
             {
-                "stock": "Bharat Electronics",
-                "reason": "reason for its decline was not specified in the provided text"
+                "stock": "Tata Motors",
+                "reason": "No specific reason mentioned in the text."
             }
         ]
     },
     "market_drivers": {
-        "summary": "Today’s market advance was driven by robust institutional flows and continued policy tailwinds, as investors cheered bold government reforms ranging from sector‐specific relief measures to ongoing GST rationalization and fiscal support, all underpinned by a surprisingly benign 1.55% retail inflation reading that rekindles talk of an imminent RBI rate cut. While global cues remained mixed—with Asian bourses flitting between gains and losses and US tech stocks under pressure—domestic confidence held firm, propelling heavyweights Infosys (+3.78%) and TCS (+2.64%) higher and lifting FMCG, realty and auto stocks on the back of sustained consumption momentum and a resurgent real estate cycle."
+        "summary": "Today’s market advance was underpinned by a broad sectoral rally led by IT heavyweights TCS and Infosys and pharma outperformers such as Dr. Reddy’s, bolstered by corporate updates from Syngene and Hitachi Energy India. Strong domestic institutional buying of over ₹1,800 crore cushioned the impact of ₹1,100 crore of FII outflows, while blue-chips like Reliance Industries, ICICI Bank and HDFC Bank provided crucial support. Positive global cues—ranging from stable crude oil prices to softer U.S. Treasury yields—lifted risk sentiment, and anticipation of forthcoming GST reform measures added a favorable policy backdrop, encouraging rotation into healthcare, financials and other cyclical plays."
     }
 }

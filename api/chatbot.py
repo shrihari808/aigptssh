@@ -20,6 +20,7 @@ from starlette.status import HTTP_403_FORBIDDEN
 from langchain_community.chat_message_histories.postgres import PostgresChatMessageHistory
 from config import *
 from streaming.streaming import combined_preprocessing
+from api.security import api_key_auth
 
 
 
@@ -95,7 +96,7 @@ def add_to_memory(question,response,session_id):
 
 
 @router.post("/chatbot/")
-async def chatbot_endpoint(input_data: InputText, session_id: str, market: str = Query("IND", title="Market", description="Choose between 'US' or 'IND'"), flag: str = Query(None, title="Flag", description="Optional flag to specify the type of response"), ai_key_auth: str = Depends(authenticate_ai_key), db: Session = Depends(get_db)):
+async def chatbot_endpoint(input_data: InputText, session_id: str, market: str = Query("IND", title="Market", description="Choose between 'US' or 'IND'"), flag: str = Query(None, title="Flag", description="Optional flag to specify the type of response"), api_key: str = Depends(api_key_auth), db: Session = Depends(get_db)):
     #default_response = "I'm sorry, but as an AI Stock market Assistant, my main focus is on providing information and insights related to stocks, financial statements, and market news. If you have any questions related to those topics, feel free to ask!"
     default_response="The search query you're trying to use does not appear to be related to the Indian financial markets. Please ensure your query focuses on topics like finance, investing, stocks, or other related subjects to maintain platform quality. If your query is relevant but isn’t yielding the desired results, consider refining it to improve accuracy and alignment with financial market topics"
     valid,_,_,_= await combined_preprocessing(input_data.input_text,session_id)

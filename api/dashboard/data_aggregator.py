@@ -1,3 +1,5 @@
+# REPLACE THE ENTIRE FILE WITH THIS
+
 # aigptssh/api/dashboard/data_aggregator.py
 import json
 import os
@@ -28,7 +30,7 @@ def get_age_in_seconds(iso_timestamp):
             dt_obj = datetime.fromisoformat(iso_timestamp)
         else:
             dt_obj = datetime.fromisoformat(iso_timestamp).replace(tzinfo=timezone.utc)
-        
+
         age_seconds = (datetime.now(timezone.utc) - dt_obj).total_seconds()
         return age_seconds
     except (ValueError, TypeError) as e:
@@ -39,11 +41,11 @@ def get_human_readable_age(seconds):
     """Converts seconds to human readable age format."""
     if seconds == float('inf'):
         return "Unknown"
-    
+
     days = int(seconds // 86400)
     hours = int((seconds % 86400) // 3600)
     minutes = int((seconds % 3600) // 60)
-    
+
     if days > 0:
         return f"{days} day{'s' if days > 1 else ''} ago"
     elif hours > 0:
@@ -59,20 +61,20 @@ def select_latest_news_articles(news_articles, count=3):
     """
     if not news_articles:
         return []
-    
+
     sorted_articles = sorted(
-        news_articles, 
-        key=lambda x: get_age_in_seconds(x.get('page_age')), 
+        news_articles,
+        key=lambda x: get_age_in_seconds(x.get('page_age')),
         reverse=False
     )
-    
+
     selected_articles = []
     for article in sorted_articles[:count]:
         age_seconds = get_age_in_seconds(article.get('page_age'))
         description = article.get("description", "")
         if not description or description.strip() == "":
             description = "No description available"
-        
+
         formatted_article = {
             "title": article.get("title", "No Title"),
             "snippet": description,
@@ -80,8 +82,50 @@ def select_latest_news_articles(news_articles, count=3):
             "age": get_human_readable_age(age_seconds)
         }
         selected_articles.append(formatted_article)
-    
+
     return selected_articles
+
+async def aggregate_and_process_stock_data(stock_name: str):
+    """
+    Fetches, scrapes, and processes data for a single stock.
+    """
+    print(f"--- Starting Stock Data Aggregation for: {stock_name} ---")
+
+    brave_fetcher = BraveDashboard()
+    # The get_portfolio_data method can handle a list with a single stock
+    stock_data = brave_fetcher.get_portfolio_data([stock_name])
+    news_articles = stock_data.get("latest_news", [])
+    scraped_articles = await scrape_urls(news_articles) if news_articles else []
+
+    vector_store = DashboardVectorStore(collection_name="stock_news_content")
+    vector_store.add_documents(scraped_articles)
+    scoring_service = DashboardScoringService(vector_store=vector_store)
+
+    stock_query = f"What is the latest news, analyst opinions, and performance data for the stock: {stock_name}?"
+
+    context_queries = {
+        "key_issues_context": stock_query,
+        "indices_context": f"Provide a summary of the latest news and key events for the stock: {stock_name}.",
+        "market_drivers_context": f"What were the main reasons and key driving factors for the stock: {stock_name}?"
+    }
+
+    llm_contexts = {
+        "indices_context": scoring_service.get_enhanced_context(context_queries["indices_context"], k=5),
+        "market_drivers_context": scoring_service.get_enhanced_context(context_queries["market_drivers_context"], k=5),
+        "key_issues_context": scoring_service.get_enhanced_context(context_queries["key_issues_context"], k=15)
+    }
+
+    latest_news_articles = select_latest_news_articles(news_articles, count=3)
+
+    processed_data = {
+        "last_updated_utc": datetime.now(timezone.utc).isoformat(),
+        "llm_contexts": llm_contexts,
+        "latest_news_articles": latest_news_articles,
+        "portfolio": [stock_name]  # Keep portfolio format for the LLM generator
+    }
+
+    return processed_data
+
 
 async def aggregate_and_process_portfolio_data(portfolio: list[str]):
     """
@@ -98,15 +142,15 @@ async def aggregate_and_process_portfolio_data(portfolio: list[str]):
     vector_store = DashboardVectorStore(collection_name="portfolio_news_content")
     vector_store.add_documents(scraped_articles)
     scoring_service = DashboardScoringService(vector_store=vector_store)
-    
+
     portfolio_query = f"What is the latest news, analyst opinions, and performance data for the stocks: {', '.join(portfolio)}?"
-    
+
     context_queries = {
         "key_issues_context": portfolio_query,
         "indices_context": f"Provide a summary of the latest news and key events for the stocks: {', '.join(portfolio)}.",
         "market_drivers_context": f"What were the main reasons and key driving factors for the stocks in this portfolio: {', '.join(portfolio)}?"
     }
-    
+
     llm_contexts = {
         "indices_context": scoring_service.get_enhanced_context(context_queries["indices_context"], k=5),
         "market_drivers_context": scoring_service.get_enhanced_context(context_queries["market_drivers_context"], k=5),
@@ -119,7 +163,7 @@ async def aggregate_and_process_portfolio_data(portfolio: list[str]):
         "last_updated_utc": datetime.now(timezone.utc).isoformat(),
         "llm_contexts": llm_contexts,
         "latest_news_articles": latest_news_articles,
-        "portfolio": portfolio  # --- ADD THIS LINE ---
+        "portfolio": portfolio
     }
 
     return processed_data
@@ -130,7 +174,7 @@ async def aggregate_and_process_data():
     Fetches, scrapes, processes, and updates the dashboard data.
     """
     print("--- Starting Full Data Aggregation and Processing Pipeline ---")
-    
+
     brave_fetcher = BraveDashboard()
     qualitative_data = brave_fetcher.get_dashboard_data()
     news_articles = qualitative_data.get("latest_news", [])
@@ -139,16 +183,16 @@ async def aggregate_and_process_data():
     vector_store = DashboardVectorStore()
     vector_store.add_documents(scraped_articles)
     scoring_service = DashboardScoringService(vector_store=vector_store)
-    
+
     context_queries = {
         "indices_context": "What was the performance of key Indian market indices like the NIFTY 50 and Sensex today?",
         "sectors_context": "Which sectors were the top performers and underperformers in the Indian stock market today?",
         "standouts_context": "Who were the biggest standout stock gainers and losers in the Indian market today?",
         "market_drivers_context": "What were the main reasons and key driving factors for today's market movement?"
     }
-    
+
     llm_contexts = {key: scoring_service.get_enhanced_context(query, k=5) for key, query in context_queries.items()}
-    
+
     latest_news_articles = select_latest_news_articles(news_articles, count=3)
 
     processed_data = {
@@ -156,7 +200,7 @@ async def aggregate_and_process_data():
         "llm_contexts": llm_contexts,
         "latest_news_articles": latest_news_articles
     }
-    
+
     save_data_to_json(processed_data, DATA_JSON_PATH)
 
     llm_generator = LLMGenerator(input_path=DATA_JSON_PATH)
@@ -174,7 +218,7 @@ async def aggregate_and_process_data():
     final_dashboard_content = new_dashboard_content
     save_data_to_json(final_dashboard_content, FINAL_OUTPUT_PATH)
     save_dashboard_history(final_dashboard_content)
-    
+
     print("\n--- Pipeline Complete: Final dashboard output generated and saved. ---")
     return final_dashboard_content
 
@@ -203,36 +247,72 @@ def save_data_to_json(data, output_path):
         print(f"Error saving data to JSON file: {e}")
 
 # --- THIS IS THE UPDATED TEST BLOCK ---
-if __name__ == '__main__':
-    if sys.platform == "win32":
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+# if __name__ == '__main__':
+#     if sys.platform == "win32":
+#         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-    async def test_portfolio_snapshot():
-        """
-        A main function to manually test the portfolio snapshot generation and save the outputs to JSON files.
-        """
-        test_portfolio = ["Bharti Airtel", "Asian paints", "Tata motors", "Bharti Airtel"]
-        print(f"--- Manual Test: Generating snapshot for portfolio: {test_portfolio} ---")
+    # async def test_stock_snapshot():
+    #     """
+    #     A main function to manually test the stock snapshot generation and save the outputs to JSON files.
+    #     """
+    #     test_stock = "Reliance Industries"
+    #     print(f"--- Manual Test: Generating snapshot for stock: {test_stock} ---")
 
-        portfolio_data_path = os.path.join(OUTPUT_DIR, 'portfolio_data.json')
-        portfolio_output_path = os.path.join(OUTPUT_DIR, 'portfolio_output.json')
+    #     stock_data_path = os.path.join(OUTPUT_DIR, 'stock_data.json')
+    #     stock_output_path = os.path.join(OUTPUT_DIR, 'stock_output.json')
 
-        processed_data = await aggregate_and_process_portfolio_data(test_portfolio)
+    #     processed_data = await aggregate_and_process_stock_data(test_stock)
 
-        if not processed_data:
-            print("--- Test Failed: No data was processed for the portfolio. ---")
-            return
+    #     if not processed_data:
+    #         print("--- Test Failed: No data was processed for the stock. ---")
+    #         return
 
-        save_data_to_json(processed_data, portfolio_data_path)
-        print(f"\n--- Intermediate processed data saved to {portfolio_data_path} ---")
+    #     save_data_to_json(processed_data, stock_data_path)
+    #     print(f"\n--- Intermediate processed data saved to {stock_data_path} ---")
 
-        # Use the new PortfolioLLMGenerator for the test
-        llm_generator = PortfolioLLMGenerator(input_path=portfolio_data_path)
-        final_dashboard_content = llm_generator.generate_dashboard_content()
+    #     # Use the PortfolioLLMGenerator as it's designed to handle this structure
+    #     llm_generator = PortfolioLLMGenerator(input_path=stock_data_path)
+    #     final_dashboard_content = llm_generator.generate_dashboard_content()
 
-        save_data_to_json(final_dashboard_content, portfolio_output_path)
-        print(f"--- Final generated dashboard output saved to {portfolio_output_path} ---")
+    #     save_data_to_json(final_dashboard_content, stock_output_path)
+    #     print(f"--- Final generated dashboard output saved to {stock_output_path} ---")
 
-        print("\n--- Manual Test Completed Successfully ---")
+    #     print("\n--- Manual Test Completed Successfully ---")
 
-    asyncio.run(test_portfolio_snapshot())
+    # asyncio.run(test_stock_snapshot())
+
+    # Uncomment the following lines to run the portfolio snapshot test
+
+
+    # async def test_portfolio_snapshot():
+    #     """
+    #     A main function to manually test the portfolio snapshot generation and save the outputs to JSON files.
+    #     """
+    #     test_portfolio = ["Bharti Airtel", "Asian paints", "Tata motors", "HDFC Bank"]
+    #     print(f"--- Manual Test: Generating snapshot for portfolio: {test_portfolio} ---")
+
+    #     portfolio_data_path = os.path.join(OUTPUT_DIR, 'portfolio_data.json')
+    #     portfolio_output_path = os.path.join(OUTPUT_DIR, 'portfolio_output.json')
+
+    #     processed_data = await aggregate_and_process_portfolio_data(test_portfolio)
+
+    #     if not processed_data:
+    #         print("--- Test Failed: No data was processed for the portfolio. ---")
+    #         return
+
+    #     save_data_to_json(processed_data, portfolio_data_path)
+    #     print(f"\n--- Intermediate processed data saved to {portfolio_data_path} ---")
+
+    #     # Use the new PortfolioLLMGenerator for the test
+    #     llm_generator = PortfolioLLMGenerator(input_path=portfolio_data_path)
+    #     final_dashboard_content = llm_generator.generate_dashboard_content()
+
+    #     save_data_to_json(final_dashboard_content, portfolio_output_path)
+    #     print(f"--- Final generated dashboard output saved to {portfolio_output_path} ---")
+
+    #     print("\n--- Manual Test Completed Successfully ---")
+
+    # asyncio.run(test_portfolio_snapshot())
+
+
+    # asyncio.run(aggregate_and_process_data())

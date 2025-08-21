@@ -16,7 +16,7 @@ PORTFOLIO_OUTPUT_PATH = os.path.join(OUTPUT_DIR, 'portfolio_output.json')
 
 router = APIRouter()
 
-@router.get("/portfolio")
+@router.get("/dashboard/portfolio")
 async def get_portfolio_snapshot(portfolio: List[str] = Query(..., description="A list of stock tickers in the user's portfolio.")):
     """
     Generates a market snapshot for a given portfolio of stocks.

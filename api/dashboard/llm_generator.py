@@ -237,6 +237,8 @@ class PortfolioLLMGenerator(LLMGenerator):
             context_parts.append(f"Source URL: {url}\nSource Age: {age}\nContent: {text}")
         return "\n\n---\n\n".join(context_parts)
         
+    # REPLACE THE _generate_key_issues METHOD IN THE PortfolioLLMGenerator CLASS WITH THIS
+
     def _generate_key_issues(self, all_context_docs, portfolio):
         """
         Generates diversified 'Key Issues' by analyzing each stock individually.
@@ -253,7 +255,7 @@ class PortfolioLLMGenerator(LLMGenerator):
             stocks_to_analyze = portfolio[:3]
         
         for stock in stocks_to_analyze:
-            print(f"Analyzing key issue for: {stock}")
+            print(f"Analyzing key issues for: {stock}")
             
             # 1. Filter context for the current stock
             stock_context_docs = [
@@ -268,50 +270,71 @@ class PortfolioLLMGenerator(LLMGenerator):
 
             context_str = self._generate_context_string(stock_context_docs)
 
-            # 2. Identify the single most important issue for this stock
-            issue_parser = StrOutputParser()
-            issue_prompt = ChatPromptTemplate.from_template(
-                """Based on the provided news for {stock}, what is the single most important 'Key Issue' or theme?
-                The issue should be a concise title.
-
-                Context for {stock}:
-                {context}
-
-                The single most important key issue is:
-                """
-            )
-            issue_chain = issue_prompt | llm | issue_parser
-            try:
-                issue_title = issue_chain.invoke({"stock": stock, "context": context_str}).strip()
-                print(f"Identified issue for {stock}: {issue_title}")
-            except Exception as e:
-                print(f"Error identifying issue for {stock}: {e}")
-                continue
-
-            # 3. Generate concise Bullish and Bearish views for this issue
-            views_parser = JsonOutputParser()
-            views_prompt = ChatPromptTemplate.from_template(
-                """For the Key Issue: "{issue}" for the stock {stock}, analyze the provided context.
-                Synthesize the information into a 'bullish_view' and a 'bearish_view'.
-                **Each view must be a single paragraph and strictly under 500 characters.**
+            # 2. Identify up to 3 most important issues for this stock
+            issues_parser = JsonOutputParser()
+            issues_prompt = ChatPromptTemplate.from_template(
+                """Based on the provided news for {stock}, what are the up to 3 most important 'Key Issues' or themes?
+                The output should be a JSON object with a key "issues" which is a list of concise titles.
 
                 Context for {stock}:
                 {context}
 
                 {format_instructions}
                 """,
-                partial_variables={"format_instructions": views_parser.get_format_instructions()},
+                partial_variables={"format_instructions": issues_parser.get_format_instructions()},
             )
-            views_chain = views_prompt | llm | views_parser
+            issues_chain = issues_prompt | llm | issues_parser
             try:
-                views = views_chain.invoke({"issue": issue_title, "stock": stock, "context": context_str})
-                key_issues_content.append({
-                    "issue_title": issue_title,
-                    "bullish_view": views.get("bullish_view"),
-                    "bearish_view": views.get("bearish_view")
-                })
+                issues_result = issues_chain.invoke({"stock": stock, "context": context_str})
+                issue_titles = issues_result.get("issues", [])
+                print(f"Identified issues for {stock}: {issue_titles}")
             except Exception as e:
-                print(f"Error generating views for '{issue_title}': {e}")
+                print(f"Error identifying issues for {stock}: {e}")
                 continue
+
+            # 3. Generate concise Bullish and Bearish views for each issue
+            for issue_title in issue_titles:
+                # Filter context for the current issue
+                issue_context_docs = [doc for doc in stock_context_docs if issue_title.lower() in doc.get('text', '').lower()]
+                if not issue_context_docs:
+                    issue_context_docs = stock_context_docs # fallback to all stock context
+
+                issue_context_str = self._generate_context_string(issue_context_docs)
+                issue_source_urls = list(set([doc['metadata'].get('url') for doc in issue_context_docs if doc['metadata'].get('url')]))
+
+
+                views_parser = JsonOutputParser()
+                views_prompt = ChatPromptTemplate.from_template(
+                    """For the Key Issue: "{issue}" for the stock {stock}, analyze the provided context.
+                    Synthesize the information into a 'bullish_view' and a 'bearish_view'.
+                    **Each view must be a single paragraph and strictly under 500 characters.**
+                    The output should also include a 'sources' key with a list of the source URLs used.
+
+                    Context for {stock}:
+                    {context}
+
+                    Source URLs: {sources}
+
+                    {format_instructions}
+                    """,
+                    partial_variables={"format_instructions": views_parser.get_format_instructions()},
+                )
+                views_chain = views_prompt | llm | views_parser
+                try:
+                    views = views_chain.invoke({
+                        "issue": issue_title,
+                        "stock": stock,
+                        "context": issue_context_str,
+                        "sources": issue_source_urls
+                    })
+                    key_issues_content.append({
+                        "issue_title": issue_title,
+                        "bullish_view": views.get("bullish_view"),
+                        "bearish_view": views.get("bearish_view"),
+                        "sources": views.get("sources", [])
+                    })
+                except Exception as e:
+                    print(f"Error generating views for '{issue_title}': {e}")
+                    continue
 
         return {"key_issues": key_issues_content}
