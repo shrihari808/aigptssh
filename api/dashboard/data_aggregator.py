@@ -157,8 +157,9 @@ async def aggregate_and_process_data():
         except json.JSONDecodeError:
             print("Warning: Could not decode existing dashboard data. Starting fresh.")
             existing_dashboard_content = {}
-            
-    final_dashboard_content = update_dashboard_data(existing_dashboard_content, new_dashboard_content)
+
+    #final_dashboard_content = update_dashboard_data(existing_dashboard_content, new_dashboard_content)
+    final_dashboard_content = new_dashboard_content
     save_data_to_json(final_dashboard_content, FINAL_OUTPUT_PATH)
     save_dashboard_history(final_dashboard_content)
     
@@ -191,7 +192,7 @@ def update_dashboard_data(existing_data, new_data):
         all_articles = existing_articles + new_articles
         unique_articles = {article['url']: article for article in all_articles}.values()
         sorted_articles = sorted(unique_articles, key=lambda x: get_human_readable_age_in_seconds(x.get('age', '')))
-        existing_data['latest_news']['articles'] = sorted_articles[:len(existing_articles) or 3]
+        existing_data['latest_news']['articles'] = sorted_articles[:3]
     for key in ['sector_analysis', 'standouts_analysis', 'market_drivers']:
         if key in new_data and new_data[key]:
             existing_data[key] = new_data[key]
