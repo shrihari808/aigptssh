@@ -3,11 +3,11 @@ import json
 import os
 from config import GPT4o_mini as llm
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import JsonOutputParser
+from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
 
 class LLMGenerator:
     """
-    Uses an LLM to generate structured dashboard content based on pre-processed context.
+    Uses an LLM to generate structured dashboard content based on pre-processed context for the general market.
     """
     def __init__(self, input_path):
         self.input_path = input_path
@@ -26,22 +26,12 @@ class LLMGenerator:
     def _generate_section(self, section_name, context_docs, prompt_template, output_parser):
         """
         Generates a single section of the dashboard content from document objects.
-        
-        Args:
-            section_name (str): The name of the section.
-            context_docs (list of dicts): The list of document objects with text and metadata.
-            prompt_template (ChatPromptTemplate): The prompt template for the LLM.
-            output_parser (JsonOutputParser): The parser for the LLM's output.
-        
-        Returns:
-            A tuple containing the generated content (dict) and a list of source URLs (list).
         """
         print(f"Generating content for section: {section_name}...")
         if not context_docs:
             print(f"No context available for {section_name}. Skipping.")
             return {"error": f"No context provided for {section_name}."}, []
             
-        # Create a more detailed context string that includes metadata for each document.
         context_parts = []
         for doc in context_docs:
             metadata = doc.get('metadata', {})
@@ -156,3 +146,166 @@ class LLMGenerator:
 
         print("--- LLM Content Generation Complete ---")
         return final_output
+
+class PortfolioLLMGenerator(LLMGenerator):
+    """
+    A dedicated generator for creating portfolio-specific snapshots,
+    including the new 'Key Issues' section.
+    """
+    def generate_dashboard_content(self):
+        """
+        Overrides the parent method to generate the portfolio-specific layout.
+        """
+        final_output = {
+            "last_updated_utc": self.data.get("last_updated_utc"),
+            "market_summary": {},
+            "latest_news": {},
+            "key_issues": [],
+            "market_drivers": {}
+        }
+        
+        contexts = self.data.get("llm_contexts", {})
+
+        # 1. Market Summary (tailored to the portfolio) - CORRECTED PROMPT
+        summary_parser = JsonOutputParser()
+        summary_prompt = ChatPromptTemplate.from_template(
+            """Analyze the provided context about the user's portfolio stocks. 
+            Identify 3-4 distinct key themes or summary points. If the context is empty or sparse, state that there is "No significant news impacting the portfolio today."
+            For each point, create a title and a concise one-paragraph summary.
+            
+            Context: {context}
+            
+            {format_instructions}
+            """,
+            partial_variables={"format_instructions": summary_parser.get_format_instructions()},
+        )
+        summary_content, summary_sources = self._generate_section(
+            "market_summary", contexts.get("indices_context"), summary_prompt, summary_parser
+        )
+        final_output["market_summary"] = {
+            "summary_points": summary_content.get("summary_points", []),
+            "sources": summary_sources
+        }
+
+        # 2. Latest News
+        latest_news_articles = self.data.get("latest_news_articles", [])
+        final_output["latest_news"] = {"articles": latest_news_articles}
+
+        # 3. Key Issues (New Multi-Step and Diversified Logic)
+        key_issues_content = self._generate_key_issues(
+            contexts.get("key_issues_context"), 
+            self.data.get("portfolio", [])
+        )
+        final_output["key_issues"] = key_issues_content.get("key_issues", [])
+
+        # 4. Market Drivers (tailored to the portfolio)
+        drivers_parser = JsonOutputParser()
+        drivers_prompt = ChatPromptTemplate.from_template(
+            """Analyze the context to determine the key drivers behind the performance of the stocks in this portfolio.
+            Summarize the main factors in a single narrative paragraph.
+
+            Context: {context}
+
+            {format_instructions}
+            """,
+            partial_variables={"format_instructions": drivers_parser.get_format_instructions()},
+        )
+        drivers_content, _ = self._generate_section(
+            "market_drivers", contexts.get("market_drivers_context"), drivers_prompt, drivers_parser
+        )
+        final_output["market_drivers"] = drivers_content
+
+        print("--- Portfolio LLM Content Generation Complete ---")
+        return final_output
+
+    def _generate_context_string(self, context_docs):
+        """Helper to create a context string from document objects."""
+        if not context_docs:
+            return ""
+        context_parts = []
+        for doc in context_docs:
+            metadata = doc.get('metadata', {})
+            text = doc.get('text', '')
+            url = metadata.get('url', 'N/A')
+            age = metadata.get('age', 'N/A')
+            context_parts.append(f"Source URL: {url}\nSource Age: {age}\nContent: {text}")
+        return "\n\n---\n\n".join(context_parts)
+        
+    def _generate_key_issues(self, all_context_docs, portfolio):
+        """
+        Generates diversified 'Key Issues' by analyzing each stock individually.
+        """
+        print("Generating content for section: Key Issues...")
+        if not all_context_docs:
+            return {"error": "No context for Key Issues."}
+
+        key_issues_content = []
+        
+        # Determine which stocks to analyze
+        stocks_to_analyze = portfolio
+        if len(portfolio) > 3:
+            stocks_to_analyze = portfolio[:3]
+        
+        for stock in stocks_to_analyze:
+            print(f"Analyzing key issue for: {stock}")
+            
+            # 1. Filter context for the current stock
+            stock_context_docs = [
+                doc for doc in all_context_docs 
+                if stock.lower() in doc.get('text', '').lower() or 
+                   stock.lower() in doc.get('metadata', {}).get('title', '').lower()
+            ]
+
+            if not stock_context_docs:
+                print(f"No specific context found for {stock}. Skipping.")
+                continue
+
+            context_str = self._generate_context_string(stock_context_docs)
+
+            # 2. Identify the single most important issue for this stock
+            issue_parser = StrOutputParser()
+            issue_prompt = ChatPromptTemplate.from_template(
+                """Based on the provided news for {stock}, what is the single most important 'Key Issue' or theme?
+                The issue should be a concise title.
+
+                Context for {stock}:
+                {context}
+
+                The single most important key issue is:
+                """
+            )
+            issue_chain = issue_prompt | llm | issue_parser
+            try:
+                issue_title = issue_chain.invoke({"stock": stock, "context": context_str}).strip()
+                print(f"Identified issue for {stock}: {issue_title}")
+            except Exception as e:
+                print(f"Error identifying issue for {stock}: {e}")
+                continue
+
+            # 3. Generate concise Bullish and Bearish views for this issue
+            views_parser = JsonOutputParser()
+            views_prompt = ChatPromptTemplate.from_template(
+                """For the Key Issue: "{issue}" for the stock {stock}, analyze the provided context.
+                Synthesize the information into a 'bullish_view' and a 'bearish_view'.
+                **Each view must be a single paragraph and strictly under 500 characters.**
+
+                Context for {stock}:
+                {context}
+
+                {format_instructions}
+                """,
+                partial_variables={"format_instructions": views_parser.get_format_instructions()},
+            )
+            views_chain = views_prompt | llm | views_parser
+            try:
+                views = views_chain.invoke({"issue": issue_title, "stock": stock, "context": context_str})
+                key_issues_content.append({
+                    "issue_title": issue_title,
+                    "bullish_view": views.get("bullish_view"),
+                    "bearish_view": views.get("bearish_view")
+                })
+            except Exception as e:
+                print(f"Error generating views for '{issue_title}': {e}")
+                continue
+
+        return {"key_issues": key_issues_content}

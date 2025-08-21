@@ -1,3 +1,4 @@
+# aigptssh/api/dashboard/brave_search.py
 import requests
 import os
 from dotenv import load_dotenv
@@ -44,7 +45,7 @@ class BraveDashboard:
             
         try:
             # Note: The Web Search API is used for standouts as it provides better general results
-            url = self.BASE_URL if query == self.QUERIES["latest_news"] else "https://api.search.brave.com/res/v1/web/search"
+            url = self.BASE_URL if "news" in query else "https://api.search.brave.com/res/v1/web/search"
             response = requests.get(url, headers=self.headers, params=params)
             response.raise_for_status()
             return response.json()
@@ -82,6 +83,33 @@ class BraveDashboard:
 
         print(f"Successfully fetched {len(news_items)} unique news articles.")
         return news_items
+
+    def get_portfolio_data(self, portfolio: list[str]):
+        """
+        Fetches news and data for a specific portfolio of stocks.
+        """
+        print(f"Fetching data for portfolio: {portfolio}")
+        all_news = []
+        urls_seen = set()
+
+        for stock in portfolio:
+            query = f"{stock} stock news"
+            results = self._perform_search(query, count=10)
+            if results and results.get("results"):
+                for item in results["results"]:
+                    url = item.get("url")
+                    if url and url not in urls_seen:
+                        urls_seen.add(url)
+                        all_news.append({
+                            "title": item.get("title"),
+                            "url": url,
+                            "description": item.get("description"),
+                            "page_age": item.get("page_age"),
+                            "age": item.get("age")
+                        })
+            time.sleep(1) # Respect API rate limits
+        
+        return {"latest_news": all_news}
 
 
     def get_standouts(self):
