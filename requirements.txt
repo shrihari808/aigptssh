@@ -214,3 +214,5 @@ youtube-transcript-api
 typing
 asyncpraw
 apscheduler
+playwright
+json
