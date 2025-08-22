@@ -14,6 +14,7 @@ from .fundamentals_rag import fundamental_chat2, corp
 from .dashboard import dashboard
 from .dashboard.portfolio import portfolio_snapshot
 from .dashboard.stock import stock_snapshot
+from .dashboard import trending
 
 # --- CORRECTED IMPORT ---
 # Import from the 'streaming' directory, which is at the same level as 'api'
@@ -38,3 +39,4 @@ api_router.include_router(corp.corp_rag, tags=["Fundamentals RAG"])
 api_router.include_router(dashboard.router, tags=["Dashboard"])
 api_router.include_router(portfolio_snapshot.router, tags=["Dashboard"])
 api_router.include_router(stock_snapshot.router, tags=["Dashboard"])
+api_router.include_router(trending.router, tags=["Dashboard"])

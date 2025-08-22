@@ -3,6 +3,13 @@ import requests
 import os
 from dotenv import load_dotenv
 import time
+import re
+from playwright.sync_api import sync_playwright
+import pandas as pd
+from langchain_openai import ChatOpenAI
+from langchain.prompts import PromptTemplate
+from langchain_core.output_parsers import JsonOutputParser
+from config import GPT4o_mini
 
 # Load environment variables from .env file
 load_dotenv()
@@ -52,6 +59,104 @@ class BraveDashboard:
         except requests.exceptions.RequestException as e:
             print(f"An error occurred during the API request: {e}")
             return None
+
+    def _get_reason_from_snippets(self, stock_name, search_results):
+        """
+        Uses an LLM to determine the reason for a stock's price movement from search result snippets.
+        """
+        if not search_results or not search_results.get("web", {}).get("results"):
+            return {"reason": "Could not determine the reason from search results.", "source_url": ""}
+
+        first_result = search_results["web"]["results"][0]
+        title = first_result.get("title", "")
+        description = first_result.get("description", "")
+        extra_snippets = first_result.get("extra_snippets", [])
+        source_url = first_result.get("url", "")
+
+        # Combine all available text
+        all_text = f"Title: {title}\nDescription: {description}\n" + "\n".join(extra_snippets)
+
+        # Use an LLM to summarize the reason
+        prompt = PromptTemplate(
+            template="""
+            Based on the following search snippets for '{stock_name}', what is the primary reason for its recent stock price movement?
+            Provide a concise, one-sentence summary.
+
+            Snippets:
+            {snippets}
+
+            Respond in a JSON format with two keys: "reason" and "source_url".
+            """,
+            input_variables=["stock_name", "snippets"],
+        )
+        
+        parser = JsonOutputParser()
+        chain = prompt | GPT4o_mini | parser
+
+        try:
+            response = chain.invoke({"stock_name": stock_name, "snippets": all_text})
+            response['source_url'] = source_url
+            return response
+        except Exception as e:
+            print(f"LLM reason extraction failed for {stock_name}: {e}")
+            return {"reason": "Could not summarize the reason.", "source_url": source_url}
+
+    def scrape_trending_stocks(self):
+        """
+        Scrapes trending stocks from StockEdge and then uses Brave Search and an LLM to find the reason for the trend.
+        """
+        print("Scraping trending stocks from StockEdge...")
+        
+        base_url = "https://web.stockedge.com/trending-stocks?filter-type=Major%20Stocks"
+        urls = {
+            "Gainer": f"{base_url}&indicator=Gainers",
+            "Loser": f"{base_url}&indicator=Losers"
+        }
+
+        trending_stocks = []
+
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+
+            for indicator, url in urls.items():
+                page.goto(url, timeout=60000)
+                page.wait_for_selector("div#in\\.stockedge\\.app\\:id\\/pricemovers-stockname-div")
+
+                name_els = page.query_selector_all("div#in\\.stockedge\\.app\\:id\\/pricemovers-stockname-div")
+                change_selector = (
+                    "ion-text#in\\.stockedge\\.app\\:id\\/pricemovers-stockchgpercentage-lbl-positive-txt, "
+                    "ion-text#in\\.stockedge\\.app\\:id\\/pricemovers-stockchgpercentage-lbl-negative-txt"
+                )
+                change_els = page.query_selector_all(change_selector)
+
+                for name_el, change_el in zip(name_els, change_els):
+                    stock_name = name_el.inner_text().strip()
+                    chg_text = change_el.inner_text().strip()
+                    chg_clean = chg_text.replace("▲", "").replace("▼", "").replace("%", "")
+                    
+                    try:
+                        chg_val = float(chg_clean)
+                        if chg_val > 3:
+                            # Find the reason using Brave Search and LLM
+                            reason_query = f"why is {stock_name} stock price {'increasing' if indicator == 'Gainer' else 'decreasing'} today"
+                            search_results = self._perform_search(reason_query, count=3)
+                            time.sleep(1)
+                            reason_data = self._get_reason_from_snippets(stock_name, search_results)
+
+                            trending_stocks.append({
+                                "stock": stock_name,
+                                "percentage_change": f"+{chg_val}%" if indicator == "Gainer" else f"-{chg_val}%",
+                                "reason": reason_data.get("reason", "Reason not found."),
+                                "source": reason_data.get("source_url", "")
+                            })
+                    except ValueError:
+                        continue
+            
+            browser.close()
+
+        return {"trending_stocks": trending_stocks}
+
 
     def get_latest_news(self, target_count=50):
         """

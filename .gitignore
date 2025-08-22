@@ -225,3 +225,4 @@ app_service/api/dashboard/dashboard_history.db
 portfolio_data.json
 portfolio_output.json
 portfolio_history.db
+trending_stocks.json
