@@ -1,121 +1,128 @@
 {
-    "last_updated_utc": "2025-08-21T12:15:27.744633+00:00",
+    "last_updated_utc": "2025-08-25T10:59:27.758707+00:00",
     "market_summary": {
         "summary_points": [
             {
-                "title": "Muted Opening Anticipated",
-                "summary": "Indian benchmark indices Sensex and Nifty 50 are expected to start flat on Thursday, as Gift Nifty trades marginally above Nifty futures and global market cues remain mixed, pointing to a cautious opening.",
-                "age": "10 hours"
-            },
-            {
-                "title": "Benchmarks Extend Winning Streak",
-                "summary": "Equity markets logged a fifth consecutive session of gains, with the Sensex climbing over 213 points to 81,857.84 and the Nifty 50 topping the 25,000 mark, closing at 25,050.55 on sustained bullish sentiment.",
-                "age": "10 hours"
-            },
-            {
-                "title": "IT and Pharma Drive Gains, FMCG Sees Profit Booking",
-                "summary": "Sectoral trends saw strong performances in IT and pharma stocks lifting the Nifty above 25,100, while FMCG names witnessed profit-taking after recent rallies, reflecting varied investor focus across segments.",
+                "title": "Six-Day Winning Streak Snapped Amid Powell’s Speech",
+                "summary": "The Indian stock market snapped its six-day winning run on Friday as indices fell sharply ahead of Fed Chair Jerome Powell’s Jackson Hole address, with the Nifty 50 losing 213.65 points to close at 24,870.10 and the Sensex down 693.86 points to 81,306.85. Hints of a potential Fed rate reduction spurred panic selling, overshadowing weekly gains and setting the tone for cautious trading.",
                 "age": "3 hours"
             },
             {
-                "title": "Global Cues Mixed After Fed Minutes",
-                "summary": "Asian markets traded unevenly and US equities slipped following the release of Fed meeting minutes, leading Indian markets to monitor overseas developments closely for guidance on interest rates and liquidity.",
-                "age": "10 hours"
+                "title": "Technical Outlook: Key Levels for Sensex and Nifty",
+                "summary": "Technical analysts highlight the 50-day simple moving average (SMA) at 81,900 for the Sensex as a pivotal level; failure to hold this support could drag the index toward the 20-day SMA near 81,000–81,100 or even 80,400. On the upside, sustained trading above 81,900 may trigger a fresh rally toward resistance zones at 82,500 and 83,300, guiding short-term trading strategies.",
+                "age": "9 hours"
             },
             {
-                "title": "Domestic Institutional Buying Cushions Market",
-                "summary": "Robust inflows from domestic institutions countered heavy foreign institutional investor selling, helping sustain market momentum and underpinning the recent rally in key indices.",
+                "title": "Auto Stocks Bolster Markets, Paints and Conglomerates Lag",
+                "summary": "Amid broader market weakness, auto heavyweights such as M&M, Maruti, and Bharat Electronics (BEL) emerged as top performers on the Nifty 50, while large-cap names like Grasim, Asian Paints, and Adani Enterprises faced heavy selling pressure. This divergence underscores sector rotation and profit-taking ahead of key global policy announcements.",
                 "age": "3 hours"
             },
             {
-                "title": "Key Stock Movers: Infosys, TCS Lead; Select Names Lag",
-                "summary": "Among Sensex components, Infosys and TCS powered ahead with gains near 3–4%, while counters like Bharat Electronics and Bajaj Finance underperformed, highlighting divergent stock-specific flows.",
-                "age": "1 day"
+                "title": "FPI Selling Sparks Next Week’s Market Triggers",
+                "summary": "Foreign portfolio investors’ cautious stance and offloading ahead of global rate cues emerge as a prime catalyst, alongside expectations of a US Fed rate cut in September, mixed corporate earnings, valuation pressures, domestic policy reforms such as GST changes, and technical factors. These five potential triggers are set to shape Indian market moves in the upcoming week.",
+                "age": "3 hours"
+            },
+            {
+                "title": "MarketSmith’s Top Stock Recommendations",
+                "summary": "MarketSmith India’s August 25 recommendations spotlight stocks demonstrating strong base formations and relative strength, aiming to capitalize on post-correction resilience. These picks follow a week where Nifty fell 0.85% to 24,870 amid profit booking in heavyweight sectors, while broader indices ended with weekly gains driven by domestic institutional (DII) buying and hopes for GST reforms.",
+                "age": "10 hours"
+            },
+            {
+                "title": "Global Cues Point to Higher Monday Open",
+                "summary": "Domestic benchmark indices are poised for a higher start on Monday, tracking robust Asian and US markets and a near-90% probability of a Fed rate cut priced in by traders. Futures on Gift Nifty traded at a premium of around 55 points, signaling optimism after Powell’s Jackson Hole remarks hinted at more dovish policy ahead.",
+                "age": "9 hours"
             }
         ],
         "sources": [
-            "https://www.livemint.com/market/stock-market-news/indian-stock-market-10-key-things-that-changed-for-market-overnight-gift-nifty-us-fed-meeting-minutes-to-gold-prices-11755708562879.html",
-            "https://www.livemint.com/market/stock-market-news/indian-stock-market-10-key-things-that-changed-for-market-overnight-gift-nifty-china-lpr-to-india-china-ties-11755622836425.html",
-            "https://www.livemint.com/market/stock-market-news/nifty-50-sensex-today-what-to-expect-from-indian-stock-market-in-trade-on-august-21-11755708261409.html",
-            "https://timesofindia.indiatimes.com/business/india-business/stock-market-today-nifty50-bse-sensex-august-20-2025-dalal-street-indian-equities-global-markets-gst-reforms-donald-trump-tariffs/articleshow/123399414.cms",
-            "https://www.analyticsinsight.net/stocks/stock-market-today-sensex-rises-281-points-it-and-pharma-stocks-shine"
+            "https://www.livemint.com/market/stock-market-news/nifty-50-sensex-today-what-to-expect-from-indian-stock-market-on-august-25-after-jerome-powell-s-jackson-hole-speech-11756047772707.html",
+            "https://www.livemint.com/market/stock-market-news/stock-recommendations-today-25-august-marketsmith-nifty-sensex-tega-industries-aadhar-housing-finance-11755868445175.html",
+            "https://www.livemint.com/market/stock-market-news/us-fed-rate-cut-buzz-to-fpis-selling-top-five-triggers-for-the-indian-stock-market-next-week-11755936818017.html",
+            "https://www.livemint.com/market/stock-market-news/indian-stock-market-8-things-that-changed-for-market-over-weekend-gift-nifty-to-jerome-powell-s-jackson-hole-speech-11756048094619.html"
         ]
     },
     "latest_news": {
         "articles": [
             {
-                "title": "Stock Market LIVE Updates: Nifty at 25,100, Sensex up 275 pts; Dr Reddy's, Bajaj Finance, Cipla top gainers",
-                "snippet": "Currently, the stock is trading 8.09 percent below its 52-week high and 27.79 percent above its 52-week low. Market capitalisation stands at Rs 1,929,189.30 crore. ... The company has received a long-term supply order for transmission gears for premium motorcycles from a globally renowned Indian ...",
-                "url": "https://www.moneycontrol.com/news/business/markets/stock-market-live-sensex-nifty-50-share-price-gift-nifty-latest-updates-21-08-2025-liveblog-13473600.html",
-                "age": "1 hour ago"
+                "title": "Stock Market LIVE Updates: GIFT Nifty indicates a strong start; US, Asian markets gain",
+                "snippet": "In the near term, particularly on Tuesday, the Indian market may trade sideways as traders await the final verdict on Trump’s additional 25% tariff decision on 27th August. The Nifty is expected to remain within the range of 24,800–25,150 before any decisive directional move. ... The latest US stock ...",
+                "url": "https://www.moneycontrol.com/news/business/markets/stock-market-live-sensex-nifty-50-share-price-gift-nifty-latest-updates-25-08-2025-liveblog-13483288.html",
+                "age": "9 minutes ago"
             },
             {
-                "title": "Stock Market Highlights: Sensex rises for 6th day, settles 142 pts higher, Nifty above 25,050; Cipla rises 3%, DRL 2% - The Economic Times",
-                "snippet": "Markets extended gains for the fifth straight session on Wednesday. In today’s trade, stocks such as IndusInd Bank, India Cements, Godrej Properties, Clean Science, and Exide Industries will be in focus on the back of key news developments. ... GIFT Nifty on the NSE IX traded higher by 3.5 points, or 0.01 per cent, at 25,083.50, signaling that Dalal Street was headed for a muted start on Thursday. ... Indian ...",
-                "url": "https://economictimes.indiatimes.com/markets/stocks/live-blog/bse-sensex-today-live-nifty-stock-market-updates-21-august-2025/liveblog/123421031.cms?from=mdr",
+                "title": "Stock market closing highlights: Sensex rises 329 pts led by IT shares; Nifty at 24,968 | Markets News - Business Standard",
+                "snippet": "Stock market closing highlights, Monday, August 25, 2025: Indian equities finished the session with gains amid strength in global peers. Buying in Indian and global stocks emerged after Fed Chair Jerome Powell left the door open for rate cuts in the Jackson Hole summit in Wyoming on Friday, ...",
+                "url": "https://www.business-standard.com/markets/news/stock-market-live-updates-august-25-nse-bse-sensex-today-nifty-gift-nifty-ipo-fed-rate-cut-asian-market-125082500070_1.html",
+                "age": "38 minutes ago"
+            },
+            {
+                "title": "Stock Market: Stock Market Today | Stock Market Live News Update",
+                "snippet": "Share Market Today - Stock Market and Share Market Live Updates: Get all the latest share market and India stock market news and updates on Moneycontrol.com",
+                "url": "https://www.moneycontrol.com/stocksmarketsindia/",
                 "age": "2 hours ago"
-            },
-            {
-                "title": "Stock Market Today: Sensex Rises 281 Points, IT and Pharma Stocks Shine",
-                "snippet": "Indian stock market today see indices rallying as Nifty 50 holds above 25,100 with IT sector leadership.",
-                "url": "https://www.analyticsinsight.net/stocks/stock-market-today-sensex-rises-281-points-it-and-pharma-stocks-shine",
-                "age": "3 hours ago"
             }
         ]
     },
     "sector_analysis": {
         "top_performing_sectors": [
             {
-                "sector": "Information Technology (IT)",
-                "explanation": "The Nifty IT index rose 0.34% to 35,811.05, led by gains in TCS and Infosys, making IT the primary driver of today’s rally."
+                "sector": "Auto",
+                "explanation": "Auto stocks like M&M and Maruti led the Nifty outperformers as investors rotated into high-quality cyclicals ahead of Powell’s Jackson Hole speech."
             },
             {
-                "sector": "Financials",
-                "explanation": "The Nifty Bank index climbed 0.24% to 55,833.95, with Bajaj Finance and Bajaj Finserv each gaining over 1%, reflecting renewed investor interest in the banking space."
+                "sector": "Telecommunication",
+                "explanation": "Telecom shares saw strong buying interest as participants sought defensive exposure amid volatile global cues."
             },
             {
-                "sector": "Pharmaceuticals",
-                "explanation": "Pharma stocks contributed strongly, with Dr. Reddy’s Laboratories jumping 2.28% to lead the Nifty 50 gainers."
+                "sector": "Healthcare",
+                "explanation": "Healthcare stocks attracted demand as investors looked for defensive plays during the market pullback."
             }
         ],
         "underperforming_sectors": [
             {
-                "sector": "FMCG",
-                "explanation": "After a three-day rally on GST reform hopes, FMCG names like Dabur India and Tata Consumer faced profit booking and fell over 1%."
+                "sector": "Banking",
+                "explanation": "Banking heavyweight stocks faced profit booking pressure, dragging the financial sector lower."
+            },
+            {
+                "sector": "Metals",
+                "explanation": "Metals shares came under selling pressure on weak global cues and FII outflows."
+            },
+            {
+                "sector": "Materials",
+                "explanation": "Material stocks, including names like Grasim and Asian Paints, weakened amid broad-based market decline."
             }
         ]
     },
     "standouts_analysis": {
         "gainers": [
             {
-                "stock": "Shanti Gold International",
-                "reason": "Shares surged nearly 11% after a remarkable 174% jump in Q1 net profit to Rs. 25 crore."
+                "name": "M&M",
+                "reason": "Reason not specified in the text."
             },
             {
-                "stock": "Infosys",
-                "reason": "Led the IT rally with a 3.88% gain, driven by strong sector performance."
+                "name": "Maruti Suzuki",
+                "reason": "Reason not specified in the text."
             },
             {
-                "stock": "Tata Consultancy Services",
-                "reason": "Jumped 2.69% as broader technology stocks shone on resilient IT demand."
+                "name": "Bharat Electronics (BEL)",
+                "reason": "Reason not specified in the text."
             }
         ],
         "losers": [
             {
-                "stock": "Bharat Electronics",
-                "reason": "No specific reason mentioned in the text."
+                "name": "Asian Paints",
+                "reason": "Named among the biggest decliners amid profit-taking ahead of Fed Chair Jerome Powell’s Jackson Hole speech."
             },
             {
-                "stock": "Bajaj Finance",
-                "reason": "No specific reason mentioned in the text."
+                "name": "Ultra Tech Cement",
+                "reason": "Featured as a top loser due to sector-wide profit-booking in metals ahead of the Fed event."
             },
             {
-                "stock": "Tata Motors",
-                "reason": "No specific reason mentioned in the text."
+                "name": "Tata Steel",
+                "reason": "Slumped on profit-taking and weak global cues before Powell’s remarks."
             }
         ]
     },
     "market_drivers": {
-        "summary": "Today’s market advance was underpinned by a broad sectoral rally led by IT heavyweights TCS and Infosys and pharma outperformers such as Dr. Reddy’s, bolstered by corporate updates from Syngene and Hitachi Energy India. Strong domestic institutional buying of over ₹1,800 crore cushioned the impact of ₹1,100 crore of FII outflows, while blue-chips like Reliance Industries, ICICI Bank and HDFC Bank provided crucial support. Positive global cues—ranging from stable crude oil prices to softer U.S. Treasury yields—lifted risk sentiment, and anticipation of forthcoming GST reform measures added a favorable policy backdrop, encouraging rotation into healthcare, financials and other cyclical plays."
+        "summary": "Indian markets opened on a buoyant note as GIFT Nifty traded at a healthy premium, driven by positive global cues from Asian peers and Wall Street after Fed Chair Jerome Powell’s Jackson Hole remarks stoked rate-cut expectations. Domestically, sustained DII buying and optimism around potential GST reforms underpinned the market, even as profit-booking weighed on heavyweight banking and metal stocks. Corporate highlights such as Apollo Micro Systems’ Rs 1.1 bn avionic export order and a steady rupee—alongside softer gold and silver prices—further shaped the mixed but overall resilient trading session."
     }
 }

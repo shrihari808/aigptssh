@@ -1,8 +1,9 @@
 # aigptssh/api/dashboard/trending.py
 import json
 import os
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import FileResponse
+from api.security import api_key_auth
 
 router = APIRouter()
 
@@ -11,7 +12,7 @@ OUTPUT_DIR = os.path.dirname(os.path.abspath(__file__))
 TRENDING_OUTPUT_PATH = os.path.join(OUTPUT_DIR, 'trending_stocks.json')
 
 @router.get("/dashboard/trending")
-async def get_trending_stocks():
+async def get_trending_stocks(api_key: str = Depends(api_key_auth)):
     """
     Retrieves the pre-generated trending stocks from the trending_stocks.json file.
     """

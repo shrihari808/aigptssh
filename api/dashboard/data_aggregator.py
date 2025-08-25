@@ -204,7 +204,7 @@ async def aggregate_and_process_data():
     save_data_to_json(processed_data, DATA_JSON_PATH)
 
     llm_generator = LLMGenerator(input_path=DATA_JSON_PATH)
-    new_dashboard_content = llm_generator.generate_dashboard_content()
+    new_dashboard_content = await llm_generator.generate_dashboard_content()
 
     existing_dashboard_content = {}
     if os.path.exists(FINAL_OUTPUT_PATH):
@@ -228,7 +228,7 @@ async def generate_trending_stocks_data():
     """
     print("--- Starting Trending Stocks Generation ---")
     brave_fetcher = BraveDashboard()
-    trending_stocks = brave_fetcher.scrape_trending_stocks()
+    trending_stocks = await brave_fetcher.scrape_trending_stocks()
     output_path = os.path.join(OUTPUT_DIR, 'trending_stocks.json')
     save_data_to_json(trending_stocks, output_path)
     print("\n--- Pipeline Complete: Trending stocks identified and saved. ---")

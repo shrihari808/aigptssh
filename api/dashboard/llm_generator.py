@@ -1,6 +1,7 @@
 # aigptssh/api/dashboard/llm_generator.py
 import json
 import os
+import asyncio
 from config import GPT4o_mini as llm
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
@@ -23,9 +24,9 @@ class LLMGenerator:
             print(f"Error loading data from {self.input_path}: {e}")
             return None
 
-    def _generate_section(self, section_name, context_docs, prompt_template, output_parser):
+    async def _generate_section(self, section_name, context_docs, prompt_template, output_parser):
         """
-        Generates a single section of the dashboard content from document objects.
+        Asynchronously generates a single section of the dashboard content.
         """
         print(f"Generating content for section: {section_name}...")
         if not context_docs:
@@ -46,13 +47,14 @@ class LLMGenerator:
         chain = prompt_template | llm | output_parser
         
         try:
-            response = chain.invoke({"context": context_str})
+            # Use ainvoike for non-blocking LLM call
+            response = await chain.ainvoke({"context": context_str})
             return response, source_urls
         except Exception as e:
             print(f"An error occurred during LLM generation for {section_name}: {e}")
             return {"error": "Failed to generate content from LLM."}, []
 
-    def generate_dashboard_content(self):
+    async def generate_dashboard_content(self):
         final_output = {
             "last_updated_utc": self.data.get("last_updated_utc"),
             "market_summary": {},
@@ -78,7 +80,7 @@ class LLMGenerator:
             """,
             partial_variables={"format_instructions": summary_parser.get_format_instructions()},
         )
-        summary_content, summary_sources = self._generate_section(
+        summary_content, summary_sources = await self._generate_section(
             "market_summary", contexts.get("indices_context"), summary_prompt, summary_parser
         )
         final_output["market_summary"] = {
@@ -105,7 +107,7 @@ class LLMGenerator:
             """,
             partial_variables={"format_instructions": sectors_parser.get_format_instructions()},
         )
-        sector_content, _ = self._generate_section(
+        sector_content, _ = await self._generate_section(
             "sector_analysis", contexts.get("sectors_context"), sectors_prompt, sectors_parser
         )
         final_output["sector_analysis"] = sector_content
@@ -122,7 +124,7 @@ class LLMGenerator:
             """,
             partial_variables={"format_instructions": standouts_parser.get_format_instructions()},
         )
-        standouts_content, _ = self._generate_section(
+        standouts_content, _ = await self._generate_section(
             "standouts_analysis", contexts.get("standouts_context"), standouts_prompt, standouts_parser
         )
         final_output["standouts_analysis"] = standouts_content
@@ -139,7 +141,7 @@ class LLMGenerator:
             """,
             partial_variables={"format_instructions": drivers_parser.get_format_instructions()},
         )
-        drivers_content, _ = self._generate_section(
+        drivers_content, _ = await self._generate_section(
             "market_drivers", contexts.get("market_drivers_context"), drivers_prompt, drivers_parser
         )
         final_output["market_drivers"] = drivers_content
@@ -152,9 +154,10 @@ class PortfolioLLMGenerator(LLMGenerator):
     A dedicated generator for creating portfolio-specific snapshots,
     including the new 'Key Issues' section.
     """
-    def generate_dashboard_content(self):
+    async def generate_dashboard_content(self):
         """
         Overrides the parent method to generate the portfolio-specific layout.
+        This is now an async method.
         """
         final_output = {
             "last_updated_utc": self.data.get("last_updated_utc"),
@@ -184,7 +187,7 @@ class PortfolioLLMGenerator(LLMGenerator):
                 "portfolio": ", ".join(portfolio)
              },
         )
-        summary_content, summary_sources = self._generate_section(
+        summary_content, summary_sources = await self._generate_section(
             "market_summary", contexts.get("indices_context"), summary_prompt, summary_parser
         )
         final_output["market_summary"] = {
@@ -197,8 +200,8 @@ class PortfolioLLMGenerator(LLMGenerator):
         final_output["latest_news"] = {"articles": latest_news_articles}
 
 
-        # 3. Key Issues (New Multi-Step and Diversified Logic)
-        key_issues_content = self._generate_key_issues(
+        # 3. Key Issues (Concurrent Logic)
+        key_issues_content = await self._generate_key_issues(
             contexts.get("key_issues_context"), 
             self.data.get("portfolio", [])
         )
@@ -216,7 +219,7 @@ class PortfolioLLMGenerator(LLMGenerator):
             """,
             partial_variables={"format_instructions": drivers_parser.get_format_instructions()},
         )
-        drivers_content, _ = self._generate_section(
+        drivers_content, _ = await self._generate_section(
             "market_drivers", contexts.get("market_drivers_context"), drivers_prompt, drivers_parser
         )
         final_output["market_drivers"] = drivers_content
@@ -237,104 +240,105 @@ class PortfolioLLMGenerator(LLMGenerator):
             context_parts.append(f"Source URL: {url}\nSource Age: {age}\nContent: {text}")
         return "\n\n---\n\n".join(context_parts)
         
-    # REPLACE THE _generate_key_issues METHOD IN THE PortfolioLLMGenerator CLASS WITH THIS
-
-    def _generate_key_issues(self, all_context_docs, portfolio):
+    async def _analyze_stock_issues(self, stock, all_context_docs):
         """
-        Generates diversified 'Key Issues' by analyzing each stock individually.
+        Asynchronously analyzes a single stock to find its key issues.
+        """
+        print(f"Analyzing key issues for: {stock}")
+        
+        stock_context_docs = [
+            doc for doc in all_context_docs 
+            if stock.lower() in doc.get('text', '').lower() or 
+               stock.lower() in doc.get('metadata', {}).get('title', '').lower()
+        ]
+
+        if not stock_context_docs:
+            print(f"No specific context found for {stock}. Skipping.")
+            return []
+
+        context_str = self._generate_context_string(stock_context_docs)
+        
+        issues_parser = JsonOutputParser()
+        issues_prompt = ChatPromptTemplate.from_template(
+            """Based on the provided news for {stock}, what are the up to 3 most important 'Key Issues' or themes?
+            The output should be a JSON object with a key "issues" which is a list of concise titles.
+
+            Context for {stock}:
+            {context}
+
+            {format_instructions}
+            """,
+            partial_variables={"format_instructions": issues_parser.get_format_instructions()},
+        )
+        issues_chain = issues_prompt | llm | issues_parser
+        
+        try:
+            issues_result = await issues_chain.ainvoke({"stock": stock, "context": context_str})
+            issue_titles = issues_result.get("issues", [])
+            print(f"Identified issues for {stock}: {issue_titles}")
+        except Exception as e:
+            print(f"Error identifying issues for {stock}: {e}")
+            return []
+
+        stock_key_issues = []
+        for issue_title in issue_titles:
+            issue_context_docs = [doc for doc in stock_context_docs if issue_title.lower() in doc.get('text', '').lower()]
+            if not issue_context_docs:
+                issue_context_docs = stock_context_docs
+
+            issue_context_str = self._generate_context_string(issue_context_docs)
+            issue_source_urls = list(set([doc['metadata'].get('url') for doc in issue_context_docs if doc['metadata'].get('url')]))
+
+            views_parser = JsonOutputParser()
+            views_prompt = ChatPromptTemplate.from_template(
+                """For the Key Issue: "{issue}" for the stock {stock}, analyze the provided context.
+                Synthesize the information into a 'bullish_view' and a 'bearish_view'.
+                **Each view must be a single paragraph and strictly under 500 characters.**
+                The output should also include a 'sources' key with a list of the source URLs used.
+
+                Context for {stock}:
+                {context}
+
+                Source URLs: {sources}
+
+                {format_instructions}
+                """,
+                partial_variables={"format_instructions": views_parser.get_format_instructions()},
+            )
+            views_chain = views_prompt | llm | views_parser
+            try:
+                views = await views_chain.ainvoke({
+                    "issue": issue_title,
+                    "stock": stock,
+                    "context": issue_context_str,
+                    "sources": issue_source_urls
+                })
+                stock_key_issues.append({
+                    "issue_title": issue_title,
+                    "bullish_view": views.get("bullish_view"),
+                    "bearish_view": views.get("bearish_view"),
+                    "sources": views.get("sources", [])
+                })
+            except Exception as e:
+                print(f"Error generating views for '{issue_title}': {e}")
+                continue
+        
+        return stock_key_issues
+
+    async def _generate_key_issues(self, all_context_docs, portfolio):
+        """
+        Generates 'Key Issues' by concurrently analyzing each stock.
         """
         print("Generating content for section: Key Issues...")
         if not all_context_docs:
             return {"error": "No context for Key Issues."}
 
-        key_issues_content = []
+        stocks_to_analyze = portfolio[:3] if len(portfolio) > 3 else portfolio
         
-        # Determine which stocks to analyze
-        stocks_to_analyze = portfolio
-        if len(portfolio) > 3:
-            stocks_to_analyze = portfolio[:3]
+        tasks = [self._analyze_stock_issues(stock, all_context_docs) for stock in stocks_to_analyze]
+        results_from_all_stocks = await asyncio.gather(*tasks)
         
-        for stock in stocks_to_analyze:
-            print(f"Analyzing key issues for: {stock}")
-            
-            # 1. Filter context for the current stock
-            stock_context_docs = [
-                doc for doc in all_context_docs 
-                if stock.lower() in doc.get('text', '').lower() or 
-                   stock.lower() in doc.get('metadata', {}).get('title', '').lower()
-            ]
-
-            if not stock_context_docs:
-                print(f"No specific context found for {stock}. Skipping.")
-                continue
-
-            context_str = self._generate_context_string(stock_context_docs)
-
-            # 2. Identify up to 3 most important issues for this stock
-            issues_parser = JsonOutputParser()
-            issues_prompt = ChatPromptTemplate.from_template(
-                """Based on the provided news for {stock}, what are the up to 3 most important 'Key Issues' or themes?
-                The output should be a JSON object with a key "issues" which is a list of concise titles.
-
-                Context for {stock}:
-                {context}
-
-                {format_instructions}
-                """,
-                partial_variables={"format_instructions": issues_parser.get_format_instructions()},
-            )
-            issues_chain = issues_prompt | llm | issues_parser
-            try:
-                issues_result = issues_chain.invoke({"stock": stock, "context": context_str})
-                issue_titles = issues_result.get("issues", [])
-                print(f"Identified issues for {stock}: {issue_titles}")
-            except Exception as e:
-                print(f"Error identifying issues for {stock}: {e}")
-                continue
-
-            # 3. Generate concise Bullish and Bearish views for each issue
-            for issue_title in issue_titles:
-                # Filter context for the current issue
-                issue_context_docs = [doc for doc in stock_context_docs if issue_title.lower() in doc.get('text', '').lower()]
-                if not issue_context_docs:
-                    issue_context_docs = stock_context_docs # fallback to all stock context
-
-                issue_context_str = self._generate_context_string(issue_context_docs)
-                issue_source_urls = list(set([doc['metadata'].get('url') for doc in issue_context_docs if doc['metadata'].get('url')]))
-
-
-                views_parser = JsonOutputParser()
-                views_prompt = ChatPromptTemplate.from_template(
-                    """For the Key Issue: "{issue}" for the stock {stock}, analyze the provided context.
-                    Synthesize the information into a 'bullish_view' and a 'bearish_view'.
-                    **Each view must be a single paragraph and strictly under 500 characters.**
-                    The output should also include a 'sources' key with a list of the source URLs used.
-
-                    Context for {stock}:
-                    {context}
-
-                    Source URLs: {sources}
-
-                    {format_instructions}
-                    """,
-                    partial_variables={"format_instructions": views_parser.get_format_instructions()},
-                )
-                views_chain = views_prompt | llm | views_parser
-                try:
-                    views = views_chain.invoke({
-                        "issue": issue_title,
-                        "stock": stock,
-                        "context": issue_context_str,
-                        "sources": issue_source_urls
-                    })
-                    key_issues_content.append({
-                        "issue_title": issue_title,
-                        "bullish_view": views.get("bullish_view"),
-                        "bearish_view": views.get("bearish_view"),
-                        "sources": views.get("sources", [])
-                    })
-                except Exception as e:
-                    print(f"Error generating views for '{issue_title}': {e}")
-                    continue
+        # Flatten the list of lists into a single list
+        key_issues_content = [issue for stock_issues in results_from_all_stocks for issue in stock_issues]
 
         return {"key_issues": key_issues_content}

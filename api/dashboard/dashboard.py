@@ -1,8 +1,9 @@
 # aigptssh/api/dashboard/dashboard.py
 import json
 import os
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import FileResponse
+from api.security import api_key_auth
 
 router = APIRouter()
 
@@ -11,7 +12,7 @@ OUTPUT_DIR = os.path.dirname(os.path.abspath(__file__))
 FINAL_OUTPUT_PATH = os.path.join(OUTPUT_DIR, 'dashboard_output.json')
 
 @router.get("/dashboard")
-async def get_dashboard_snapshot():
+async def get_dashboard_snapshot(api_key: str = Depends(api_key_auth)):
     """
     Retrieves the pre-generated market snapshot from the dashboard_output.json file.
     """

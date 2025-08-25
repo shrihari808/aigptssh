@@ -226,3 +226,5 @@ portfolio_data.json
 portfolio_output.json
 portfolio_history.db
 trending_stocks.json
+stock_data.json
+stock_output.json
