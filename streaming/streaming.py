@@ -712,7 +712,15 @@ async def web_rag_mix(
                 await asyncio.to_thread(history_db.add_user_message, query)
                 await asyncio.to_thread(history_db.add_ai_message, final_response_text)
 
-    return StreamingResponse(tiered_stream_generator(), media_type="text/event-stream")
+    return StreamingResponse(
+        tiered_stream_generator(), 
+        media_type="text/plain",  # Change from "text/event-stream" to "text/plain"
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"  # Disable nginx buffering
+        }
+    )
 
 @cmots_rag.post("/cmots_rag")
 async def cmots_only(
@@ -883,7 +891,15 @@ async def red_rag_bing(
             print(f"ERROR: An error occurred during final response streaming: {e}")
             yield b"An error occurred while generating the response."
 
-    return StreamingResponse(generate_chat_res(), media_type="text/event-stream")
+    return StreamingResponse(
+        generate_chat_res(), 
+        media_type="text/plain",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive", 
+            "X-Accel-Buffering": "no"
+        }
+    )
 
 
 async def validate_query_only(query: str) -> dict:

@@ -5,6 +5,8 @@ import asyncpg
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import Request
+from fastapi.responses import Response
 import uvicorn
 
 # --- Add the project root to the Python path ---
@@ -89,7 +91,18 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
+
+@app.middleware("http")
+async def add_no_cache_headers(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path in ["/web_rag", "/reddit_rag", "/yt_rag"]:
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache" 
+        response.headers["Expires"] = "0"
+        response.headers["X-Accel-Buffering"] = "no"
+    return response
 
 # --- Include the master router ---
 app.include_router(api_router)
