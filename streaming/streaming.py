@@ -601,39 +601,34 @@ async def web_rag_mix(
 
     brave_searcher = BraveNews(brave_api_key)
 
-    # /aigptssh/streaming/streaming.py
-
     async def tiered_stream_generator():
         # --- Caching Logic Start ---
         cached_passages = []
         if use_caching:
             yield create_progress_bar_string(5, "Checking cache for context...").encode("utf-8")
 
-            # Check if it's a follow-up question that could benefit from cache
             if is_followup_question(query, chat_history):
-                # Query the session-specific cache
-                cached_docs_with_scores = query_session_cache(str(session_id), query)
+                cached_docs_with_scores = await asyncio.to_thread(
+                    query_session_cache, str(session_id), query
+                )
 
-                # Assess sufficiency of cached documents
-                sufficiency_score = scoring_service.assess_context_sufficiency(query, cached_docs_with_scores)
+                sufficiency_score = await asyncio.to_thread(
+                    scoring_service.assess_context_sufficiency, query, cached_docs_with_scores
+                )
 
-                # A threshold of 0.4 is a good starting point
                 if sufficiency_score > 0.4:
                     print("DEBUG: Sufficient context found in cache. Bypassing web scrape.")
-                    # Convert results back to the passage dictionary format for processing
                     for doc, score in cached_docs_with_scores:
                         cached_passages.append({
                             "text": doc.page_content,
                             "metadata": doc.metadata,
-                            "final_combined_score": score # Use similarity score as the ranking metric
+                            "final_combined_score": score
                         })
 
         if cached_passages:
-            # If cache was sufficient, use the cached passages directly
             final_passages = cached_passages
             yield create_progress_bar_string(95, "Generating answer from cache...").encode("utf-8")
         else:
-            # --- Fallback to Web Scraping Logic (if cache is not used, empty, or insufficient) ---
             async with aiohttp.ClientSession(**brave_searcher.session_config) as session:
                 yield create_progress_bar_string(10, "Searching for sources...").encode("utf-8")
 
@@ -666,14 +661,12 @@ async def web_rag_mix(
                     yield "\nCould not extract sufficient detailed information.".encode("utf-8")
                     return
 
-                # Add newly scraped passages to the cache if caching is enabled
                 if use_caching:
-                    add_passages_to_cache(str(session_id), final_passages)
+                    await asyncio.to_thread(add_passages_to_cache, str(session_id), final_passages)
 
                 yield create_progress_bar_string(95, "Generating final answer...").encode("utf-8")
 
-        # --- Final Answer Generation (common for both cached and scraped paths) ---
-        final_context = scoring_service.create_enhanced_context(final_passages)
+        final_context = await asyncio.to_thread(scoring_service.create_enhanced_context, final_passages)
         final_links = list(set([p["metadata"].get("link") for p in final_passages if p.get("metadata", {}).get("link")]))
 
         final_prompt = PromptTemplate.from_template(
@@ -705,9 +698,8 @@ async def web_rag_mix(
                     final_response_text += chunk.content
                     yield chunk.content.encode("utf-8")
 
-            # --- Final Database Operations ---
-            if not cached_passages: # Only process for dataframe if it was a fresh scrape
-                df_to_insert = brave_searcher._process_for_dataframe(scraped_sources)
+            if not cached_passages:
+                df_to_insert = await asyncio.to_thread(brave_searcher._process_for_dataframe, scraped_sources)
                 if not df_to_insert.empty:
                     asyncio.create_task(insert_post1(df_to_insert, db_pool))
 
@@ -717,8 +709,8 @@ async def web_rag_mix(
 
             if final_response_text:
                 history_db = PostgresChatMessageHistory(str(session_id), psql_url)
-                history_db.add_user_message(query)
-                history_db.add_ai_message(final_response_text)
+                await asyncio.to_thread(history_db.add_user_message, query)
+                await asyncio.to_thread(history_db.add_ai_message, final_response_text)
 
     return StreamingResponse(tiered_stream_generator(), media_type="text/event-stream")
 
@@ -795,8 +787,14 @@ async def red_rag_bing(
                 return
             yield create_progress_bar_string(50, "Processing and embedding Reddit content...").encode("utf-8")
 
-            # Step 3: Chunk, Embed & Store in Vector DB
-            retriever = create_reddit_vector_store_from_scraped_data(scraped_data)
+            # --- MODIFICATION START ---
+            # Run the synchronous, CPU-bound function in a separate thread
+            retriever = await asyncio.to_thread(
+                create_reddit_vector_store_from_scraped_data,
+                scraped_data
+            )
+            # --- MODIFICATION END ---
+
             if not retriever:
                 yield "\nFailed to process Reddit content for analysis.".encode("utf-8")
                 return

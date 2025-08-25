@@ -4,6 +4,12 @@ from config import REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET, REDDIT_USER_AGENT
 
 class RedditScraper:
     def __init__(self):
+        if not all([REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET, REDDIT_USER_AGENT]):
+            raise ValueError(
+                "Missing Reddit API credentials. Please ensure REDDIT_CLIENT_ID, "
+                "REDDIT_CLIENT_SECRET, and REDDIT_USER_AGENT are set in your environment."
+            )
+        
         self.reddit = asyncpraw.Reddit(
             client_id=REDDIT_CLIENT_ID,
             client_secret=REDDIT_CLIENT_SECRET,
@@ -35,11 +41,15 @@ class RedditScraper:
                 "score": submission.score,
                 "selftext": submission.selftext,
                 "comments": comments,
-                "url": url,  # Add the URL to the scraped data
-                "page_age": article.get("page_age") # Pass page_age through
+                "url": url,
+                "page_age": article.get("page_age")
             }
             print(f"DEBUG: Successfully scraped '{submission.title}'. Found {len(comments)} comments.")
             return scraped_data
         except Exception as e:
-            print(f"Error scraping Reddit URL {url}: {e}")
+            if "401" in str(e):
+                print(f"CRITICAL ERROR: Reddit API returned a 401 Unauthorized error. "
+                      f"Please check your REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET.")
+            else:
+                print(f"Error scraping Reddit URL {url}: {e}")
             return None
