@@ -8,6 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi import Request
 from fastapi.responses import Response
 import uvicorn
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from api.dashboard.data_aggregator import aggregate_and_process_data, generate_trending_stocks_data
 
 # --- Add the project root to the Python path ---
 # This ensures that imports work correctly from anywhere in the project.
@@ -45,7 +47,7 @@ async def close_db_pool():
         print("INFO: Database connection pool closed.")
 
 # --- Add Lifecycle Event Handlers for DB Pool using lifespan ---
-
+scheduler = AsyncIOScheduler()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -66,10 +68,14 @@ async def lifespan(app: FastAPI):
     else:
         app.state.db_pool = None
         print("ERROR: DATABASE_URL not set. Database pool not initialized.")
-
+    
+    scheduler.add_job(aggregate_and_process_data, 'interval', minutes=15)
+    scheduler.add_job(generate_trending_stocks_data, 'interval', minutes=30)
+    scheduler.start()
     yield # The application is now running
 
     print("INFO: Application shutdown...")
+    scheduler.shutdown()
     if app.state.db_pool:
         print("INFO: Closing database connection pool...")
         await app.state.db_pool.close()

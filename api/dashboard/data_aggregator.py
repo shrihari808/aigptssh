@@ -222,6 +222,17 @@ async def aggregate_and_process_data():
     print("\n--- Pipeline Complete: Final dashboard output generated and saved. ---")
     return final_dashboard_content
 
+async def generate_trending_stocks_data():
+    """
+    Fetches trending stocks and saves them to a JSON file.
+    """
+    print("--- Starting Trending Stocks Generation ---")
+    brave_fetcher = BraveDashboard()
+    trending_stocks = brave_fetcher.scrape_trending_stocks()
+    output_path = os.path.join(OUTPUT_DIR, 'trending_stocks.json')
+    save_data_to_json(trending_stocks, output_path)
+    print("\n--- Pipeline Complete: Trending stocks identified and saved. ---")
+
 def get_human_readable_age_in_seconds(age_str):
     if not age_str or not isinstance(age_str, str):
         return float('inf')
@@ -247,9 +258,9 @@ def save_data_to_json(data, output_path):
         print(f"Error saving data to JSON file: {e}")
 
 # --- THIS IS THE UPDATED TEST BLOCK ---
-# if __name__ == '__main__':
-#     if sys.platform == "win32":
-#         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+if __name__ == '__main__':
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
     # async def test_stock_snapshot():
     #     """
