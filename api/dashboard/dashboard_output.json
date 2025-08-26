@@ -1,128 +1,122 @@
 {
-    "last_updated_utc": "2025-08-25T10:59:27.758707+00:00",
+    "last_updated_utc": "2025-08-26T14:34:33.007301+00:00",
     "market_summary": {
         "summary_points": [
             {
-                "title": "Six-Day Winning Streak Snapped Amid Powell’s Speech",
-                "summary": "The Indian stock market snapped its six-day winning run on Friday as indices fell sharply ahead of Fed Chair Jerome Powell’s Jackson Hole address, with the Nifty 50 losing 213.65 points to close at 24,870.10 and the Sensex down 693.86 points to 81,306.85. Hints of a potential Fed rate reduction spurred panic selling, overshadowing weekly gains and setting the tone for cautious trading.",
-                "age": "3 hours"
+                "title": "Sensex & Nifty Technical Outlook",
+                "summary": "Technically, the Sensex’s 50-day simple moving average (around 81,900) is a key support level, with any dip below potentially dragging the index toward the 20-day SMA near 81,100–81,000 or even 80,700–80,400. Conversely, a sustained breakout above 81,900 could open the way to immediate resistance at 82,500 and further upside toward 83,300, according to Kotak Securities and Share.Market analysts.",
+                "age": "1 day ago"
             },
             {
-                "title": "Technical Outlook: Key Levels for Sensex and Nifty",
-                "summary": "Technical analysts highlight the 50-day simple moving average (SMA) at 81,900 for the Sensex as a pivotal level; failure to hold this support could drag the index toward the 20-day SMA near 81,000–81,100 or even 80,400. On the upside, sustained trading above 81,900 may trigger a fresh rally toward resistance zones at 82,500 and 83,300, guiding short-term trading strategies.",
-                "age": "9 hours"
+                "title": "Fed Rate-Cut Optimism After Jackson Hole",
+                "summary": "Jerome Powell’s Jackson Hole speech, which hinted at a possible Federal Reserve rate cut as early as September, lifted market sentiment in India. Traders ramped up bets on monetary easing, with Fed funds futures pricing in nearly a 90% probability of a rate reduction, up from about 75% before his remarks.",
+                "age": "1 day ago"
             },
             {
-                "title": "Auto Stocks Bolster Markets, Paints and Conglomerates Lag",
-                "summary": "Amid broader market weakness, auto heavyweights such as M&M, Maruti, and Bharat Electronics (BEL) emerged as top performers on the Nifty 50, while large-cap names like Grasim, Asian Paints, and Adani Enterprises faced heavy selling pressure. This divergence underscores sector rotation and profit-taking ahead of key global policy announcements.",
-                "age": "3 hours"
+                "title": "Weekly Rebound Meets End-Week Selloff",
+                "summary": "The Indian market staged a strong comeback last week, with the BSE Sensex gaining 0.88%. However, the benchmarks snapped a six-day winning streak on Friday as panic selling ahead of Powell’s speech saw the Nifty 50 lose 213 points, the Sensex shed 693 points and the Bank Nifty fall 606 points.",
+                "age": "1 day ago"
             },
             {
-                "title": "FPI Selling Sparks Next Week’s Market Triggers",
-                "summary": "Foreign portfolio investors’ cautious stance and offloading ahead of global rate cues emerge as a prime catalyst, alongside expectations of a US Fed rate cut in September, mixed corporate earnings, valuation pressures, domestic policy reforms such as GST changes, and technical factors. These five potential triggers are set to shape Indian market moves in the upcoming week.",
-                "age": "3 hours"
+                "title": "Global Cues Signal Higher Open",
+                "summary": "Asian indices—Japan’s Nikkei 225, South Korea’s Kospi and Hong Kong futures—all traded higher on Monday, while US stock futures rose after Powell’s speech. Gift Nifty was trading at a premium of roughly 55–68 points to domestic Nifty futures, indicating a positive start for Indian benchmarks.",
+                "age": "1 day ago"
             },
             {
-                "title": "MarketSmith’s Top Stock Recommendations",
-                "summary": "MarketSmith India’s August 25 recommendations spotlight stocks demonstrating strong base formations and relative strength, aiming to capitalize on post-correction resilience. These picks follow a week where Nifty fell 0.85% to 24,870 amid profit booking in heavyweight sectors, while broader indices ended with weekly gains driven by domestic institutional (DII) buying and hopes for GST reforms.",
-                "age": "10 hours"
-            },
-            {
-                "title": "Global Cues Point to Higher Monday Open",
-                "summary": "Domestic benchmark indices are poised for a higher start on Monday, tracking robust Asian and US markets and a near-90% probability of a Fed rate cut priced in by traders. Futures on Gift Nifty traded at a premium of around 55 points, signaling optimism after Powell’s Jackson Hole remarks hinted at more dovish policy ahead.",
-                "age": "9 hours"
+                "title": "Sectoral Winners & Losers",
+                "summary": "Auto heavyweights such as M&M, Maruti and Bharat Electronics led gains among the Nifty constituents, while industrial names including Grasim, Asian Paints and Adani Enterprises underperformed, reflecting mixed sectoral flows amid broader volatility.",
+                "age": "1 day ago"
             }
         ],
         "sources": [
-            "https://www.livemint.com/market/stock-market-news/nifty-50-sensex-today-what-to-expect-from-indian-stock-market-on-august-25-after-jerome-powell-s-jackson-hole-speech-11756047772707.html",
-            "https://www.livemint.com/market/stock-market-news/stock-recommendations-today-25-august-marketsmith-nifty-sensex-tega-industries-aadhar-housing-finance-11755868445175.html",
             "https://www.livemint.com/market/stock-market-news/us-fed-rate-cut-buzz-to-fpis-selling-top-five-triggers-for-the-indian-stock-market-next-week-11755936818017.html",
-            "https://www.livemint.com/market/stock-market-news/indian-stock-market-8-things-that-changed-for-market-over-weekend-gift-nifty-to-jerome-powell-s-jackson-hole-speech-11756048094619.html"
+            "https://www.livemint.com/market/stock-market-news/indian-stock-market-8-things-that-changed-for-market-over-weekend-gift-nifty-to-jerome-powell-s-jackson-hole-speech-11756048094619.html",
+            "https://www.livemint.com/market/stock-market-news/nifty-50-sensex-today-what-to-expect-from-indian-stock-market-on-august-25-after-jerome-powell-s-jackson-hole-speech-11756047772707.html"
         ]
     },
     "latest_news": {
         "articles": [
             {
-                "title": "Stock Market LIVE Updates: GIFT Nifty indicates a strong start; US, Asian markets gain",
-                "snippet": "In the near term, particularly on Tuesday, the Indian market may trade sideways as traders await the final verdict on Trump’s additional 25% tariff decision on 27th August. The Nifty is expected to remain within the range of 24,800–25,150 before any decisive directional move. ... The latest US stock ...",
-                "url": "https://www.moneycontrol.com/news/business/markets/stock-market-live-sensex-nifty-50-share-price-gift-nifty-latest-updates-25-08-2025-liveblog-13483288.html",
-                "age": "9 minutes ago"
-            },
-            {
-                "title": "Stock market closing highlights: Sensex rises 329 pts led by IT shares; Nifty at 24,968 | Markets News - Business Standard",
-                "snippet": "Stock market closing highlights, Monday, August 25, 2025: Indian equities finished the session with gains amid strength in global peers. Buying in Indian and global stocks emerged after Fed Chair Jerome Powell left the door open for rate cuts in the Jackson Hole summit in Wyoming on Friday, ...",
-                "url": "https://www.business-standard.com/markets/news/stock-market-live-updates-august-25-nse-bse-sensex-today-nifty-gift-nifty-ipo-fed-rate-cut-asian-market-125082500070_1.html",
-                "age": "38 minutes ago"
-            },
-            {
                 "title": "Stock Market: Stock Market Today | Stock Market Live News Update",
                 "snippet": "Share Market Today - Stock Market and Share Market Live Updates: Get all the latest share market and India stock market news and updates on Moneycontrol.com",
                 "url": "https://www.moneycontrol.com/stocksmarketsindia/",
                 "age": "2 hours ago"
+            },
+            {
+                "title": "Stock market today: Nifty50 ends below 24,720; BSE Sensex down over 800 points as Trump administration notifies 50% tariffs on India - Times of India",
+                "snippet": "From fancy interiors of the new ... shares latest updates ... ADB to the rescue? Pakistan eyes $2 billion railway upgrade; China’s decade-long rail promise falters · Global markets in red! Donald Trump's tariff threat rattle stocks; Hang Seng dips 1%, FTSE down 50 points · Trump’s 50% tariffs: Indian refiners may ...",
+                "url": "https://timesofindia.indiatimes.com/business/india-business/stock-market-today-nifty50-bse-sensex-august-26-2025-donald-trump-50-tariffs-on-india-impact-indian-equities-global-markets/articleshow/123515104.cms",
+                "age": "3 hours ago"
+            },
+            {
+                "title": "Rs 6 lakh crore gone! Sensex falls 849 points, Nifty slips below 24,750. Trump tariff bomb and 6 other reasons why stock market fell today - The Economic Times",
+                "snippet": "US tariffs on Indian goodsSensex drop todayimpact of tariffs on Indian exportsStock market crashWhy is stock market down todayUS Tariffniftysensex crash todaywhy stock market is falling todaysensex crash · (What's moving Sensex and Nifty Track latest market news, stock tips, Budget 2025, Share ...",
+                "url": "https://economictimes.indiatimes.com/markets/stocks/news/why-is-the-stock-market-down-today-sensex-drops-over-600-pts-nifty-below-24800-7-reasons-behind-the-slump/articleshow/123516594.cms?from=mdr",
+                "age": "3 hours ago"
             }
         ]
     },
     "sector_analysis": {
         "top_performing_sectors": [
             {
+                "sector": "Information Technology",
+                "explanation": "IT stocks jumped about 2.5–2.75% on growing expectations of a Fed rate cut after dovish comments from Jerome Powell."
+            },
+            {
+                "sector": "FMCG",
+                "explanation": "The FMCG index rose 0.91% on hopes of increased consumption amid proposed GST reforms."
+            },
+            {
                 "sector": "Auto",
-                "explanation": "Auto stocks like M&M and Maruti led the Nifty outperformers as investors rotated into high-quality cyclicals ahead of Powell’s Jackson Hole speech."
-            },
-            {
-                "sector": "Telecommunication",
-                "explanation": "Telecom shares saw strong buying interest as participants sought defensive exposure amid volatile global cues."
-            },
-            {
-                "sector": "Healthcare",
-                "explanation": "Healthcare stocks attracted demand as investors looked for defensive plays during the market pullback."
+                "explanation": "Auto heavyweights like M&M and Maruti led gains as robust demand forecasts and company-specific earnings drove the segment higher."
             }
         ],
         "underperforming_sectors": [
             {
-                "sector": "Banking",
-                "explanation": "Banking heavyweight stocks faced profit booking pressure, dragging the financial sector lower."
+                "sector": "Realty",
+                "explanation": "The Realty index plunged nearly 2% amid broad-based profit-taking and risk-off sentiment ahead of key global cues."
             },
             {
-                "sector": "Metals",
-                "explanation": "Metals shares came under selling pressure on weak global cues and FII outflows."
+                "sector": "Consumer Durables",
+                "explanation": "Consumer Durables fell almost 2% as investors sold cyclicals in anticipation of mixed earnings and policy uncertainty."
             },
             {
-                "sector": "Materials",
-                "explanation": "Material stocks, including names like Grasim and Asian Paints, weakened amid broad-based market decline."
+                "sector": "Oil & Gas",
+                "explanation": "Oil & Gas stocks dropped close to 2% on concerns over slowing global demand and market jitters around monetary policy."
             }
         ]
     },
     "standouts_analysis": {
         "gainers": [
             {
-                "name": "M&M",
-                "reason": "Reason not specified in the text."
+                "stock": "Eicher Motors",
+                "reason": "Shares rose 2.68%, making it the biggest mover on the upside for the day."
             },
             {
-                "name": "Maruti Suzuki",
-                "reason": "Reason not specified in the text."
+                "stock": "Hindustan Unilever",
+                "reason": "Shares gained 2.32% on expectations of increased consumption amid the proposed GST reforms."
             },
             {
-                "name": "Bharat Electronics (BEL)",
-                "reason": "Reason not specified in the text."
+                "stock": "Maruti Suzuki India",
+                "reason": "Shares climbed 1.85%, led by strong auto‐sector momentum."
             }
         ],
         "losers": [
             {
-                "name": "Asian Paints",
-                "reason": "Named among the biggest decliners amid profit-taking ahead of Fed Chair Jerome Powell’s Jackson Hole speech."
+                "stock": "Shriram Finance",
+                "reason": "Shares plunged 4.03%, the steepest fall in the Nifty, amid broad‐based market selling."
             },
             {
-                "name": "Ultra Tech Cement",
-                "reason": "Featured as a top loser due to sector-wide profit-booking in metals ahead of the Fed event."
+                "stock": "Sun Pharma",
+                "reason": "Shares fell 3.35% as investors booked profits in the pharmaceutical space."
             },
             {
-                "name": "Tata Steel",
-                "reason": "Slumped on profit-taking and weak global cues before Powell’s remarks."
+                "stock": "Tata Steel",
+                "reason": "Shares dropped 2.87% amid sharp selling pressure in the metal segment."
             }
         ]
     },
     "market_drivers": {
-        "summary": "Indian markets opened on a buoyant note as GIFT Nifty traded at a healthy premium, driven by positive global cues from Asian peers and Wall Street after Fed Chair Jerome Powell’s Jackson Hole remarks stoked rate-cut expectations. Domestically, sustained DII buying and optimism around potential GST reforms underpinned the market, even as profit-booking weighed on heavyweight banking and metal stocks. Corporate highlights such as Apollo Micro Systems’ Rs 1.1 bn avionic export order and a steady rupee—alongside softer gold and silver prices—further shaped the mixed but overall resilient trading session."
+        "summary": "Today’s market oscillated in a narrow range as robust domestic liquidity and falling interest rates were offset by profit-booking from foreign institutional investors and muted global cues around trade tariffs and geopolitical uncertainty. Hopes of tax reforms, including potential GST rationalization, and a revival in consumer spending and private investment underpinned sentiment, but a plateau in corporate earnings growth kept participants cautious. In the absence of fresh company-specific triggers, the tug-of-war between strong domestic flows and hesitant foreign demand capped any significant move, leaving benchmarks largely flat."
     }
 }
