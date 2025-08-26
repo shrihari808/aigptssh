@@ -1,88 +1,85 @@
 {
-    "last_updated_utc": "2025-08-26T14:34:33.007301+00:00",
+    "last_updated_utc": "2025-08-26T15:58:43.120563+00:00",
     "market_summary": {
         "summary_points": [
             {
-                "title": "Sensex & Nifty Technical Outlook",
-                "summary": "Technically, the Sensex’s 50-day simple moving average (around 81,900) is a key support level, with any dip below potentially dragging the index toward the 20-day SMA near 81,100–81,000 or even 80,700–80,400. Conversely, a sustained breakout above 81,900 could open the way to immediate resistance at 82,500 and further upside toward 83,300, according to Kotak Securities and Share.Market analysts.",
+                "title": "Weekly Market Rebound",
+                "summary": "After a brief correction, Indian benchmark indices staged a strong comeback last week, with the BSE Sensex rising 0.88% and both Sensex and Nifty closing the week with gains of around 1%. Midcap and smallcap segments outperformed as optimism around potential GST reforms and sustained domestic institutional investor buying helped markets recover from their recent corrective phase.",
                 "age": "1 day ago"
             },
             {
-                "title": "Fed Rate-Cut Optimism After Jackson Hole",
-                "summary": "Jerome Powell’s Jackson Hole speech, which hinted at a possible Federal Reserve rate cut as early as September, lifted market sentiment in India. Traders ramped up bets on monetary easing, with Fed funds futures pricing in nearly a 90% probability of a rate reduction, up from about 75% before his remarks.",
+                "title": "Technical Levels to Watch",
+                "summary": "Technically, the critical support for the Sensex lies at the 50-day SMA near 81,900, with a break below likely to test the 20-day SMA in the 81,100–81,000 zone and potentially dragging levels down to 80,700–80,400. On the upside, immediate resistance is in the 82,000–82,200 zone, with a decisive breakout above 82,500 opening the path toward 83,300. An indecisive ‘inside body’ daily candle further underscores choppy trading conditions.",
                 "age": "1 day ago"
             },
             {
-                "title": "Weekly Rebound Meets End-Week Selloff",
-                "summary": "The Indian market staged a strong comeback last week, with the BSE Sensex gaining 0.88%. However, the benchmarks snapped a six-day winning streak on Friday as panic selling ahead of Powell’s speech saw the Nifty 50 lose 213 points, the Sensex shed 693 points and the Bank Nifty fall 606 points.",
+                "title": "Jackson Hole-Induced Pullback",
+                "summary": "Markets snapped a six-day winning streak as panic selling ahead of Fed Chair Jerome Powell’s Jackson Hole speech drove the Nifty 50 down by 213 points to 24,870, the Sensex by 693 points to 81,306, and the Bank Nifty by 606 points to 55,149. Auto heavyweights—M&M, Maruti, and BEL—emerged as top gainers, while Grasim, Asian Paints, and Adani Enterprises led the losses, reflecting a risk-off sentiment.",
                 "age": "1 day ago"
             },
             {
-                "title": "Global Cues Signal Higher Open",
-                "summary": "Asian indices—Japan’s Nikkei 225, South Korea’s Kospi and Hong Kong futures—all traded higher on Monday, while US stock futures rose after Powell’s speech. Gift Nifty was trading at a premium of roughly 55–68 points to domestic Nifty futures, indicating a positive start for Indian benchmarks.",
-                "age": "1 day ago"
+                "title": "Trading Caution Ahead of US Tariffs",
+                "summary": "Ahead of the US tariffs on Indian goods, markets are poised for a weak start on August 26, mirroring global equity weakness and an 85-point discount in Gift Nifty near 24,905. Although Monday saw the Sensex gain 329 points, the Nifty slipped below 24,900, and an inside candle formation points to uncertainty in the immediate session as investors assess the trade and geopolitical risks.",
+                "age": "14 hours ago"
             },
             {
-                "title": "Sectoral Winners & Losers",
-                "summary": "Auto heavyweights such as M&M, Maruti and Bharat Electronics led gains among the Nifty constituents, while industrial names including Grasim, Asian Paints and Adani Enterprises underperformed, reflecting mixed sectoral flows amid broader volatility.",
+                "title": "MarketSmith’s Stock Picks Amid Reversal",
+                "summary": "MarketSmith India recommends Tega Industries and Aadhar Housing Finance after Friday’s sharp reversal ended a six-day rally, with the Nifty closing 0.85% lower at 24,870. Selling pressure was pronounced in banking and metals, yet the week ended on a positive note thanks to GST reform hopes and DII support. The selected stocks align with prevailing technical patterns and remain poised for a potential rebound.",
                 "age": "1 day ago"
             }
         ],
         "sources": [
+            "https://www.livemint.com/market/stock-market-news/stock-recommendations-today-25-august-marketsmith-nifty-sensex-tega-industries-aadhar-housing-finance-11755868445175.html",
+            "https://www.livemint.com/market/stock-market-news/nifty-50-sensex-today-what-to-expect-from-indian-stock-market-in-trade-on-august-26-ahead-of-trump-tariffs-11756145283315.html",
             "https://www.livemint.com/market/stock-market-news/us-fed-rate-cut-buzz-to-fpis-selling-top-five-triggers-for-the-indian-stock-market-next-week-11755936818017.html",
-            "https://www.livemint.com/market/stock-market-news/indian-stock-market-8-things-that-changed-for-market-over-weekend-gift-nifty-to-jerome-powell-s-jackson-hole-speech-11756048094619.html",
             "https://www.livemint.com/market/stock-market-news/nifty-50-sensex-today-what-to-expect-from-indian-stock-market-on-august-25-after-jerome-powell-s-jackson-hole-speech-11756047772707.html"
         ]
     },
     "latest_news": {
         "articles": [
             {
-                "title": "Stock Market: Stock Market Today | Stock Market Live News Update",
-                "snippet": "Share Market Today - Stock Market and Share Market Live Updates: Get all the latest share market and India stock market news and updates on Moneycontrol.com",
-                "url": "https://www.moneycontrol.com/stocksmarketsindia/",
-                "age": "2 hours ago"
-            },
-            {
                 "title": "Stock market today: Nifty50 ends below 24,720; BSE Sensex down over 800 points as Trump administration notifies 50% tariffs on India - Times of India",
                 "snippet": "From fancy interiors of the new ... shares latest updates ... ADB to the rescue? Pakistan eyes $2 billion railway upgrade; China’s decade-long rail promise falters · Global markets in red! Donald Trump's tariff threat rattle stocks; Hang Seng dips 1%, FTSE down 50 points · Trump’s 50% tariffs: Indian refiners may ...",
                 "url": "https://timesofindia.indiatimes.com/business/india-business/stock-market-today-nifty50-bse-sensex-august-26-2025-donald-trump-50-tariffs-on-india-impact-indian-equities-global-markets/articleshow/123515104.cms",
-                "age": "3 hours ago"
+                "age": "4 hours ago"
+            },
+            {
+                "title": "Sensex Today | Stock Market Highlights: Nifty closes below 20-DMA at the lowest since May 9 as 50% tariffs loom",
+                "snippet": "Stock Market Highlights: The Nifty 50 index had a forgettable session on Tuesday, with the index declining over 250 points but close above the 24,700 mark. More importantly, the index closed below its 20-Day Moving Average (DMA) of 24,737. ICICI Bank (37 points) Reliance Industries (30 points), ...",
+                "url": "https://www.cnbctv18.com/market/stock-market-live-updates-sensex-nifty-50-today-midcaps-fno-expiry-nse-bse-trump-tariffs-psu-banks-vodafone-idea-psu-banks-paytm-tata-motors-share-price-liveblog-19659149.htm",
+                "age": "5 hours ago"
             },
             {
                 "title": "Rs 6 lakh crore gone! Sensex falls 849 points, Nifty slips below 24,750. Trump tariff bomb and 6 other reasons why stock market fell today - The Economic Times",
                 "snippet": "US tariffs on Indian goodsSensex drop todayimpact of tariffs on Indian exportsStock market crashWhy is stock market down todayUS Tariffniftysensex crash todaywhy stock market is falling todaysensex crash · (What's moving Sensex and Nifty Track latest market news, stock tips, Budget 2025, Share ...",
                 "url": "https://economictimes.indiatimes.com/markets/stocks/news/why-is-the-stock-market-down-today-sensex-drops-over-600-pts-nifty-below-24800-7-reasons-behind-the-slump/articleshow/123516594.cms?from=mdr",
-                "age": "3 hours ago"
+                "age": "5 hours ago"
             }
         ]
     },
     "sector_analysis": {
         "top_performing_sectors": [
             {
-                "sector": "Information Technology",
-                "explanation": "IT stocks jumped about 2.5–2.75% on growing expectations of a Fed rate cut after dovish comments from Jerome Powell."
-            },
-            {
                 "sector": "FMCG",
-                "explanation": "The FMCG index rose 0.91% on hopes of increased consumption amid proposed GST reforms."
+                "explanation": "Nifty FMCG rose about 0.9% on expectations of increased consumption amid proposed GST reforms."
             },
             {
-                "sector": "Auto",
-                "explanation": "Auto heavyweights like M&M and Maruti led gains as robust demand forecasts and company-specific earnings drove the segment higher."
+                "sector": "Automobiles",
+                "explanation": "Auto stocks such as Eicher Motors and Maruti Suzuki led gains, buoyed by resilient consumer demand and strong quarterly showings."
             }
         ],
         "underperforming_sectors": [
             {
                 "sector": "Realty",
-                "explanation": "The Realty index plunged nearly 2% amid broad-based profit-taking and risk-off sentiment ahead of key global cues."
+                "explanation": "Nifty Realty plunged nearly 2% as profit‐booking hit property developers amid weak market sentiment."
             },
             {
-                "sector": "Consumer Durables",
-                "explanation": "Consumer Durables fell almost 2% as investors sold cyclicals in anticipation of mixed earnings and policy uncertainty."
+                "sector": "Metals",
+                "explanation": "Metal stocks fell almost 2% on renewed concerns over global demand and disappointing earnings outlooks."
             },
             {
-                "sector": "Oil & Gas",
-                "explanation": "Oil & Gas stocks dropped close to 2% on concerns over slowing global demand and market jitters around monetary policy."
+                "sector": "Banking & Financial Services",
+                "explanation": "Nifty Bank and Financial Services dropped around 1.3% due to heavy selling in HDFC Bank, ICICI Bank and other large private lenders."
             }
         ]
     },
@@ -90,33 +87,33 @@
         "gainers": [
             {
                 "stock": "Eicher Motors",
-                "reason": "Shares rose 2.68%, making it the biggest mover on the upside for the day."
+                "reason": "Shares jumped 2.68% to top the Nifty gainers list, though no specific catalyst was mentioned."
             },
             {
                 "stock": "Hindustan Unilever",
-                "reason": "Shares gained 2.32% on expectations of increased consumption amid the proposed GST reforms."
+                "reason": "Advanced 2.32% as the FMCG sector rallied on expectations of increased consumption amid proposed GST reforms."
             },
             {
                 "stock": "Maruti Suzuki India",
-                "reason": "Shares climbed 1.85%, led by strong auto‐sector momentum."
+                "reason": "Rose around 1.85% as auto heavyweights gained on optimism over potential US Fed rate cuts boosting demand."
             }
         ],
         "losers": [
             {
                 "stock": "Shriram Finance",
-                "reason": "Shares plunged 4.03%, the steepest fall in the Nifty, amid broad‐based market selling."
+                "reason": "Tumbled 4.03% as the broader market sell-off particularly hit financial stocks."
             },
             {
                 "stock": "Sun Pharma",
-                "reason": "Shares fell 3.35% as investors booked profits in the pharmaceutical space."
+                "reason": "Dropped 3.35% after reports that the US President levied additional tariffs on Indian exports."
             },
             {
                 "stock": "Tata Steel",
-                "reason": "Shares dropped 2.87% amid sharp selling pressure in the metal segment."
+                "reason": "Fell 2.87% amid sector-wide selling pressure in metals."
             }
         ]
     },
     "market_drivers": {
-        "summary": "Today’s market oscillated in a narrow range as robust domestic liquidity and falling interest rates were offset by profit-booking from foreign institutional investors and muted global cues around trade tariffs and geopolitical uncertainty. Hopes of tax reforms, including potential GST rationalization, and a revival in consumer spending and private investment underpinned sentiment, but a plateau in corporate earnings growth kept participants cautious. In the absence of fresh company-specific triggers, the tug-of-war between strong domestic flows and hesitant foreign demand capped any significant move, leaving benchmarks largely flat."
+        "summary": "Today’s flat trading reflects a tug-of-war between healthy domestic liquidity—buoyed by falling interest rates and potential tax reforms—and a moderation in corporate earnings growth that has tempered investor enthusiasm. Foreign institutional investors have also trimmed positions, largely on profit‐booking and portfolio rebalancing amid tariff uncertainty and global supply-chain concerns. While global cues and geopolitical stability remain watchpoints, a revival in consumer spending and a pickup in private sector investment are seen as the most likely catalysts for a sustainable up-move, with long-term gains ultimately hinging on steady macro fundamentals, earnings revival and attractive relative valuations."
     }
 }

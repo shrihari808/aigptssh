@@ -636,12 +636,11 @@ async def web_rag_mix(
                     yield "\nCould not find any initial sources.".encode("utf-8")
                     return
 
-                yield f"# Reading sources | {len(initial_sources)} articles\n".encode("utf-8")
+                yield f"& Reading sources | {len(initial_sources)} articles\n".encode("utf-8")
                 for source in initial_sources:
                     yield f"{json.dumps({'title': source.get('title'), 'url': source.get('link')})}\n".encode("utf-8")
-                    time.sleep(0.1)
 
-                yield "# Filtering Content ...\n".encode("utf-8")
+                yield "& Filtering Content ...\n".encode("utf-8")
                 
                 sources_to_scrape = initial_sources[:10]
 
@@ -654,7 +653,7 @@ async def web_rag_mix(
                         scraped_sources.extend(scraped)
                     await asyncio.sleep(0.1)
 
-                yield "# Re-ranking context ...\n".encode("utf-8")
+                yield "& Re-ranking context ...\n".encode("utf-8")
 
                 final_passages = await scoring_service.rerank_content_chunks(query, scraped_sources, top_n=7)
                 if not final_passages:
@@ -664,7 +663,7 @@ async def web_rag_mix(
                 if use_caching:
                     await asyncio.to_thread(add_passages_to_cache, str(session_id), final_passages)
 
-        yield "# Creating enhanced context ...\n".encode("utf-8")
+        yield "& Creating enhanced context ...\n".encode("utf-8")
 
         final_context = await asyncio.to_thread(scoring_service.create_enhanced_context, final_passages)
         final_links = list(set([p["metadata"].get("link") for p in final_passages if p.get("metadata", {}).get("link")]))
@@ -689,7 +688,7 @@ async def web_rag_mix(
         )
         final_chain = final_prompt | llm_stream
 
-        yield "#Thinking ...\n".encode("utf-8")
+        yield "& Thinking ...\n".encode("utf-8")
 
         final_response_text = ""
         with get_openai_callback() as cb:
@@ -1028,7 +1027,6 @@ async def red_rag_bing(
             yield f"# Reading sources | {len(articles)} articles\n".encode("utf-8")
             for article in articles:
                 yield f"{json.dumps({'title': article.get('title'), 'url': article.get('url')})}\n".encode("utf-8")
-                time.sleep(0.1)
 
             top_articles = articles[:5] # Limit to top 5 articles for scraping
             final_links = [article['url'] for article in top_articles]
