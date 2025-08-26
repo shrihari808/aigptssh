@@ -609,8 +609,6 @@ async def web_rag_mix(
         # --- Caching Logic Start ---
         cached_passages = []
         if use_caching:
-            yield create_progress_bar_string(5, "Checking cache for context...").encode("utf-8")
-
             if is_followup_question(query, chat_history):
                 cached_docs_with_scores = await asyncio.to_thread(
                     query_session_cache, str(session_id), query
@@ -631,34 +629,32 @@ async def web_rag_mix(
 
         if cached_passages:
             final_passages = cached_passages
-            yield create_progress_bar_string(95, "Generating answer from cache...").encode("utf-8")
         else:
             async with aiohttp.ClientSession(**brave_searcher.session_config) as session:
-                yield create_progress_bar_string(10, "Searching for sources...").encode("utf-8")
-
                 initial_sources = await brave_searcher.search_and_scrape(session, query, max_sources=30)
                 if not initial_sources:
                     yield "\nCould not find any initial sources.".encode("utf-8")
                     return
 
-                yield create_progress_bar_string(20, f"Found {len(initial_sources)} sources...").encode("utf-8")
+                yield f"# Reading sources | {len(initial_sources)} articles\n".encode("utf-8")
+                for source in initial_sources:
+                    yield f"{json.dumps({'title': source.get('title'), 'url': source.get('link')})}\n".encode("utf-8")
+                    time.sleep(0.1)
+
+                yield "# Filtering Content ...\n".encode("utf-8")
+                
                 sources_to_scrape = initial_sources[:10]
 
                 scraped_sources = []
                 total_to_scrape = len(sources_to_scrape)
-                start_progress, end_progress = 20, 70
 
                 for i, source in enumerate(sources_to_scrape):
-                    progress = start_progress + int(((i + 1) / total_to_scrape) * (end_progress - start_progress))
-                    title = source.get('title', 'Untitled Source')[:45]
-                    yield create_progress_bar_string(progress, f"Analyzing: {title}...").encode("utf-8")
-
                     scraped = await brave_searcher.scrape_top_urls(session, [source])
                     if scraped:
                         scraped_sources.extend(scraped)
                     await asyncio.sleep(0.1)
 
-                yield create_progress_bar_string(80, "Ranking context...").encode("utf-8")
+                yield "# Re-ranking context ...\n".encode("utf-8")
 
                 final_passages = await scoring_service.rerank_content_chunks(query, scraped_sources, top_n=7)
                 if not final_passages:
@@ -668,7 +664,7 @@ async def web_rag_mix(
                 if use_caching:
                     await asyncio.to_thread(add_passages_to_cache, str(session_id), final_passages)
 
-                yield create_progress_bar_string(95, "Generating final answer...").encode("utf-8")
+        yield "# Creating enhanced context ...\n".encode("utf-8")
 
         final_context = await asyncio.to_thread(scoring_service.create_enhanced_context, final_passages)
         final_links = list(set([p["metadata"].get("link") for p in final_passages if p.get("metadata", {}).get("link")]))
@@ -693,8 +689,6 @@ async def web_rag_mix(
         )
         final_chain = final_prompt | llm_stream
 
-        yield create_progress_bar_string(100, "Done!").encode("utf-8")
-        yield "\n\n".encode("utf-8")
         yield "#Thinking ...\n".encode("utf-8")
 
         final_response_text = ""
@@ -986,8 +980,8 @@ async def condense_context_for_llm(query: str, passages: list[dict]) -> str:
         # Fallback to the original, larger context if condensation fails
         return context_text
 
-@yt_rag.post("/yt_rag")
-async def yt_rag_brave(
+@red_rag.post("/reddit_rag")
+async def red_rag_bing(
     request: InRequest,
     session_id: int = Query(...),
     prompt_history_id: int = Query(...),
@@ -997,13 +991,10 @@ async def yt_rag_brave(
     api_key: str = Depends(api_key_auth)
 ):
     """
-    Handles YouTube-based RAG requests using an embedding-based approach.
-    1. Searches for relevant videos.
-    2. Fetches transcripts.
-    3. Chunks and embeds transcripts into a vector store.
-    4. Retrieves relevant chunks.
-    5. Synthesizes an answer from the chunks.
+    Handles Reddit-based RAG requests with a full pipeline:
+    Search -> Scrape -> Chunk & Embed -> Retrieve -> Rerank -> Synthesize.
     """
+
     original_query = request.query.strip()
 
     validation_result = await validate_query_only(original_query)
@@ -1020,38 +1011,57 @@ async def yt_rag_brave(
         final_links = []
 
         try:
-            # Step 1: Search & Filter Videos
-            yield create_progress_bar_string(10, "Searching for relevant videos...").encode("utf-8")
-            video_urls = await get_yt_data_async(original_query)
+            # Step 1: Search for Reddit posts
+            brave_api_key = os.getenv('BRAVE_API_KEY')
+            search_results = await fetch_search_red(original_query, brave_api_key)
 
-            if not video_urls:
-                yield "\nCould not find any relevant YouTube videos for your query.".encode("utf-8")
+            if not search_results:
+                yield "\nCould not find any relevant Reddit discussions for your query.".encode("utf-8")
                 return
-            final_links = video_urls
-            yield create_progress_bar_string(25, f"Found {len(video_urls)} videos. Fetching transcripts...").encode("utf-8")
 
-            # Step 2: Fetch Transcripts asynchronously
-            video_transcripts = []
-            async for transcript_data in get_data(video_urls, db_pool):
-                video_transcripts.append(transcript_data)
-            if not video_transcripts:
-                yield "\nFound videos, but could not retrieve their transcripts.".encode("utf-8")
+            articles, df, links = await process_search_red(search_results)
+
+            if not articles:
+                yield "\nCould not find any relevant Reddit discussions for your query.".encode("utf-8")
                 return
-            yield create_progress_bar_string(50, "Processing and embedding video content...").encode("utf-8")
+            
+            yield f"# Reading sources | {len(articles)} articles\n".encode("utf-8")
+            for article in articles:
+                yield f"{json.dumps({'title': article.get('title'), 'url': article.get('url')})}\n".encode("utf-8")
+                time.sleep(0.1)
 
-            # Step 3: Chunk, Embed & Store in Vector DB
-            retriever = create_yt_vector_store_from_transcripts(video_transcripts)
+            top_articles = articles[:5] # Limit to top 5 articles for scraping
+            final_links = [article['url'] for article in top_articles]
+
+            yield "# Filtering Content ...\n".encode("utf-8")
+
+            # Step 2: Scrape top Reddit posts
+            scraper = RedditScraper()
+            scraped_data = [await scraper.scrape_post(article) for article in top_articles]
+
+            if not any(scraped_data):
+                yield "\nFound Reddit discussions, but could not scrape their content.".encode("utf-8")
+                return
+
+            # --- MODIFICATION START ---
+            # Run the synchronous, CPU-bound function in a separate thread
+            retriever = await asyncio.to_thread(
+                create_reddit_vector_store_from_scraped_data,
+                scraped_data
+            )
+            # --- MODIFICATION END ---
+
             if not retriever:
-                yield "\nFailed to process video content for analysis.".encode("utf-8")
+                yield "\nFailed to process Reddit content for analysis.".encode("utf-8")
                 return
-            yield create_progress_bar_string(75, "Finding the most relevant information...").encode("utf-8")
+            
+            yield "# Re-ranking context ...\n".encode("utf-8")
 
             # Step 4: Search Chunks for Relevance
-            relevant_chunks: list[Document] = await retriever.aget_relevant_documents(original_query)
+            relevant_chunks: list[Document] = await retriever.ainvoke(original_query)
             if not relevant_chunks:
-                yield "\nCould not find specific information related to your query in the videos.".encode("utf-8")
+                yield "\nCould not find specific information related to your query in the Reddit posts.".encode("utf-8")
                 return
-            yield create_progress_bar_string(80, "Ranking and scoring relevant information...").encode("utf-8")
 
             # Step 5: Score and Rerank Chunks
             passages_to_score = [
@@ -1061,60 +1071,53 @@ async def yt_rag_brave(
             reranked_passages = await scoring_service.score_and_rerank_passages(original_query, passages_to_score)
 
             if not reranked_passages:
-                yield "\nCould not determine the most relevant information from the videos.".encode("utf-8")
+                yield "\nCould not determine the most relevant information from the Reddit posts.".encode("utf-8")
                 return
 
             top_passages = reranked_passages[:7]
-            yield create_progress_bar_string(85, "Creating final context...").encode("utf-8")
-
-            # Create the full context directly without condensation
+            
+            yield "# Creating enhanced context ...\n".encode("utf-8")
+            
             final_context = scoring_service.create_enhanced_context(top_passages)
 
-            # Create a mapping of source titles to URLs for the final prompt
-            source_map = {p['metadata'].get('title'): p['metadata'].get('url') for p in top_passages if p.get('metadata')}
-
-            yield create_progress_bar_string(90, "Synthesizing the final answer...").encode("utf-8")
-
         except Exception as e:
-            print(f"ERROR: YouTube RAG pipeline failed: {e}")
-            yield "\nAn error occurred while processing the videos.".encode("utf-8")
+            print(f"ERROR: Reddit RAG pipeline failed: {e}")
+            yield "\nAn error occurred while processing the Reddit discussions.".encode("utf-8")
             return
 
-        # Step 6: Synthesize Answer using the full context
-        prompt = """
-        You are a financial information assistant. Your task is to answer the user's question using the provided context from YouTube video transcripts.
+        # Step 6: Synthesize Answer
+        res_prompt = """
+        You are a financial information assistant specializing in Reddit discussions and community insights.
+        Using the provided Reddit articles and chat history, respond to the user's inquiries with detailed analysis.
 
-        Guidelines:
-        - Base your answer on the information within the transcripts. Do not invent or use outside knowledge.
-        - Provide a comprehensive and detailed response covering all relevant aspects from the transcripts.
-        - Cite your sources by adding a number like [1], [2], etc., for each video used in your answer.
-        - At the end of your response, create a "Sources" section and list all the YouTube links with their corresponding citation numbers and video title. Do not list the same source multiple times.
+        Focus on:
+        - Community sentiment and discussions
+        - Popular opinions and debates
+        - Emerging trends mentioned by users
+        - Different perspectives from the Reddit community
+        - Provide the source links with their citation numbers at the end of the response
 
-        **User's question:** {query}
+        Use proper markdown formatting and cite relevant Reddit discussions.
 
-        **Context from Videos:**
+        The user has asked the following question: {input}
+
+        Context from Reddit:
         {context}
-
-        **Source Map (Titles and URLs):**
-        {source_map}
         """
 
-        yt_prompt = PromptTemplate(template=prompt, input_variables=["query", "context", "source_map"])
-        chain = yt_prompt | llm_stream
+        R_prompt = PromptTemplate(
+            template=res_prompt,
+            input_variables=["context", "input"]
+        )
+        ans_chain = R_prompt | llm_stream
 
-        # Step 6: Stream the final response
-        yield create_progress_bar_string(100, "Done!").encode("utf-8")
-        yield "\n\n".encode("utf-8")
+        # Step 7: Stream the final response
         yield "#Thinking ...\n".encode("utf-8")
 
         final_response = ""
         try:
             with get_openai_callback() as cb:
-                async for chunk in chain.astream({
-                    "context": final_context,
-                    "query": original_query,
-                    "source_map": source_map
-                }):
+                async for chunk in ans_chain.astream({"context": final_context, "input": original_query}):
                     content = chunk.content
                     if content:
                         final_response += content
@@ -1136,4 +1139,12 @@ async def yt_rag_brave(
             print(f"ERROR: An error occurred during final response streaming: {e}")
             yield b"An error occurred while generating the response."
 
-    return StreamingResponse(generate_chat_res(), media_type="text/event-stream")
+    return StreamingResponse(
+        generate_chat_res(), 
+        media_type="text/plain",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive", 
+            "X-Accel-Buffering": "no"
+        }
+    )
