@@ -377,32 +377,27 @@ async def combined_preprocessing(query: str, chat_history: list[str], today: str
     if is_followup and chat_history:
         # For follow-up questions, include memory contextualization
         combined_prompt = """
-You are a financial assistant. Analyze this user query and provide a JSON response.
-
-Context: This appears to be a follow-up question based on chat history.
+You are a financial assistant for the Indian stock market. Your primary function is to analyze user queries and prepare them for a financial search engine.
 
 User Query: "{query}"
-Recent Chat History: {chat_history}
 Today's Date: {today}
 
 Tasks:
-1. VALIDATE: Is this query related to Indian stock market, finance, economics, elections, or companies?
-2. REFORMULATE: Create a standalone question that incorporates relevant context from chat history
-3. CLEAN: Ensure the reformulated query is complete and grammatically correct
+1. VALIDATE: Is this query related to the Indian stock market, business, or finance?
+2. INTERPRET: Interpret ambiguous acronyms or terms (e.g., "HCC", "BEL") as company names or stock tickers within the Indian market context.
+3. REFORMULATE: Create a clear, standalone search query suitable for a financial news search. For ambiguous tickers like "HCC," reformulate the query to "HCC Ltd. stock" to ensure financial context.
 
 Return JSON format:
 {{
     "valid": 1 or 0,
-    "reformulated_query": "standalone question with context",
-    "is_followup": true,
-    "needs_memory": true
+    "reformulated_query": "financially-focused search query",
+    "is_followup": false,
+    "needs_memory": false
 }}
 
 Guidelines:
-- If user mentions "it", "this", "that", "the company", "the stock" - identify from context
-- Include specific company/stock names from history if referenced
-- Make the reformulated query understandable without chat history
-- For validation: 1=valid financial query, 0=not related to finance/markets
+- For validation: 1 = valid query related to Indian markets/business/finance, 0 = not related.
+- If the user asks why a company is trending, the reformulated query should be specific, like "Why is [Company Name] stock price trending".
 """
 
         input_data = {
@@ -420,8 +415,8 @@ User Query: "{query}"
 Today's Date: {today}
 
 Tasks:
-1. VALIDATE: Is this query related to Indian stock market, finance, economics, elections, or companies?
-2. PROCESS: Clean the query and ensure it's grammatically correct
+1. VALIDATE: Is this query related to the Indian stock market, Indian business, or Indian finance?
+2. PROCESS: Clean the query and ensure it's grammatically correct.
 
 Return JSON format:
 {{
@@ -432,10 +427,10 @@ Return JSON format:
 }}
 
 Guidelines:
-- If asking for "latest news" about any company, consider valid
-- If asking about "current news" or "trending news", consider valid
-- For validation: 1=valid financial query, 0=not related to finance/markets
-- Keep reformulated_query same as original for standalone questions
+- If asking for "latest news" about any company, consider it valid.
+- If asking about "current news" or "trending news", consider it valid.
+- For validation: 1 = valid query related to Indian markets/business/finance, 0 = not related.
+- Keep reformulated_query the same as the original for standalone questions.
 """
 
         input_data = {
@@ -591,9 +586,8 @@ async def web_rag_mix(
     REPLACED: Final version with corrected session management.
     Implements the full, multi-stage "search and re-rank" strategy.
     """
-    query = request.query.strip()
+    original_query = request.query.strip()
     today = datetime.now().strftime("%Y-%m-%d")
-    chat_history = await get_chat_history_optimized(str(session_id), db_pool, limit=3)
 
     brave_api_key = os.getenv('BRAVE_API_KEY')
     if not brave_api_key:
@@ -602,6 +596,16 @@ async def web_rag_mix(
     brave_searcher = BraveNews(brave_api_key)
 
     async def tiered_stream_generator():
+        # --- Preprocessing Step ---
+        chat_history = await get_chat_history_optimized(str(session_id), db_pool, limit=3)
+        preprocessing_result = await combined_preprocessing(original_query, chat_history, today)
+
+        if preprocessing_result.get("valid", 0) == 0:
+            yield "I am a financial markets search engine and can only answer questions related to Indian markets, business, and finance. Please ask a relevant question.".encode("utf-8")
+            return
+
+        query = preprocessing_result.get("reformulated_query", original_query)  # Use a new local variable for the potentially reformulated query
+
         # --- Caching Logic Start ---
         cached_passages = []
         if use_caching:
@@ -671,8 +675,10 @@ async def web_rag_mix(
 
         final_prompt = PromptTemplate.from_template(
             """
-            You are a financial markets expert. Provide a detailed, well-structured final answer using the comprehensive context provided.
+            You are a financial markets expert. Today's date is {today}. Provide a detailed, well-structured final answer using the comprehensive context provided.
             Use markdown for readability and cite the source links where appropriate. Provide the source links with their citation numbers at the end of the response.
+
+            **CRITICAL INSTRUCTION:** Focus exclusively on financial, startup, corporate, and stock market-related information.
 
             Comprehensive Context:
             {context}
@@ -687,14 +693,13 @@ async def web_rag_mix(
         )
         final_chain = final_prompt | llm_stream
 
-
         yield create_progress_bar_string(100, "Done!").encode("utf-8")
         yield "\n\n".encode("utf-8")
         yield "#Thinking ...\n".encode("utf-8")
 
         final_response_text = ""
         with get_openai_callback() as cb:
-            async for chunk in final_chain.astream({"context": final_context, "history": chat_history, "input": query}):
+            async for chunk in final_chain.astream({"context": final_context, "history": chat_history, "input": query, "today": today}):
                 if chunk.content:
                     final_response_text += chunk.content
                     yield chunk.content.encode("utf-8")
@@ -710,11 +715,11 @@ async def web_rag_mix(
 
             if final_response_text:
                 history_db = PostgresChatMessageHistory(str(session_id), psql_url)
-                await asyncio.to_thread(history_db.add_user_message, query)
+                await asyncio.to_thread(history_db.add_user_message, original_query)
                 await asyncio.to_thread(history_db.add_ai_message, final_response_text)
 
     return StreamingResponse(
-        tiered_stream_generator(), 
+        tiered_stream_generator(),
         media_type="text/plain",  # Change from "text/event-stream" to "text/plain"
         headers={
             "Cache-Control": "no-cache",
