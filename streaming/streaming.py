@@ -671,7 +671,7 @@ async def web_rag_mix(
         final_prompt = PromptTemplate.from_template(
             """
             You are a financial markets expert. Today's date is {today}. Provide a detailed, well-structured final answer using the comprehensive context provided.
-            Use markdown for readability and cite the source links where appropriate. Provide the source links with their citation numbers at the end of the response.
+            Use markdown for readability. Do not use tables in your response.
 
             **CRITICAL INSTRUCTION:** Focus exclusively on financial, startup, corporate, and stock market-related information.
 
