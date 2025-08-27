@@ -1,35 +1,35 @@
 {
-    "last_updated_utc": "2025-08-27T12:55:58.264171+00:00",
+    "last_updated_utc": "2025-08-27T13:10:56.889823+00:00",
     "market_summary": {
         "summary_points": [
             {
-                "title": "US Tariff Draft Notice Sparks Sell-Off",
-                "summary": "The United States’ draft notification of an additional 25% tariff on Indian imports triggered a broad-based sell-off in Indian equity markets on Tuesday. Benchmark indices Nifty50 and BSE Sensex plunged over 1% each—Nifty fell 255.70 points to 24,712.05 and Sensex dropped 849.37 points to 80,786.54—driven by heightened trade tension fears and a sudden surge in risk-off sentiment among investors.",
+                "title": "US Trade Tariff Escalation Hits Indian Markets",
+                "summary": "After the United States issued draft notifications to impose additional 25% tariffs on Indian imports—potentially raising total duties to 50%—investor sentiment turned sharply risk-off, triggering a broad market downturn and overshadowing other global cues. The tariffs are slated to take effect from August 27, amplifying concerns over prolonged trade tensions.",
                 "age": "1 day ago"
             },
             {
-                "title": "Global Market Slump Adds to Downside Pressure",
-                "summary": "Asian equities opened lower following Wall Street’s lead as U.S. tariff threats and disappointing macro data weighed on sentiment. Japan’s Nikkei fell over 1%, South Korea’s Kospi lost nearly 0.9%, and Hang Seng futures signaled further weakness. U.S. indices also ended in the red, with the Dow down 0.77% and S&P 500 off 0.43%, exacerbating bearish cues for Indian markets.",
+                "title": "Sharp Correction in Domestic Indices",
+                "summary": "The Nifty50 fell by 255.70 points (1.02%) to close at 24,712.05, while the BSE Sensex dropped 849.37 points (1.04%) to finish at 80,786.54. Both benchmarks marked intraday lows near the day’s end as selling pressure persisted across sectors, reflecting a broad-based sell-off.",
                 "age": "1 day ago"
             },
             {
-                "title": "Foreign Fund Outflows Intensify Market Weakness",
-                "summary": "Continuous foreign institutional investor (FII) withdrawals compounded market jitters, as overseas investors sold down Indian equities amid rising geopolitical risks and global monetary tightening. The sustained outflow trend dented liquidity and exerted downward pressure on the rupee, reinforcing a cautious stance among domestic participants.",
+                "title": "Global Market Downturn Adds Pressure",
+                "summary": "Regional markets in Asia moved lower, tracking Wall Street losses amid US-China tariff threats—Japan’s Nikkei shed 1.16% and South Korea’s Kospi dipped 0.88%. US futures and Gift Nifty futures trading at a 64-point discount signaled a negative start for Indian markets, reinforcing the bearish domestic trend.",
                 "age": "1 day ago"
             },
             {
-                "title": "Technical Playbook: Paradeep Phosphates Recommendation",
-                "summary": "MarketSmith India has flagged Paradeep Phosphates for a potential rebound, highlighting a downward-sloping trendline breakout. With a current P/E of 39.31 and 52-week high at ₹3,743, analysts recommend buying in the ₹3,200–3,280 zone with a target of ₹3,800 over two to three months and a stop-loss at ₹3,050. Key risks include export trade hurdles, U.S. probe concerns, intense price competition, and inventory overhang.",
-                "age": "12 hours ago"
-            },
-            {
-                "title": "Expert Views: Risk-Off Momentum Dominates",
-                "summary": "Strategists such as Dr. V.K. Vijayakumar of Geojit Investments and Sudeep Shah of SBI Securities noted that the tariff shock triggered a broader risk-off wave across domestic markets. They pointed to currency swings, falling commodity prices, and technical breakdowns below key support levels as factors reinforcing investor caution and driving the sharp intraday corrections.",
+                "title": "Foreign Fund Outflows Worsen Sentiment",
+                "summary": "Continuous foreign institutional investor (FII) sell-offs intensified the domestic slide as overseas capital exited equities in response to rising trade tensions and unfavorable global cues, compounding the day’s bearish momentum.",
                 "age": "1 day ago"
             },
             {
-                "title": "Indian Markets Halted for Ganesh Chaturthi Holiday",
-                "summary": "While global markets were mixed, Indian exchanges remained closed today in observance of Ganesh Chaturthi. Despite the holiday pause, market participants monitored Asia’s steady performance and braced for reopening next week amid lingering concerns over trade tensions and policy developments.",
+                "title": "Technical Stock Picks Highlight Opportunities Amid Sell-off",
+                "summary": "Despite broad market weakness, analysts identified selective buying opportunities in individual stocks such as Paradeep Phosphates, recommending a buy range of ₹3,200–3,280, a target price of ₹3,800 in two to three months, and a stop loss at ₹3,050, based on recent breakout signals and risk-reward analysis.",
+                "age": "13 hours ago"
+            },
+            {
+                "title": "Markets Closed for Ganesh Chaturthi",
+                "summary": "Domestic markets were closed for Ganesh Chaturthi, leaving Asian peers to trade largely higher in the absence of Indian participation. Investors awaited the reopening and further clarity on trade policy developments to gauge the next directional cues.",
                 "age": "8 hours ago"
             }
         ],
@@ -64,72 +64,72 @@
         ]
     },
     "sector_analysis": {
-        "top_performers": [
+        "top_performing_sectors": [
             {
                 "sector": "FMCG",
-                "performance": "Up 0.91%",
+                "performance": "+0.91%",
                 "explanation": "Gained on expectations of increased consumption amid proposed GST reforms."
             },
             {
                 "sector": "Banking",
-                "performance": "Gained",
-                "explanation": "Supported by positive triggers and strong domestic liquidity, making banks the ‘heroes’ of the session."
+                "performance": "Positive",
+                "explanation": "Benefited from positive triggers and fresh buying interest during a mixed market opening."
             },
             {
                 "sector": "Metals",
-                "performance": "Gained",
-                "explanation": "Rallied on sector-specific buying interest and favourable news flow."
+                "performance": "Positive",
+                "explanation": "Attracted value-seeking funds amid broader sector rotation."
             }
         ],
-        "underperformers": [
+        "underperforming_sectors": [
             {
                 "sector": "Realty",
-                "performance": "Down around 2%",
-                "explanation": "Suffered heavy selling amid profit-taking after recent rallies."
+                "performance": "≈-2%",
+                "explanation": "Hit by profit-taking and subdued sentiment in the property segment."
             },
             {
                 "sector": "Consumer Durables",
-                "performance": "Down around 2%",
-                "explanation": "Weighed down by broad market weakness and valuation-driven profit-booking."
+                "performance": "≈-2%",
+                "explanation": "Faced heavy selling pressure as growth worries dented demand prospects."
             },
             {
                 "sector": "Oil & Gas",
-                "performance": "Down around 2%",
-                "explanation": "Hit by broader sell-off and sectoral profit-taking."
+                "performance": "≈-2%",
+                "explanation": "Slumped on commodity price headwinds and overall market weakness."
             }
         ]
     },
     "standouts_analysis": {
-        "top_gainers": [
+        "gainers": [
             {
-                "stock": "Eicher Motors",
-                "reason": ""
+                "stock": "Hindustan Unilever",
+                "reason": "Shares rose 2.32% on expectations of increased consumption amid the proposed GST reforms."
             },
             {
-                "stock": "Hindustan Unilever (HUL)",
-                "reason": "FMCG sector gained on expectations of increased consumption amid proposed GST reforms."
+                "stock": "Eicher Motors",
+                "reason": "Shares rallied 2.68%, bucking the broader market decline, though no specific catalyst was cited in the reports."
             },
             {
                 "stock": "Maruti Suzuki",
-                "reason": ""
+                "reason": "Stock gained around 1.85% despite the overall market weakness, with no single driver mentioned."
             }
         ],
-        "top_losers": [
+        "losers": [
             {
                 "stock": "Shriram Finance",
-                "reason": ""
+                "reason": "Shares plunged 4.03% as the financial-services segment came under pressure in a broadly downbeat market."
             },
             {
-                "stock": "Sun Pharmaceutical",
-                "reason": "Pharma sector ended lower amid a broad market sell-off."
+                "stock": "Sun Pharma",
+                "reason": "Stock fell 3.35%, weighed down by sector‐wide weakness in pharmaceuticals amid rising trade‐tension worries."
             },
             {
                 "stock": "Tata Steel",
-                "reason": "Metal sector declined amid market weakness."
+                "reason": "Shares dropped 2.87% due to heavy selling in the metal sector."
             }
         ]
     },
     "market_drivers": {
-        "summary": "Today’s market was weighed down by growing US tariff concerns and ongoing foreign institutional selling, which fueled profit booking across big‐cap names such as Sun Pharma, Adani Ports and Power Grid. While strong domestic liquidity and talk of GST and tax reforms offered some underpinning, easing corporate earnings momentum and sluggish consumer spending capped upside. Sectorally, metals, realty and pharma led declines, even as FMCG stocks held up relatively well. In sum, a mix of global tariff jitters, FII outflows, earnings uncertainty and targeted sector weakness dictated the trading session’s subdued performance."
+        "summary": "Today’s market skid was driven largely by negative global cues — especially anxiety over fresh US tariffs and geopolitical uncertainties — which, coupled with persistent foreign institutional selling and profit‐booking, overshadowed supportive domestic factors such as ample liquidity, falling interest rates and talk of tax/GST reforms. Sectoral underperformance among metals, realty and pharma stocks (notably Sun Pharma), along with a mid‐cap bias against risk ahead of a looming holiday, weighed on benchmarks, while defensive pockets like FMCG managed modest gains. Absent clearer catalysts on tariff clarity, GST reforms and a pick‐up in consumer spending and private investments, markets are expected to linger in a tight trading range."
     }
 }

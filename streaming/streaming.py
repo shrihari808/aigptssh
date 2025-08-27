@@ -1011,6 +1011,7 @@ async def red_rag_bing(
 
         try:
             # Step 1: Search for Reddit posts
+            yield "& Searching for relevant Reddit discussions...\n".encode("utf-8")
             brave_api_key = os.getenv('BRAVE_API_KEY')
             search_results = await fetch_search_red(original_query, brave_api_key)
 
@@ -1023,15 +1024,15 @@ async def red_rag_bing(
             if not articles:
                 yield "\nCould not find any relevant Reddit discussions for your query.".encode("utf-8")
                 return
-            
-            yield f"# Reading sources | {len(articles)} articles\n".encode("utf-8")
+
+            yield f"& Reading sources | {len(articles)} articles\n".encode("utf-8")
             for article in articles:
                 yield f"{json.dumps({'title': article.get('title'), 'url': article.get('url')})}\n".encode("utf-8")
 
             top_articles = articles[:5] # Limit to top 5 articles for scraping
             final_links = [article['url'] for article in top_articles]
 
-            yield "# Filtering Content ...\n".encode("utf-8")
+            yield "& Filtering Content ...\n".encode("utf-8")
 
             # Step 2: Scrape top Reddit posts
             scraper = RedditScraper()
@@ -1053,7 +1054,7 @@ async def red_rag_bing(
                 yield "\nFailed to process Reddit content for analysis.".encode("utf-8")
                 return
             
-            yield "# Re-ranking context ...\n".encode("utf-8")
+            yield "& Re-ranking context ...\n".encode("utf-8")
 
             # Step 4: Search Chunks for Relevance
             relevant_chunks: list[Document] = await retriever.ainvoke(original_query)
@@ -1074,7 +1075,7 @@ async def red_rag_bing(
 
             top_passages = reranked_passages[:7]
             
-            yield "# Creating enhanced context ...\n".encode("utf-8")
+            yield "& Creating enhanced context ...\n".encode("utf-8")
             
             final_context = scoring_service.create_enhanced_context(top_passages)
 
@@ -1093,9 +1094,8 @@ async def red_rag_bing(
         - Popular opinions and debates
         - Emerging trends mentioned by users
         - Different perspectives from the Reddit community
-        - Provide the source links with their citation numbers at the end of the response
 
-        Use proper markdown formatting and cite relevant Reddit discussions.
+        Use proper markdown formatting.
 
         The user has asked the following question: {input}
 
@@ -1110,7 +1110,7 @@ async def red_rag_bing(
         ans_chain = R_prompt | llm_stream
 
         # Step 7: Stream the final response
-        yield "#Thinking ...\n".encode("utf-8")
+        yield "& Thinking ...\n".encode("utf-8")
 
         final_response = ""
         try:
@@ -1132,6 +1132,8 @@ async def red_rag_bing(
                 history_db = PostgresChatMessageHistory(str(session_id), psql_url)
                 history_db.add_user_message(original_query)
                 history_db.add_ai_message(final_response)
+            
+            yield "\n& Stream finished".encode("utf-8")
 
         except Exception as e:
             print(f"ERROR: An error occurred during final response streaming: {e}")
