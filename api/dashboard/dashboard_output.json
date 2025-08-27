@@ -1,64 +1,65 @@
 {
-    "last_updated_utc": "2025-08-26T16:51:21.513687+00:00",
+    "last_updated_utc": "2025-08-27T12:55:58.264171+00:00",
     "market_summary": {
         "summary_points": [
             {
-                "title": "Dovish Powell Speech Spurs Bullish Start",
-                "summary": "After Federal Reserve Chair Jerome Powell’s Jackson Hole address hinted at a possible rate cut in September, Indian equity benchmarks were set for a higher Monday open. Gift Nifty traded at a premium of around 55 points over Nifty futures, reflecting optimism in global markets. The backdrop of a dovish US Fed stance provided a tailwind, even as the previous session snapped a six-day winning run.",
+                "title": "US Tariff Draft Notice Sparks Sell-Off",
+                "summary": "The United States’ draft notification of an additional 25% tariff on Indian imports triggered a broad-based sell-off in Indian equity markets on Tuesday. Benchmark indices Nifty50 and BSE Sensex plunged over 1% each—Nifty fell 255.70 points to 24,712.05 and Sensex dropped 849.37 points to 80,786.54—driven by heightened trade tension fears and a sudden surge in risk-off sentiment among investors.",
                 "age": "1 day ago"
             },
             {
-                "title": "Critical Technical Levels Under Spotlight",
-                "summary": "Technically, the 50-day simple moving average near 81,900 on the Sensex has become a pivotal support-cum-resistance zone. A sustained move above this level could pave the way for a rally toward the next hurdle at 82,500 and potentially extend gains to 83,300. Conversely, failure to hold 81,900 may trigger a deeper retracement down to the 20-day SMA around 81,100–81,000 or even the 80,700–80,400 band.",
+                "title": "Global Market Slump Adds to Downside Pressure",
+                "summary": "Asian equities opened lower following Wall Street’s lead as U.S. tariff threats and disappointing macro data weighed on sentiment. Japan’s Nikkei fell over 1%, South Korea’s Kospi lost nearly 0.9%, and Hang Seng futures signaled further weakness. U.S. indices also ended in the red, with the Dow down 0.77% and S&P 500 off 0.43%, exacerbating bearish cues for Indian markets.",
                 "age": "1 day ago"
             },
             {
-                "title": "Sectoral Movers: Auto Stocks Outperform Amid Broader Sell-off",
-                "summary": "In a volatile session marked by panic ahead of Powell’s remarks, auto majors Mahindra & Mahindra, Maruti Suzuki, and Bharat Electronics led the Nifty 50 pack on the upside. Broader markets however saw profit booking, with heavyweight laggards including Grasim Industries, Asian Paints, and Adani Enterprises dragging indices lower and snapping a six-day rally.",
+                "title": "Foreign Fund Outflows Intensify Market Weakness",
+                "summary": "Continuous foreign institutional investor (FII) withdrawals compounded market jitters, as overseas investors sold down Indian equities amid rising geopolitical risks and global monetary tightening. The sustained outflow trend dented liquidity and exerted downward pressure on the rupee, reinforcing a cautious stance among domestic participants.",
                 "age": "1 day ago"
             },
             {
-                "title": "Global Headwinds Ahead of US Tariffs Weigh on Open",
-                "summary": "Indian markets were poised for a weak Tuesday start, tracking falling global equities and in anticipation of fresh US tariffs on Indian goods. Gift Nifty was trading at a nearly 85-point discount to Nifty futures, hinting at a gap-down opening. Domestic benchmarks also showed technical indecision, with the Sensex forming an inside-bar pattern on daily charts.",
-                "age": "14 hours ago"
+                "title": "Technical Playbook: Paradeep Phosphates Recommendation",
+                "summary": "MarketSmith India has flagged Paradeep Phosphates for a potential rebound, highlighting a downward-sloping trendline breakout. With a current P/E of 39.31 and 52-week high at ₹3,743, analysts recommend buying in the ₹3,200–3,280 zone with a target of ₹3,800 over two to three months and a stop-loss at ₹3,050. Key risks include export trade hurdles, U.S. probe concerns, intense price competition, and inventory overhang.",
+                "age": "12 hours ago"
             },
             {
-                "title": "Weekly Bounce Back: Sensex and Nifty End Week Higher",
-                "summary": "Despite Friday’s 0.85% dip in Nifty 50 and a 693-point drop in Sensex, both indices managed weekly gains of around 1%. Renewed domestic institutional buyer interest, coupled with optimism over potential GST reforms, helped midcap and smallcap segments outperform, cushioning major indices from a sharper retreat.",
+                "title": "Expert Views: Risk-Off Momentum Dominates",
+                "summary": "Strategists such as Dr. V.K. Vijayakumar of Geojit Investments and Sudeep Shah of SBI Securities noted that the tariff shock triggered a broader risk-off wave across domestic markets. They pointed to currency swings, falling commodity prices, and technical breakdowns below key support levels as factors reinforcing investor caution and driving the sharp intraday corrections.",
                 "age": "1 day ago"
             },
             {
-                "title": "MarketSmith India's Top Stock Picks for August 25",
-                "summary": "MarketSmith India recommended its top stock ideas amid a market reversal that ended a six-day rally. With Nifty below the key 25,000 level and market breadth skewed negative, the research house highlighted stocks positioned to benefit from renewed domestic inflows and sectoral catalysts, aiming to capitalize on near-term volatility.",
-                "age": "1 day ago"
+                "title": "Indian Markets Halted for Ganesh Chaturthi Holiday",
+                "summary": "While global markets were mixed, Indian exchanges remained closed today in observance of Ganesh Chaturthi. Despite the holiday pause, market participants monitored Asia’s steady performance and braced for reopening next week amid lingering concerns over trade tensions and policy developments.",
+                "age": "8 hours ago"
             }
         ],
         "sources": [
-            "https://www.livemint.com/market/stock-market-news/stock-recommendations-today-25-august-marketsmith-nifty-sensex-tega-industries-aadhar-housing-finance-11755868445175.html",
-            "https://www.livemint.com/market/stock-market-news/nifty-50-sensex-today-what-to-expect-from-indian-stock-market-on-august-25-after-jerome-powell-s-jackson-hole-speech-11756047772707.html",
-            "https://www.livemint.com/market/stock-market-news/us-fed-rate-cut-buzz-to-fpis-selling-top-five-triggers-for-the-indian-stock-market-next-week-11755936818017.html",
-            "https://www.livemint.com/market/stock-market-news/nifty-50-sensex-today-what-to-expect-from-indian-stock-market-in-trade-on-august-26-ahead-of-trump-tariffs-11756145283315.html"
+            "https://m.economictimes.com/markets/stocks/live-blog/bse-sensex-today-live-nifty-stock-market-updates-26-august-2025/liveblog/123514057.cms",
+            "https://timesofindia.indiatimes.com/business/india-business/donald-trump-tariffs-impact-why-are-nifty50-bse-sensex-down-today-top-6-reasons-for-stock-market-bear-sentiment/articleshow/123519233.cms",
+            "https://www.livemint.com/market/stock-market-news/stock-recommendations-today-27-august-marketsmith-nifty-sensex-paradeep-phosphates-waaree-energies-11756211923335.html",
+            "https://www.livemint.com/market/stock-market-news/indian-stock-market-10-key-things-that-changed-for-market-overnight-gift-nifty-trump-tariffs-threat-to-gold-prices-11756145590919.html",
+            "https://www.tribuneindia.com/news/business/indian-stock-market-closed-today-for-ganesh-chaturthi/"
         ]
     },
     "latest_news": {
         "articles": [
             {
-                "title": "Stock market today: Nifty50 ends below 24,720; BSE Sensex down over 800 points as Trump administration notifies 50% tariffs on India - Times of India",
-                "snippet": "From fancy interiors of the new ... shares latest updates ... ADB to the rescue? Pakistan eyes $2 billion railway upgrade; China’s decade-long rail promise falters · Global markets in red! Donald Trump's tariff threat rattle stocks; Hang Seng dips 1%, FTSE down 50 points · Trump’s 50% tariffs: Indian refiners may ...",
-                "url": "https://timesofindia.indiatimes.com/business/india-business/stock-market-today-nifty50-bse-sensex-august-26-2025-donald-trump-50-tariffs-on-india-impact-indian-equities-global-markets/articleshow/123515104.cms",
-                "age": "5 hours ago"
+                "title": "Trump Tariffs Impact: Textiles, jewellery sectors to bear the brunt; Here’s how Indian stock market may react | Stock Market News",
+                "snippet": "Indian Stock MarketNifty 50Tariff HikeTrumpGet Latest real-time updates · Catch all the Business News , Market News , Breaking News Events and Latest News Updates on Live Mint.",
+                "url": "https://www.livemint.com/market/stock-market-news/trump-tariffs-impact-textiles-jewellery-sectors-to-bear-the-brunt-here-s-how-indian-stock-market-may-react-11756283054169.html",
+                "age": "3 hours ago"
             },
             {
-                "title": "Sensex Today | Stock Market Highlights: Nifty closes below 20-DMA at the lowest since May 9 as 50% tariffs loom",
-                "snippet": "Stock Market Highlights: The Nifty 50 index had a forgettable session on Tuesday, with the index declining over 250 points but close above the 24,700 mark. More importantly, the index closed below its 20-Day Moving Average (DMA) of 24,737. ICICI Bank (37 points) Reliance Industries (30 points), ...",
-                "url": "https://www.cnbctv18.com/market/stock-market-live-updates-sensex-nifty-50-today-midcaps-fno-expiry-nse-bse-trump-tariffs-psu-banks-vodafone-idea-psu-banks-paytm-tata-motors-share-price-liveblog-19659149.htm",
-                "age": "6 hours ago"
+                "title": "FIIs dump Indian stocks for other emerging markets like Taiwan, China, South Korea. What's driving the shift? Explained | Stock Market News",
+                "snippet": "Emerging MarketsIndiaForeign ... Kong Stock ExchangeEarningsTariff HikeGet Latest real-time updates · Catch all the Business News , Market News , Breaking News Events and Latest News Updates on Live Mint. Download The Mint News App to get Daily Market Updates. Business NewsMarketsStock MarketsFIIs dump Indian stocks for ...",
+                "url": "https://www.livemint.com/market/stock-market-news/indian-stock-market-loses-fii-favour-as-taiwan-china-and-south-korea-gain-ground-whats-driving-the-shift-explained-11756285402650.html",
+                "age": "3 hours ago"
             },
             {
-                "title": "Rs 6 lakh crore gone! Sensex falls 849 points, Nifty slips below 24,750. Trump tariff bomb and 6 other reasons why stock market fell today - The Economic Times",
-                "snippet": "US tariffs on Indian goodsSensex drop todayimpact of tariffs on Indian exportsStock market crashWhy is stock market down todayUS Tariffniftysensex crash todaywhy stock market is falling todaysensex crash · (What's moving Sensex and Nifty Track latest market news, stock tips, Budget 2025, Share ...",
-                "url": "https://economictimes.indiatimes.com/markets/stocks/news/why-is-the-stock-market-down-today-sensex-drops-over-600-pts-nifty-below-24800-7-reasons-behind-the-slump/articleshow/123516594.cms?from=mdr",
-                "age": "6 hours ago"
+                "title": "Indian stock market closed today for Ganesh Chaturthi - The Tribune",
+                "snippet": "Indian stock markets remained shut on Wednesday on account of Ganesh Chaturthi. Since the festival is a state holiday in Maharashtra, both the Bombay Stock Exchange (BSE) and the National Stock Exchange (NSE), which are headquartered in Mumbai, observed a trading holiday.",
+                "url": "https://www.tribuneindia.com/news/business/indian-stock-market-closed-today-for-ganesh-chaturthi/",
+                "age": "8 hours ago"
             }
         ]
     },
@@ -66,59 +67,69 @@
         "top_performers": [
             {
                 "sector": "FMCG",
-                "explanation": "FMCG was the lone sector in the green, up around 0.9% on hopes of stronger consumer demand and potential GST reforms."
+                "performance": "Up 0.91%",
+                "explanation": "Gained on expectations of increased consumption amid proposed GST reforms."
             },
             {
-                "sector": "Auto",
-                "explanation": "Auto stocks such as Eicher Motors and Maruti Suzuki surged over 1.5–2%, lifting the sector on resilient domestic demand."
-            }
-        ],
-        "top_underperformers": [
-            {
-                "sector": "Realty",
-                "explanation": "Realty tumbled nearly 2% amid broad profit‐booking and weak global cues."
+                "sector": "Banking",
+                "performance": "Gained",
+                "explanation": "Supported by positive triggers and strong domestic liquidity, making banks the ‘heroes’ of the session."
             },
             {
                 "sector": "Metals",
-                "explanation": "Metal stocks fell about 2% on heavy selling pressure and softer commodity outlook."
+                "performance": "Gained",
+                "explanation": "Rallied on sector-specific buying interest and favourable news flow."
+            }
+        ],
+        "underperformers": [
+            {
+                "sector": "Realty",
+                "performance": "Down around 2%",
+                "explanation": "Suffered heavy selling amid profit-taking after recent rallies."
             },
             {
-                "sector": "Financials",
-                "explanation": "Banking and financials slid over 1%, hit by tariff concerns, profit‐taking, and selling in heavyweight names."
+                "sector": "Consumer Durables",
+                "performance": "Down around 2%",
+                "explanation": "Weighed down by broad market weakness and valuation-driven profit-booking."
+            },
+            {
+                "sector": "Oil & Gas",
+                "performance": "Down around 2%",
+                "explanation": "Hit by broader sell-off and sectoral profit-taking."
             }
         ]
     },
     "standouts_analysis": {
-        "gainers": [
+        "top_gainers": [
             {
                 "stock": "Eicher Motors",
-                "reason": "Shares jumped 2.68% as investors rotated into select auto names even as most sectors corrected."
+                "reason": ""
             },
             {
-                "stock": "Hindustan Unilever",
-                "reason": "Up 2.32% on optimism around higher consumer spending amid proposed GST reforms."
+                "stock": "Hindustan Unilever (HUL)",
+                "reason": "FMCG sector gained on expectations of increased consumption amid proposed GST reforms."
             },
             {
-                "stock": "Maruti Suzuki India",
-                "reason": "Rose 1.85% with auto heavyweights seeing buying interest in an otherwise weak market."
+                "stock": "Maruti Suzuki",
+                "reason": ""
             }
         ],
-        "losers": [
+        "top_losers": [
             {
                 "stock": "Shriram Finance",
-                "reason": "Tumbled 4.03% as financials came under pressure in the broader market sell-off."
+                "reason": ""
             },
             {
-                "stock": "Sun Pharma",
-                "reason": "Slid 3.35% amid overall negative sentiment following tariff‐related concerns."
+                "stock": "Sun Pharmaceutical",
+                "reason": "Pharma sector ended lower amid a broad market sell-off."
             },
             {
                 "stock": "Tata Steel",
-                "reason": "Dropped 2.87% as metal stocks faced intensified selling in a downbeat session."
+                "reason": "Metal sector declined amid market weakness."
             }
         ]
     },
     "market_drivers": {
-        "summary": "Today’s market held relatively flat as investors balanced positive global cues—dovish rate signals and easing tariff worries—with domestic headwinds such as tepid corporate earnings and mixed institutional flows. Optimism around potential GST rationalisation and broader tax reforms lent support, while foreign portfolio investors modestly booked profits after recent rally highs. Strong domestic liquidity, buoyed by mutual fund inflows, offset some of the selling, and selective company-specific news in consumer and capex-led counters triggered pockets of buying, resulting in a narrow-range trading session."
+        "summary": "Today’s market was weighed down by growing US tariff concerns and ongoing foreign institutional selling, which fueled profit booking across big‐cap names such as Sun Pharma, Adani Ports and Power Grid. While strong domestic liquidity and talk of GST and tax reforms offered some underpinning, easing corporate earnings momentum and sluggish consumer spending capped upside. Sectorally, metals, realty and pharma led declines, even as FMCG stocks held up relatively well. In sum, a mix of global tariff jitters, FII outflows, earnings uncertainty and targeted sector weakness dictated the trading session’s subdued performance."
     }
 }

@@ -671,7 +671,7 @@ async def web_rag_mix(
         final_prompt = PromptTemplate.from_template(
             """
             You are a financial markets expert. Today's date is {today}. Provide a detailed, well-structured final answer using the comprehensive context provided.
-            Use markdown for readability. Do not use tables in your response.
+            Use markdown for readability.
 
             **CRITICAL INSTRUCTION:** Focus exclusively on financial, startup, corporate, and stock market-related information.
 
@@ -710,14 +710,14 @@ async def web_rag_mix(
                 history_db = PostgresChatMessageHistory(str(session_id), psql_url)
                 await asyncio.to_thread(history_db.add_user_message, original_query)
                 await asyncio.to_thread(history_db.add_ai_message, final_response_text)
-
+        yield f"\n& Stream finished".encode("utf-8")
     return StreamingResponse(
         tiered_stream_generator(),
         media_type="text/plain",  # Change from "text/event-stream" to "text/plain"
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "X-Accel-Buffering": "no"  # Disable nginx buffering
+            "X-Accel-Buffering": "no"
         }
     )
 
