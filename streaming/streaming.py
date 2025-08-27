@@ -1029,6 +1029,7 @@ async def red_rag_bing(
             for article in articles:
                 yield f"{json.dumps({'title': article.get('title'), 'url': article.get('url')})}\n".encode("utf-8")
 
+
             top_articles = articles[:5] # Limit to top 5 articles for scraping
             final_links = [article['url'] for article in top_articles]
 
