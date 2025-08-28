@@ -636,11 +636,11 @@ async def web_rag_mix(
                     yield "\nCould not find any initial sources.".encode("utf-8")
                     return
 
-                yield f"& Reading sources | {len(initial_sources)} articles\n".encode("utf-8")
+                yield f"& Searching sources ... | {len(initial_sources)} articles\n".encode("utf-8")
                 for source in initial_sources:
                     yield f"{json.dumps({'title': source.get('title'), 'url': source.get('link')})}\n".encode("utf-8")
 
-                yield "& Filtering Content ...\n".encode("utf-8")
+                yield "& Gathering data ...\n".encode("utf-8")
                 
                 sources_to_scrape = initial_sources[:10]
 
@@ -653,7 +653,7 @@ async def web_rag_mix(
                         scraped_sources.extend(scraped)
                     await asyncio.sleep(0.1)
 
-                yield "& Re-ranking context ...\n".encode("utf-8")
+                yield "& Analyzing insights ...\n".encode("utf-8")
 
                 final_passages = await scoring_service.rerank_content_chunks(query, scraped_sources, top_n=7)
                 if not final_passages:
@@ -663,7 +663,7 @@ async def web_rag_mix(
                 if use_caching:
                     await asyncio.to_thread(add_passages_to_cache, str(session_id), final_passages)
 
-        yield "& Creating enhanced context ...\n".encode("utf-8")
+        yield "& Ranking results ...\n".encode("utf-8")
 
         final_context = await asyncio.to_thread(scoring_service.create_enhanced_context, final_passages)
         final_links = list(set([p["metadata"].get("link") for p in final_passages if p.get("metadata", {}).get("link")]))
@@ -688,7 +688,7 @@ async def web_rag_mix(
         )
         final_chain = final_prompt | llm_stream
 
-        yield "& Thinking ...\n".encode("utf-8")
+        yield "& Summarizing for you ...\n".encode("utf-8")
 
         final_response_text = ""
         with get_openai_callback() as cb:
@@ -733,173 +733,6 @@ async def cmots_only(
 ):
     """Optimized CMOTS RAG endpoint."""
     pass
-
-@red_rag.post("/reddit_rag")
-async def red_rag_bing(
-    request: InRequest,
-    session_id: int = Query(...),
-    prompt_history_id: int = Query(...),
-    user_id: int = Query(...),
-    plan_id: int = Query(...),
-    db_pool: asyncpg.Pool = Depends(get_db_pool),
-    api_key: str = Depends(api_key_auth)
-):
-    """
-    Handles Reddit-based RAG requests with a full pipeline:
-    Search -> Scrape -> Chunk & Embed -> Retrieve -> Rerank -> Synthesize.
-    """
-
-    original_query = request.query.strip()
-
-    validation_result = await validate_query_only(original_query)
-    valid = validation_result.get("valid", 0)
-    validation_tokens = validation_result.get("tokens_used", 0)
-
-    async def generate_chat_res():
-        """Generator function that streams the entire RAG process."""
-        if valid == 0:
-            error_message = "The search query is not related to financial markets, companies, or economics. Please ask a relevant question."
-            yield error_message.encode("utf-8")
-            return
-
-        final_links = []
-
-        try:
-            # Step 1: Search for Reddit posts
-            yield create_progress_bar_string(10, "Searching for relevant Reddit discussions...").encode("utf-8")
-            brave_api_key = os.getenv('BRAVE_API_KEY')
-            search_results = await fetch_search_red(original_query, brave_api_key)
-
-            if not search_results:
-                yield "\nCould not find any relevant Reddit discussions for your query.".encode("utf-8")
-                return
-
-            articles, df, links = await process_search_red(search_results)
-
-            if not articles:
-                yield "\nCould not find any relevant Reddit discussions for your query.".encode("utf-8")
-                return
-
-            top_articles = articles[:5] # Limit to top 5 articles for scraping
-            final_links = [article['url'] for article in top_articles]
-
-            yield create_progress_bar_string(25, f"Found {len(links)} discussions. Scraping top posts...").encode("utf-8")
-
-            # Step 2: Scrape top Reddit posts
-            scraper = RedditScraper()
-            scraped_data = [await scraper.scrape_post(article) for article in top_articles]
-
-            if not any(scraped_data):
-                yield "\nFound Reddit discussions, but could not scrape their content.".encode("utf-8")
-                return
-            yield create_progress_bar_string(50, "Processing and embedding Reddit content...").encode("utf-8")
-
-            # --- MODIFICATION START ---
-            # Run the synchronous, CPU-bound function in a separate thread
-            retriever = await asyncio.to_thread(
-                create_reddit_vector_store_from_scraped_data,
-                scraped_data
-            )
-            # --- MODIFICATION END ---
-
-            if not retriever:
-                yield "\nFailed to process Reddit content for analysis.".encode("utf-8")
-                return
-            yield create_progress_bar_string(75, "Finding the most relevant information...").encode("utf-8")
-
-            # Step 4: Search Chunks for Relevance
-            relevant_chunks: list[Document] = await retriever.ainvoke(original_query)
-            if not relevant_chunks:
-                yield "\nCould not find specific information related to your query in the Reddit posts.".encode("utf-8")
-                return
-            yield create_progress_bar_string(80, "Ranking and scoring relevant information...").encode("utf-8")
-
-            # Step 5: Score and Rerank Chunks
-            passages_to_score = [
-                {"text": doc.page_content, "metadata": doc.metadata} for doc in relevant_chunks
-            ]
-
-            reranked_passages = await scoring_service.score_and_rerank_passages(original_query, passages_to_score)
-
-            if not reranked_passages:
-                yield "\nCould not determine the most relevant information from the Reddit posts.".encode("utf-8")
-                return
-
-            top_passages = reranked_passages[:7]
-            final_context = scoring_service.create_enhanced_context(top_passages)
-            yield create_progress_bar_string(90, "Synthesizing the final answer...").encode("utf-8")
-
-        except Exception as e:
-            print(f"ERROR: Reddit RAG pipeline failed: {e}")
-            yield "\nAn error occurred while processing the Reddit discussions.".encode("utf-8")
-            return
-
-        # Step 6: Synthesize Answer
-        res_prompt = """
-        You are a financial information assistant specializing in Reddit discussions and community insights.
-        Using the provided Reddit articles and chat history, respond to the user's inquiries with detailed analysis.
-
-        Focus on:
-        - Community sentiment and discussions
-        - Popular opinions and debates
-        - Emerging trends mentioned by users
-        - Different perspectives from the Reddit community
-        - Provide the source links with their citation numbers at the end of the response
-
-        Use proper markdown formatting and cite relevant Reddit discussions.
-
-        The user has asked the following question: {input}
-
-        Context from Reddit:
-        {context}
-        """
-
-        R_prompt = PromptTemplate(
-            template=res_prompt,
-            input_variables=["context", "input"]
-        )
-        ans_chain = R_prompt | llm_stream
-
-        # Step 7: Stream the final response
-        yield create_progress_bar_string(100, "Done!").encode("utf-8")
-        yield "\n\n".encode("utf-8")
-        yield "#Thinking ...\n".encode("utf-8")
-
-        final_response = ""
-        try:
-            with get_openai_callback() as cb:
-                async for chunk in ans_chain.astream({"context": final_context, "input": original_query}):
-                    content = chunk.content
-                    if content:
-                        final_response += content
-                        yield content.encode("utf-8")
-                        await asyncio.sleep(0.01)
-
-                total_tokens = validation_tokens + cb.total_tokens
-                await insert_credit_usage(user_id, plan_id, total_tokens / 1000, db_pool)
-
-            links_data = {"links": final_links}
-            await store_into_db(session_id, prompt_history_id, links_data, db_pool)
-
-            if final_response:
-                history_db = PostgresChatMessageHistory(str(session_id), psql_url)
-                history_db.add_user_message(original_query)
-                history_db.add_ai_message(final_response)
-
-        except Exception as e:
-            print(f"ERROR: An error occurred during final response streaming: {e}")
-            yield b"An error occurred while generating the response."
-
-    return StreamingResponse(
-        generate_chat_res(), 
-        media_type="text/plain",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive", 
-            "X-Accel-Buffering": "no"
-        }
-    )
-
 
 async def validate_query_only(query: str) -> dict:
     """
@@ -1025,7 +858,7 @@ async def red_rag_bing(
                 yield "\nCould not find any relevant Reddit discussions for your query.".encode("utf-8")
                 return
 
-            yield f"& Reading sources | {len(articles)} articles\n".encode("utf-8")
+            yield f"& Searching Sources ... | {len(articles)} articles\n".encode("utf-8")
             for article in articles:
                 yield f"{json.dumps({'title': article.get('title'), 'url': article.get('url')})}\n".encode("utf-8")
 
@@ -1033,7 +866,7 @@ async def red_rag_bing(
             top_articles = articles[:5] # Limit to top 5 articles for scraping
             final_links = [article['url'] for article in top_articles]
 
-            yield "& Filtering Content ...\n".encode("utf-8")
+            yield "& Gathering data ...\n".encode("utf-8")
 
             # Step 2: Scrape top Reddit posts
             scraper = RedditScraper()
@@ -1055,7 +888,7 @@ async def red_rag_bing(
                 yield "\nFailed to process Reddit content for analysis.".encode("utf-8")
                 return
             
-            yield "& Re-ranking context ...\n".encode("utf-8")
+            yield "& Analyzing insights ...\n".encode("utf-8")
 
             # Step 4: Search Chunks for Relevance
             relevant_chunks: list[Document] = await retriever.ainvoke(original_query)
@@ -1076,7 +909,7 @@ async def red_rag_bing(
 
             top_passages = reranked_passages[:7]
             
-            yield "& Creating enhanced context ...\n".encode("utf-8")
+            yield "& Ranking results ...\n".encode("utf-8")
             
             final_context = scoring_service.create_enhanced_context(top_passages)
 
@@ -1111,7 +944,7 @@ async def red_rag_bing(
         ans_chain = R_prompt | llm_stream
 
         # Step 7: Stream the final response
-        yield "& Thinking ...\n".encode("utf-8")
+        yield "& Summarizing for you ...\n".encode("utf-8")
 
         final_response = ""
         try:
