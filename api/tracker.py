@@ -16,20 +16,13 @@ from config import GPT4o_mini as llm
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 from api.security import api_key_auth
-from main import lifespan
-from contextlib import asynccontextmanager
+# REMOVE: from main import lifespan
+# REMOVE: from contextlib import asynccontextmanager
 
 router = APIRouter()
 
-# Global variable for the database pool
+# Global variable for the database pool, will be set by main.py
 DB_POOL = None
-
-@asynccontextmanager
-async def get_db_pool_from_lifespan(app):
-    global DB_POOL
-    async with lifespan(app) as maybe_pool:
-        DB_POOL = app.state.db_pool
-        yield
 
 class Contract(BaseModel):
     id: int
@@ -43,7 +36,7 @@ class Contract(BaseModel):
 
 async def create_contracts_table():
     if not DB_POOL:
-        print("ERROR: Database connection pool not initialized.")
+        print("ERROR: Database connection pool not initialized for tracker.")
         return
     async with DB_POOL.acquire() as connection:
         await connection.execute("""

@@ -1,125 +1,128 @@
 {
-    "last_updated_utc": "2025-08-28T04:59:29.099555+00:00",
+    "last_updated_utc": "2025-08-28T08:54:48.871862+00:00",
     "market_summary": {
         "summary_points": [
             {
-                "title": "US Tariff Escalation Weighs on Markets",
-                "summary": "Indian equity benchmarks faced renewed pressure as the US government rolled out a draft notification imposing an additional 25% tariff on Indian goods starting Wednesday, effectively lifting total duties on exports to 50%. The heightened trade tension exacerbated investor concerns over India’s export outlook and sparked a sector-wide sell-off, marking the sharpest contraction in Nifty 50 in three months.",
-                "age": "1 hour ago"
+                "title": "Sensex and Nifty Dip Over 1%",
+                "summary": "The Indian benchmark indices witnessed a significant downturn as the Sensex plunged 849.37 points (1.04%) to close at 80,786.54, while the Nifty 50 declined 255.70 points (1.02%) to end the session at 24,712.05. Broad‐based selling across sectors erased nearly ₹6 lakh crore in investor wealth, marking one of the steepest single‐day falls in recent memory.",
+                "age": "6 hours ago"
             },
             {
-                "title": "Benchmark Indices Plunge to Fresh Lows",
-                "summary": "Sensex and Nifty50 ended sharply lower, with the Sensex shedding 849.37 points (1.04%) to 80,786.54 and the Nifty declining 255.70 points (1.02%) to 24,712.05. Both indices hit intraday lows—80,685.98 and 24,689.60 respectively—driven by broad-based selling and diminishing risk appetite amid policy uncertainty.",
-                "age": "1 day ago"
+                "title": "50% US Tariffs Weigh on Sentiment",
+                "summary": "With the US imposing an additional 25% tariff on Indian exports—bringing the total to 50%—market participants grew cautious, leading to a weak opening and intra-day pullback. While this escalation has dampened near-term sentiment, strategists view it as a temporary aberration likely to be resolved swiftly, especially after US Treasury commentary hinting at renewed bilateral engagement.",
+                "age": "3 hours ago"
             },
             {
-                "title": "Midcap and Smallcap Stocks Suffer Heavy Losses",
-                "summary": "Broader-market indices mirrored the decline in the largecaps as the BSE Midcap index fell 1.34% and the Smallcap index dropped 1.68%. The pain extended across smaller stocks, eroding market breadth and underscoring the pervasive bearish sentiment gripping mid- and small-cap segments.",
-                "age": "1 day ago"
+                "title": "Sectoral Divergence: Exports Under Pressure, Domestic Demand Holds Up",
+                "summary": "Export‐oriented sectors faced sustained selling pressure amid tariff headwinds, dragging key heavyweight stocks lower. In contrast, domestic demand-driven segments such as FMCG and consumer discretionary offered relative stability, while banking, IT, and realty stocks came under renewed selling interest despite pockets of resilience in consumer durables.",
+                "age": "7 hours ago"
             },
             {
-                "title": "Foreign Outflows and Global Cues Dampen Sentiment",
-                "summary": "Persistent selling by foreign institutional investors, coupled with weakening cues from Asian markets—where Japan’s Nikkei and South Korea’s Kospi slid over 0.8%—and sell-offs on Wall Street intensified the downturn, compounding the domestic fallout from the tariff action and underscoring the interlinked nature of global equity pressures.",
-                "age": "1 day ago"
+                "title": "Global Cues and Weak Opening Signals",
+                "summary": "Asian markets were mixed—Japan’s Nikkei and Topix in the green, South Korea’s Kospi higher and Kosdaq lower—while Hong Kong futures pointed to a subdued start. US equities closed at record highs overnight, but domestic pre-market indicators, including Gift Nifty trading around 24,650 (a discount of 80-odd points to futures), signaled a negative bias for the opening bell.",
+                "age": "6 hours ago"
             },
             {
-                "title": "Investor Wealth Erodes by Trillions",
-                "summary": "The overall market capitalization of BSE-listed companies plunged by approximately ₹4 lakh crore in a single session, falling from ₹449 lakh crore to nearly ₹445 lakh crore, translating to significant erosion in household and institutional wealth amid the sell-off sparked by tariff fears.",
-                "age": "1 hour ago"
+                "title": "Technical Charts Turn Bearish",
+                "summary": "On the technical front, the Sensex formed a pronounced bearish candle and is maintaining a lower‐top formation on intraday charts, reinforcing a negative near-term outlook. Key support levels around 80,500 for Sensex and 24,600 for Nifty 50 will be pivotal; a failure to hold could open the door to further downside.",
+                "age": "6 hours ago"
             },
             {
-                "title": "Negative Overnight Signals Point to Risk Aversion",
-                "summary": "Futures markets indicated a cautious start, with Gift Nifty trading around the 24,925 level—a 64-point discount to the previous close—while global benchmarks from Wall Street to Hong Kong pointed lower ahead of key earnings releases and economic data, signaling widespread risk aversion ahead of the domestic trading session.",
-                "age": "2 days ago"
+                "title": "Analyst Insights on Key Triggers",
+                "summary": "Market experts recommend keeping a close watch on foreign institutional flows, global market momentum, and any policy interventions aimed at cushioning trade frictions. Ajit Mishra of Religare Broking highlights the resilience in domestic demand sectors, while VK Vijayakumar of Geojit Investments believes the tariff spike will be seen as a short-lived issue with diplomatic solutions on the horizon.",
+                "age": "3 hours ago"
             }
         ],
         "sources": [
-            "https://www.livemint.com/market/stock-market-news/indian-stock-market-10-key-things-that-changed-for-market-overnight-gift-nifty-trump-tariffs-threat-to-gold-prices-11756145590919.html",
-            "https://www.livemint.com/market/stock-market-news/stock-market-crash-can-nifty-50-touch-24-000-amid-renewed-fear-of-trumps-tariffs-on-india-11756263651994.html",
-            "https://www.livemint.com/market/stock-market-news/sensex-crashes-500-points-nifty-drops-below-24-600-why-is-indian-stock-market-falling-5-key-factors-explained-11756350345979.html",
-            "https://m.economictimes.com/markets/stocks/live-blog/bse-sensex-today-live-nifty-stock-market-updates-26-august-2025/liveblog/123514057.cms",
-            "https://timesofindia.indiatimes.com/business/india-business/donald-trump-tariffs-impact-why-are-nifty50-bse-sensex-down-today-top-6-reasons-for-stock-market-bear-sentiment/articleshow/123519233.cms"
+            "https://www.livemint.com/market/stock-market-news/indian-stock-market-8-key-things-that-changed-for-market-overnight-gift-nifty-trump-tariffs-to-nvidia-q2-results-11756320140040.html",
+            "https://economictimes.indiatimes.com/markets/stocks/live-blog/bse-sensex-today-live-nifty-stock-market-updates-28-august-2025/liveblog/123553920.cms",
+            "https://www.livemint.com/market/stock-market-news/nifty-50-sensex-today-what-to-expect-from-indian-stock-market-in-trade-on-august-28-after-trump-tariffs-11756319778627.html",
+            "https://timesofindia.indiatimes.com/business/india-business/stock-market-today-nifty50-bse-sensex-august-28-2025-donald-trump-tariffs-impact-indian-equities-global-markets/articleshow/123554577.cms"
         ]
     },
     "latest_news": {
         "articles": [
             {
-                "title": "Sensex tanks over 500 points, Nifty down to 24,554, day after Trump’s additional 25% tariff kicks in",
-                "snippet": "The Indian stock market opened lower on Thursday, with Sensex dropping 508.16 points to 80,278.38 amid new US tariffs. Major sectors faced losses, while select firms like HCL Tech and HDFC Bank lagged. Discover the latest market trends and insights.",
-                "url": "https://indianexpress.com/article/business/market/sensex-tanks-nifty-down-trump-us-tariffs-10215653/",
-                "age": "15 minutes ago"
+                "title": "Stock market today: Nifty50 below 24,550; BSE Sensex drops over 600 points as Donald Trump's 50% tariffs hit India - The Times of India",
+                "snippet": "India Business News: Stock market today: Nifty50 and BSE Sensex, the Indian equity benchmark indices, tanked in opening trade on Thursday a day after 50% US tariffs came i",
+                "url": "https://timesofindia.indiatimes.com/business/india-business/stock-market-today-nifty50-bse-sensex-august-28-2025-donald-trump-tariffs-impact-indian-equities-global-markets/articleshow/123554577.cms",
+                "age": "44 minutes ago"
             },
             {
-                "title": "Why stock market is down today? Key factors behind the 600-point Sensex crash, Nifty50 below 24,550 - The Economic Times",
-                "snippet": "Indian equities experienced a sharp decline on Thursday, triggered by the implementation of 25% US tariffs on Indian imports. The Sensex and Nifty50 opened significantly lower, with banks facing the most substantial selling pressure. Weak global cues and continuous foreign fund outflows further ...",
-                "url": "https://m.economictimes.com/markets/stocks/news/why-stock-market-is-down-today-key-factors-behind-the-650-point-sensex-crash-nifty-below-24550/amp_articleshow/123555258.cms",
-                "age": "58 minutes ago"
+                "title": "Indian stock market: Nifty 50 holds above 24,500 despite Trump’s tariffs. Key technical levels you must know | Stock Market News",
+                "snippet": "Nifty 50Stock Market TodayIndian Stock MarketSensexGet Latest real-time updates · Catch all the Business News , Market News , Breaking News Events and Latest News Updates on Live Mint.",
+                "url": "https://www.livemint.com/market/stock-market-news/indian-stock-market-nifty-50-holds-above-24-500-despite-trump-s-tariffs-key-technical-levels-you-must-know-11756364958539.html",
+                "age": "1 hour ago"
             },
             {
-                "title": "Sensex crashes 700 points; why is the Indian stock market falling? Trump tariffs, other key factors explained | Stock Market News",
-                "snippet": "Indian Stock MarketStock Market TodaySensex TodayNifty 50Stock MarketGet Latest real-time updates · Catch all the Business News , Market News , Breaking News Events and Latest News Updates on Live Mint.",
-                "url": "https://www.livemint.com/market/stock-market-news/sensex-crashes-500-points-nifty-drops-below-24-600-why-is-indian-stock-market-falling-5-key-factors-explained-11756350345979.html",
+                "title": "Stock markets slide, US hints talks possible: 24 hours since 50% tariffs on India | 5 points | Latest News India - Hindustan Times",
+                "snippet": "The Donald Trump-led US administration has imposed 50 per cent tariffs on Indian imports, causing stock market declines. | Latest News India",
+                "url": "https://hindustantimes.com/india-news/stock-markets-slide-us-hints-talks-possible-24-hours-since-50-tariffs-on-india-5-points-101756361955989.html",
                 "age": "1 hour ago"
             }
         ]
     },
     "sector_analysis": {
-        "top_performers": [
+        "performing_sectors": [
             {
-                "sector": "Technology",
-                "explanation": "Technology stocks have remained resilient as investors favor domestic demand–driven software and services less exposed to U.S. tariffs."
+                "sector": "Consumer",
+                "explanation": "Buoyed by resilient domestic demand, consumer stocks like HUL and Marico have attracted sustained buying."
             },
             {
                 "sector": "Healthcare",
-                "explanation": "Healthcare names have held up on sustained domestic consumption and a defensive earnings profile amid broader market volatility."
+                "explanation": "Insulated from export tariffs, healthcare names have held up on strong local consumption and steady earnings."
             },
             {
-                "sector": "Financials (NBFCs & Banks)",
-                "explanation": "NBFCs and banks continue to attract buyers looking for yield and stability, buoyed by strong domestic liquidity and retail participation."
+                "sector": "Banking & NBFC",
+                "explanation": "Domestic financial plays continue to draw buyers as local investors position for India’s intact growth story."
             }
         ],
-        "underperformers": [
+        "underperforming_sectors": [
             {
-                "sector": "Export-oriented industries",
-                "explanation": "Sectors reliant on overseas sales are under pressure from the new 25% U.S. export tariff, triggering profit‐taking and foreign fund outflows."
+                "sector": "IT Services",
+                "explanation": "Export-oriented tech firms such as HCL Tech have been sold off on US tariff concerns and profit-taking."
             },
             {
-                "sector": "Tariff-sensitive manufacturing",
-                "explanation": "Manufacturers exposed to U.S. trade tensions are facing margin headwinds and supply‐chain disruptions, weighing on near-term performance."
+                "sector": "Utilities",
+                "explanation": "Power utilities like Power Grid and NTPC lagged amid broad market weakness and foreign fund outflows."
+            },
+            {
+                "sector": "Pharmaceuticals",
+                "explanation": "Sun Pharma and other pharma exporters dipped under the weight of additional US tariffs and market rotation."
             }
         ]
     },
     "standouts_analysis": {
         "top_gainers": [
             {
-                "stock": "Hindustan Unilever (HUL)",
-                "reason": "Led gains in the FMCG pack on expectations of increased consumption amid the proposed GST reforms."
+                "name": "Eicher Motors",
+                "reason": "rose 2.68% as it bucked the broader market decline, reflecting continued strength in the automobile sector."
             },
             {
-                "stock": "Eicher Motors",
-                "reason": "Attracted selective buying in the auto space despite a broad market sell-off."
+                "name": "Hindustan Unilever (HUL)",
+                "reason": "gained 2.32% on expectations of increased consumption ahead of proposed GST reforms, boosting FMCG stocks."
             },
             {
-                "stock": "Maruti Suzuki",
-                "reason": "Saw outperformance in the auto sector as investors rotated into consumer-durable names."
+                "name": "Maruti Suzuki",
+                "reason": "advanced 1.85% supported by resilient auto demand despite the overall market weakness."
             }
         ],
         "top_losers": [
             {
-                "stock": "Shriram Finance",
-                "reason": "Caught in the broader PSU banking sell-off as sectoral indices fell 1–2%."
+                "name": "Shriram Finance",
+                "reason": "slumped over 4% as PSU bank and financial services names were broadly sold off in the sharp market pullback."
             },
             {
-                "stock": "Sun Pharma",
-                "reason": "Dragged lower by weakness in the pharma index amid profit-taking."
+                "name": "Sun Pharma",
+                "reason": "fell 3.35% amid sector-wide selling pressure in pharmaceuticals within the downbeat market context."
             },
             {
-                "stock": "Tata Steel",
-                "reason": "Weighed down by heavy selling in the metal space, which fell nearly 2%."
+                "name": "Tata Steel",
+                "reason": "dropped 2.87% on a 2%-plus slide in metal stocks, mirroring the broader market’s weakness."
             }
         ]
     },
     "market_drivers": {
-        "summary": "Today’s market skid was driven by a confluence of factors: disappointment over Washington’s 25% tariff on Indian imports reignited global trade‐tension angst, while soft earnings from major banks and stretched valuations prompted sector‐specific selling. Foreign institutional outflows intensified the downtrend, offsetting strong domestic liquidity supported by falling interest rates and hopes of GST and broader tax reforms. Meanwhile, weak global cues—from lingering geopolitical uncertainty to murky tariff outcomes—kept investors cautious, making yesterday’s steep fall a story of external shocks, shifting institutional flows, and selective profit‐taking in bank and financial stocks."
+        "summary": "Today’s sharp market pullback was driven primarily by the onset of 25% US punitive tariffs on Indian exports, which spooked exporters and added to already weak global cues, while continuous foreign institutional outflows compounded the sell-off. Banks and export‐oriented sectors saw the heaviest selling pressure, wiping out over ₹4 lakh crore in market value, even as defensive segments like FMCG displayed relative resilience. Investors also remain watchful of broader policy moves, including potential GST reforms, and any company-specific developments that could influence near-term sentiment."
     }
 }

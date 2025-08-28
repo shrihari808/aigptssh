@@ -12,7 +12,6 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from api.dashboard.data_aggregator import aggregate_and_process_data, generate_trending_stocks_data
 
 # --- Add the project root to the Python path ---
-# This ensures that imports work correctly from anywhere in the project.
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(CURRENT_DIR)
 if PROJECT_ROOT not in sys.path:
@@ -20,32 +19,11 @@ if PROJECT_ROOT not in sys.path:
 
 # --- Import the master API router ---
 from api.router import api_router
-from config import DB_POOL # Import the DB_POOL variable to make it accessible to other modules
-from api.tracker import process_contracts, create_contracts_table, DB_POOL as TRACKER_DB_POOL
+from config import DB_POOL as CONFIG_DB_POOL
+from api import tracker # Import the tracker module
 
 # --- Database Connection Pool Management ---
-async def init_db_pool():
-    """Initializes the asyncpg connection pool."""
-    global DB_POOL
-    db_url = os.getenv('DATABASE_URL')
-    if db_url:
-        print("INFO: Initializing database connection pool...")
-        DB_POOL = await asyncpg.create_pool(
-            dsn=db_url,
-            min_size=1,
-            max_size=10
-        )
-        print("INFO: Database connection pool initialized successfully.")
-    else:
-        print("ERROR: DATABASE_URL not set. Cannot initialize connection pool.")
-
-async def close_db_pool():
-    """Closes the asyncpg connection pool."""
-    global DB_POOL
-    if DB_POOL:
-        print("INFO: Closing database connection pool...")
-        await DB_POOL.close()
-        print("INFO: Database connection pool closed.")
+DB_POOL = None
 
 # --- Add Lifecycle Event Handlers for DB Pool using lifespan ---
 scheduler = AsyncIOScheduler()
@@ -68,16 +46,16 @@ async def lifespan(app: FastAPI):
         )
         app.state.db_pool = pool
         DB_POOL = pool  # Make pool globally available
-        TRACKER_DB_POOL = pool # Make pool available to tracker module
+        tracker.DB_POOL = pool # Correctly assign the pool to the tracker module
         print("INFO: Database connection pool initialized successfully.")
-        await create_contracts_table() # Create contracts table
+        await tracker.create_contracts_table() # Create contracts table
     else:
         app.state.db_pool = None
         print("ERROR: DATABASE_URL not set. Database pool not initialized.")
 
     scheduler.add_job(aggregate_and_process_data, 'interval', minutes=15)
-    scheduler.add_job(generate_trending_stocks_data, 'interval', minutes=20)
-    scheduler.add_job(process_contracts, 'interval', minutes=30) # Add the new tracker job
+    scheduler.add_job(generate_trending_stocks_data, 'interval', minutes=1)
+    scheduler.add_job(tracker.process_contracts, 'interval', minutes=30) # Add the new tracker job
     scheduler.start()
     yield # The application is now running
 
