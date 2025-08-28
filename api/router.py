@@ -1,13 +1,8 @@
-# REPLACE THE ENTIRE FILE WITH THIS
-
-# /aigptcur/app_service/api/router.py
-
 from fastapi import APIRouter
-
 # --- Import all the individual router objects from your application ---
-
 # Imports from subdirectories of 'api'
 from . import chatbot
+from . import tracker
 from .market_content import chatwithfiles, youtube_sum
 from . import graph_openai1
 from .fundamentals_rag import fundamental_chat2, corp
@@ -16,9 +11,6 @@ from .dashboard.portfolio import portfolio_snapshot
 from .dashboard.stock import stock_snapshot
 from .dashboard import trending
 
-# --- CORRECTED IMPORT ---
-# Import from the 'streaming' directory, which is at the same level as 'api'
-# This is now an absolute import because the project root is in the Python path.
 from streaming import streaming
 
 # Create a single master router
@@ -40,3 +32,4 @@ api_router.include_router(dashboard.router, tags=["Dashboard"])
 api_router.include_router(portfolio_snapshot.router, tags=["Dashboard"])
 api_router.include_router(stock_snapshot.router, tags=["Dashboard"])
 api_router.include_router(trending.router, tags=["Dashboard"])
+api_router.include_router(tracker.router, tags=["Tracker"])

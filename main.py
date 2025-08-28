@@ -1,4 +1,4 @@
-# /aigptcur/app_service/main.py
+# /aigptssh/main.py
 import os
 import sys
 import asyncpg
@@ -21,6 +21,7 @@ if PROJECT_ROOT not in sys.path:
 # --- Import the master API router ---
 from api.router import api_router
 from config import DB_POOL # Import the DB_POOL variable to make it accessible to other modules
+from api.tracker import process_contracts, create_contracts_table, DB_POOL as TRACKER_DB_POOL
 
 # --- Database Connection Pool Management ---
 async def init_db_pool():
@@ -54,23 +55,29 @@ async def lifespan(app: FastAPI):
     Manages the application's lifespan events.
     Initializes the database pool on startup and closes it on shutdown.
     """
+    global DB_POOL
     print("INFO: Application startup...")
     db_url = os.getenv('DATABASE_URL')
     if db_url:
         print("INFO: Initializing database connection pool...")
         # Attach the pool to the app's state
-        app.state.db_pool = await asyncpg.create_pool(
+        pool = await asyncpg.create_pool(
             dsn=db_url,
             min_size=1,
             max_size=10
         )
+        app.state.db_pool = pool
+        DB_POOL = pool  # Make pool globally available
+        TRACKER_DB_POOL = pool # Make pool available to tracker module
         print("INFO: Database connection pool initialized successfully.")
+        await create_contracts_table() # Create contracts table
     else:
         app.state.db_pool = None
         print("ERROR: DATABASE_URL not set. Database pool not initialized.")
-    
+
     scheduler.add_job(aggregate_and_process_data, 'interval', minutes=15)
     scheduler.add_job(generate_trending_stocks_data, 'interval', minutes=20)
+    scheduler.add_job(process_contracts, 'interval', minutes=30) # Add the new tracker job
     scheduler.start()
     yield # The application is now running
 
@@ -105,7 +112,7 @@ async def add_no_cache_headers(request: Request, call_next):
     response = await call_next(request)
     if request.url.path in ["/web_rag", "/reddit_rag", "/yt_rag"]:
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-        response.headers["Pragma"] = "no-cache" 
+        response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
         response.headers["X-Accel-Buffering"] = "no"
     return response
