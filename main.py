@@ -54,7 +54,7 @@ async def lifespan(app: FastAPI):
         print("ERROR: DATABASE_URL not set. Database pool not initialized.")
 
     scheduler.add_job(aggregate_and_process_data, 'interval', minutes=15)
-    scheduler.add_job(generate_trending_stocks_data, 'interval', minutes=1)
+    scheduler.add_job(generate_trending_stocks_data, 'interval', minutes=60)
     scheduler.add_job(tracker.process_contracts, 'interval', minutes=30) # Add the new tracker job
     scheduler.start()
     yield # The application is now running

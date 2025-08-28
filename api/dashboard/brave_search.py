@@ -46,7 +46,7 @@ class BraveDashboard:
             "q": query, 
             "count": count, 
             "country": "IN", 
-            "text_decorations": False,
+            "text_decorations": "false",
             "freshness": freshness
         }
             

@@ -1,5 +1,3 @@
-# REPLACE THE ENTIRE FILE WITH THIS
-
 # aigptssh/api/dashboard/data_aggregator.py
 import json
 import os
@@ -229,6 +227,10 @@ async def generate_trending_stocks_data():
     print("--- Starting Trending Stocks Generation ---")
     brave_fetcher = BraveDashboard()
     trending_stocks = await brave_fetcher.scrape_trending_stocks()
+    
+    # Add the last_updated_utc timestamp
+    trending_stocks['last_updated_utc'] = datetime.now(timezone.utc).isoformat()
+    
     output_path = os.path.join(OUTPUT_DIR, 'trending_stocks.json')
     save_data_to_json(trending_stocks, output_path)
     print("\n--- Pipeline Complete: Trending stocks identified and saved. ---")
