@@ -383,7 +383,7 @@ User Query: "{query}"
 Today's Date: {today}
 
 Tasks:
-1. VALIDATE: Is this query related to the Indian stock market, business, or finance?
+1. VALIDATE: Is this query related to the Indian stock market, business, or finance? Ensure the query is relevant to Indian markets.
 2. INTERPRET: Interpret ambiguous acronyms or terms (e.g., "HCC", "BEL") as company names or stock tickers within the Indian market context.
 3. REFORMULATE: Create a clear, standalone search query suitable for a financial news search. For ambiguous tickers like "HCC," reformulate the query to "HCC Ltd. stock" to ensure financial context.
 
@@ -670,12 +670,14 @@ async def web_rag_mix(
 
         final_prompt = PromptTemplate.from_template(
             """
-            You are a financial markets expert. Today's date is {today}. Provide a detailed, well-structured final answer using the comprehensive context provided.
+            You are a financial markets expert. Today's date is {today}, make sure your answers use today as reference. Provide a detailed, well-structured final answer using the comprehensive context provided.
             Include a disclaimer "{disclaimer}" with "> **Disclaimer:**" tag ONLY IF asked for financial advice or recommendations.
+            Use tables and bullet points where appropriate for clarity.
             Use markdown for readability.
-
+            
+            
             **CRITICAL INSTRUCTION:** Focus exclusively on financial, startup, corporate, and stock market-related information.
-
+            **CRITICAL INSTRUCTION:** The "&sources" value must be a JSON array of objects at the end of your response. Each object should represent a source you cited in the answer and have the format {{"id": "[citation number]""title": "source title", "url": "source url"}}. Only include sources that you have cited. Cite your sources using [number] notation in the answer text wherever relevant. You can also use multiple citations like [1,2] if the information is supported by multiple sources.
             Comprehensive Context:
             {context}
 

@@ -215,7 +215,7 @@ class NewsRagScoringService:
         
         average_relevance = sum(similarity_scores) / len(similarity_scores)
         
-        HIGH_RELEVANCE_THRESHOLD = 0.35
+        HIGH_RELEVANCE_THRESHOLD = 0.6
         highly_relevant_docs = sum(1 for score in similarity_scores if score > HIGH_RELEVANCE_THRESHOLD)
         
         print(f"DEBUG: Raw distance scores: {[f'{score:.3f}' for score in raw_scores[:5]]}")
