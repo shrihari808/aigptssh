@@ -216,6 +216,14 @@ class NewsRagScoringService:
         average_relevance = sum(similarity_scores) / len(similarity_scores)
         
         HIGH_RELEVANCE_THRESHOLD = 0.6
+        
+        # --- MODIFICATION START ---
+        # Check if the average relevance is below the threshold
+        if average_relevance < HIGH_RELEVANCE_THRESHOLD:
+            print("Insufficient context found: Average relevance of documents is below the threshold.")
+            return 0.0
+        # --- MODIFICATION END ---
+
         highly_relevant_docs = sum(1 for score in similarity_scores if score > HIGH_RELEVANCE_THRESHOLD)
         
         print(f"DEBUG: Raw distance scores: {[f'{score:.3f}' for score in raw_scores[:5]]}")
