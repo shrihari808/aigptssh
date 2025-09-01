@@ -668,7 +668,7 @@ async def web_rag_mix(
             
             
             **CRITICAL INSTRUCTION:** Focus exclusively on financial, startup, corporate, and stock market-related information.
-            **CRITICAL INSTRUCTION:** The "&sources" value must be a JSON array of objects at the end of your response. Each object should represent a source you cited in the answer and have the format {{"id": "[citation number]""title": "source title", "url": "source url"}}. Only include sources that you have cited. Cite your sources using [number] notation in the answer text wherever relevant. You can also use multiple citations like [1,2] if the information is supported by multiple sources.
+            **CRITICAL INSTRUCTION:** The "&sources" value must be a JSON array of objects at the beginning of your response. Each object should represent a source you will cite in the answer and have the format {{"id": "[citation number]""title": "source title", "url": "source url"}}. Only include sources that you have cited. Cite your sources using [number] notation in the answer text wherever relevant. You can also use multiple citations like [1,2] if the information is supported by multiple sources.
             Comprehensive Context:
             {context}
 
