@@ -57,8 +57,8 @@ BLACKLISTED_DOMAINS = {
     'facebook.com',
     'instagram.com',
     'indmoney.com',
-    'business-standard.com',
-    'reuters.com',
+    # 'business-standard.com',
+    # 'reuters.com',
     'en.wikipedia.org',
     'wikipedia.org'
 }
@@ -215,7 +215,7 @@ class BraveNews:
 
     async def _fetch_brave_page(self, session: aiohttp.ClientSession, query_term: str, page_num: int) -> tuple[dict, bool]:
         """
-        Optimized Brave API call with better error handling.
+        Optimized Brave API call with better error handling and retry logic.
         """
         offset = (page_num - 1) * 20
         
@@ -232,29 +232,38 @@ class BraveNews:
             "X-Subscription-Token": self.brave_api_key
         }
 
-        try:
-            async with session.get(
-                self.BRAVE_API_BASE_URL, 
-                headers=brave_headers, 
-                params=brave_params,
-                timeout=aiohttp.ClientTimeout(total=10)
-            ) as response:
-                if response.status != 200:
-                    print(f"ERROR: Brave API returned status {response.status}")
-                    return {}, False
+        retries = 3
+        for attempt in range(retries):
+            try:
+                async with session.get(
+                    self.BRAVE_API_BASE_URL, 
+                    headers=brave_headers, 
+                    params=brave_params,
+                    timeout=aiohttp.ClientTimeout(total=10)
+                ) as response:
+                    if response.status == 429:
+                        wait_time = 2 ** attempt
+                        print(f"ERROR: Brave API returned status 429. Retrying in {wait_time} seconds...")
+                        await asyncio.sleep(wait_time)
+                        continue # Skips to the next iteration of the loop to retry the request
                     
-                brave_results = await response.json()
+                    response.raise_for_status()
+                    
+                    brave_results = await response.json()
+                    has_more = brave_results.get('query', {}).get('more_results_available', False)
+                    return brave_results, has_more
                 
-                has_more = brave_results.get('query', {}).get('more_results_available', False)
-                
-                return brave_results, has_more
-                
-        except asyncio.TimeoutError:
-            print(f"ERROR: Timeout calling Brave API for page {page_num}")
-            return {}, False
-        except Exception as e:
-            print(f"ERROR: Brave API call failed for page {page_num}: {str(e)}")
-            return {}, False
+            except asyncio.TimeoutError:
+                print(f"ERROR: Timeout calling Brave API for page {page_num}")
+                return {}, False
+            except Exception as e:
+                print(f"ERROR: Brave API call failed for page {page_num}: {str(e)}")
+                # If it's the last attempt, we exit the loop and return False
+                if attempt == retries - 1:
+                    return {}, False
+        
+        # This part is reached only if all retries fail
+        return {}, False
 
     def _deduplicate_content(self, processed_items: list[dict], similarity_threshold: float = 0.9) -> list[dict]:
         """
