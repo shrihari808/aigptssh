@@ -1,36 +1,36 @@
 {
-    "last_updated_utc": "2025-09-01T05:08:59.342663+00:00",
+    "last_updated_utc": "2025-09-01T05:53:58.124208+00:00",
     "market_summary": {
         "summary_points": [
             {
-                "title": "Markets Open in Green",
-                "summary": "On Monday, Indian benchmark indices Nifty50 and BSE Sensex kicked off the week on a positive note, with the Nifty rising above 24,500 to trade at 24,518.50 (up 0.38%) and the Sensex advancing over 300 points to 80,113.43 (up 0.38%), fueled by early buying momentum.",
+                "title": "Market Opens Positive with Indices Gaining",
+                "summary": "On Monday morning, Indian benchmarks Nifty50 and BSE Sensex opened firmly in the green, with Nifty50 trading above 24,500 and Sensex up over 300 points. By 9:22 AM, Nifty50 was at 24,518.50 (up 0.38%) and Sensex at 80,113.43 (up 0.38%), as traders positioned themselves ahead of a week packed with major macroeconomic events. Analysts recommend a balanced approach given the unfolding global and domestic developments.",
                 "age": "1 hours ago"
             },
             {
-                "title": "Geopolitical Realignments Underlying Market Outlook",
-                "summary": "Market strategists caution that President Trump’s trade actions are accelerating geopolitical realignments—particularly closer ties among China, India and Russia—which could materially alter global trade dynamics and, in turn, influence Indian equities.",
+                "title": "Geopolitical Tensions and US Tariffs Influence Sentiment",
+                "summary": "Market participants remain wary of the broader impact of President Trump’s tariff measures and shifting global alliances. Dr. VK Vijayakumar of Geojit Investments warns that a closer strategic partnership between China, India, and Russia could reshape trade flows and exert further influence on equity valuations, reinforcing the need for prudent portfolio management.",
                 "age": "1 hours ago"
             },
             {
-                "title": "Cautious Sentiment Amid Global Headwinds, Key Triggers This Week",
-                "summary": "Despite expectations of marginally higher openings, investors remain guarded amid mixed Asian cues and a weaker US close post-inflation data; attention now turns to US-India tariff developments, upcoming auto sales and GST Council decisions, foreign fund flows, domestic/global macro releases and crude oil movements.",
+                "title": "Cautious Outlook Amid Mixed Global Cues",
+                "summary": "Despite the positive start, sentiment remains tentative as Asian markets traded mixed and Wall Street closed lower on Friday, weighed down by inflation data and ongoing tariff concerns. Investors are parsing developments in India-China relations and global risk factors before committing to fresh positions, resulting in a subdued yet marginally positive opening.",
+                "age": "4 hours ago"
+            },
+            {
+                "title": "Key Weekly Triggers for Market Direction",
+                "summary": "A slew of catalysts will guide market direction this week, including U.S. tariff decisions affecting India, August auto sales figures, outcomes from the GST Council meeting, foreign fund flows, domestic and global macroeconomic releases, and crude oil price trends. Each of these factors is expected to drive sectoral rotations and volatility in Dalal Street.",
+                "age": "4 hours ago"
+            },
+            {
+                "title": "Domestic Growth Sectors Poised to Benefit",
+                "summary": "Research analysts highlight that consumption-led and domestic growth–oriented sectors—such as FMCG, consumer durables, discretionary goods, cement, and infrastructure—are well positioned to gain from recent GST rate cuts, robust demand, and increased government spending. These segments could outperform the broader market if economic conditions remain supportive.",
+                "age": "1 days ago"
+            },
+            {
+                "title": "Corporate Actions and Q1 Earnings in Focus",
+                "summary": "Investors are keeping an eye on several midcap companies reporting June-quarter results today, including Highway Infrastructure, Brightcom Group, Valencia India, and Vivanta Industries. Simultaneously, corporate actions such as ex-dividend trading for Alivus Life Sciences and ex-split events for Pavna Industries may lend additional stock-specific volatility ahead of the broader market open.",
                 "age": "3 hours ago"
-            },
-            {
-                "title": "Consumption and Domestic Growth Sectors in Focus",
-                "summary": "Analysts anticipate a mixed market bias but see domestic-demand and growth-oriented segments—such as FMCG, consumer durables, discretionary, cement and infrastructure—well positioned to benefit from recent GST rate cuts, steady consumption and heightened government spending.",
-                "age": "1 day ago"
-            },
-            {
-                "title": "Boost from Q2 GDP Surprise and Tariffs Ruling",
-                "summary": "Benchmarks received an additional lift from better-than-expected June-quarter GDP data and a US court ruling labeling many of President Trump’s tariffs illegal (though in effect until mid-October), providing fresh impetus to early session gains.",
-                "age": "3 hours ago"
-            },
-            {
-                "title": "Stocks and Corporate Actions to Watch Today",
-                "summary": "Ahead of Monday’s open, traders are eyeing Q1 earnings from Highway Infrastructure and Brightcom Group, alongside corporate actions—ex-dividend and ex-split trades for names like Alivus Life Sciences, Kanpur Plastipack, Triveni Turbine and Pavna Industries—that could spark stock-specific moves.",
-                "age": "2 hours ago"
             }
         ],
         "sources": [
@@ -53,7 +53,7 @@
                 "title": "Top stocks in news: Paytm, Adani Power, BHEL, Auro Pharma, BEML, Nazara Tech, NCC, HEG - BusinessToday",
                 "snippet": "Disclaimer: Business Today provides stock market news for informational purposes only and should not be construed as investment advice. Readers are encouraged to consult with a qualified financial advisor before making any investment decisions. Indian benchmark indices settled lower on Friday ...",
                 "url": "https://businesstoday.in/amp/markets/stocks/story/top-stocks-in-news-paytm-adani-power-bhel-auro-pharma-beml-nazara-tech-ncc-heg-491844-2025-09-01",
-                "age": "2 hours ago"
+                "age": "3 hours ago"
             },
             {
                 "title": "Sensex Today | Stock Market LIVE Updates: Sensex climbs over 300 pts, Nifty above 24,500; Infosys, Power Grid rise 2% each - The Economic Times",
@@ -64,41 +64,41 @@
         ]
     },
     "sector_analysis": {
-        "top_performing_sectors": [
+        "top_performers": [
             {
                 "sector": "FMCG",
-                "explanation": "Gained traction from anticipated GST rate cuts and robust domestic consumption demand."
+                "explanation": "GST rate cuts and resilient domestic consumption have supported faster revenue growth and relative outperformance in the sector."
             },
             {
                 "sector": "Consumer Durables",
-                "explanation": "Benefited from strong retail spending and supportive tax policies that boosted consumer demand."
+                "explanation": "Strong urban demand and positive consumer sentiment following GST relief have driven higher sales and stock gains."
             },
             {
-                "sector": "Infrastructure",
-                "explanation": "Rallied on expectations of increased government spending and large‐scale public works projects."
+                "sector": "Cement",
+                "explanation": "Increased government infrastructure spending and construction activity ahead of the GST Council meeting have underpinned robust cement term‐sell momentum."
             }
         ],
-        "underperforming_sectors": [
-            {
-                "sector": "Midcaps",
-                "explanation": "Under pressure from foreign fund outflows and tariff‐induced market correction fears, shedding around 0.41%."
-            },
-            {
-                "sector": "Smallcaps",
-                "explanation": "Lagged behind amid broader market weakness and liquidity concerns, losing approximately 0.29%."
-            },
+        "underperformers": [
             {
                 "sector": "Automobiles",
-                "explanation": "Weakened by mixed auto sales data and uncertainty over potential US tariff implications."
+                "explanation": "Lingering concerns over US tariffs and slowing rural demand weighed on auto sales and share prices."
+            },
+            {
+                "sector": "Mid‐caps",
+                "explanation": "Foreign fund outflows and risk‐off sentiment hit mid‐cap names hardest, leading to steeper declines than large caps."
+            },
+            {
+                "sector": "Small‐caps",
+                "explanation": "Heightened volatility from FII selling and profit‐booking in smaller stocks resulted in underperformance relative to benchmarks."
             }
         ]
     },
     "standouts_analysis": {
         "gainers": [],
         "losers": [],
-        "note": "The provided excerpts did not name any individual stocks as top daily gainers or losers."
+        "note": "No individual stocks were specifically cited in the provided excerpts as top gainers or losers for the day."
     },
     "market_drivers": {
-        "summary": "Indian markets traded cautiously amid mixed global cues as Asian peers dipped on renewed US tariff concerns and US futures held near flat ahead of key employment data, while sentiment awaited clarity on potential GST reforms from this week’s Council meeting. Domestically, a robust 7.8% Q1 GDP print lent support, and auto stocks found a bid on strong August sales, even as textiles and equipment makers remained under pressure from reciprocal 25% US duties. Institutional flows stayed divergent, with FIIs turning net sellers to the tune of Rs 8,312 crore, offset by DII purchases of Rs 11,487 crore, underscoring a sentiment-driven session in the absence of fresh positive triggers."
+        "summary": "Today’s market action was shaped by a mix of domestic policy anticipation, global headwinds and shifting institutional flows. Investors awaited clarity on potential GST Council reforms that could rationalise indirect taxes, even as India’s stronger-than-expected 7.8% Q1 GDP print provided underlying support. However, sentiment remained cautious amid a US federal appeals court ruling on reciprocal tariffs and ongoing Trump-era trade tensions clouding export prospects. Auto sales data and oil price movements also factored in, while FPIs were net sellers (~₹8,300 crore) against DIIs’ buying (~₹11,500 crore), underscoring the tug-of-war between foreign caution and local confidence."
     }
 }
