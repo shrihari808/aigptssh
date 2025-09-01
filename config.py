@@ -50,6 +50,7 @@ ENABLE_CACHING = True  # Set to True to enable caching
 encoding = tiktoken.get_encoding("cl100k_base")
 
 # Brave Search Parameters
+NUM_SUB_QUERIES = 2
 MAX_SCRAPED_SOURCES = 10
 MAX_PAGES = 1
 MAX_ITEMS_PER_DOMAIN = 1

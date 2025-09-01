@@ -1,128 +1,104 @@
 {
-    "last_updated_utc": "2025-08-29T11:22:13.957253+00:00",
+    "last_updated_utc": "2025-09-01T05:08:59.342663+00:00",
     "market_summary": {
         "summary_points": [
             {
-                "title": "Markets Poised for a Moderately Higher Open",
-                "summary": "The Sensex and Nifty 50 are expected to open marginally higher amid cautious investor sentiment and mixed global market cues. Gift Nifty trading around the 24,670 level—nearly a 20-point premium to the previous Nifty futures close—points to a mildly positive start, though traders remain wary ahead of further tariff developments.",
-                "age": "9 hours ago"
+                "title": "Markets Open in Green",
+                "summary": "On Monday, Indian benchmark indices Nifty50 and BSE Sensex kicked off the week on a positive note, with the Nifty rising above 24,500 to trade at 24,518.50 (up 0.38%) and the Sensex advancing over 300 points to 80,113.43 (up 0.38%), fueled by early buying momentum.",
+                "age": "1 hours ago"
             },
             {
-                "title": "Global Cues Paint a Mixed Picture",
-                "summary": "Asian markets traded mostly lower, with Japan’s Nikkei down 0.33% and South Korea’s Kospi off 0.19%, while Hong Kong futures suggested a higher open. In contrast, US indices closed at record highs—S&P 500 up 0.32%, Dow Jones up 0.16% and Nasdaq up 0.53%—providing some relief to domestic investors.",
-                "age": "9 hours ago"
+                "title": "Geopolitical Realignments Underlying Market Outlook",
+                "summary": "Market strategists caution that President Trump’s trade actions are accelerating geopolitical realignments—particularly closer ties among China, India and Russia—which could materially alter global trade dynamics and, in turn, influence Indian equities.",
+                "age": "1 hours ago"
             },
             {
-                "title": "Steep Losses on US Tariff Concerns",
-                "summary": "On Thursday, Indian equities saw a sharp sell-off after the US imposed 50% tariffs on Indian goods. The Sensex tumbled 705.97 points (0.87%) to 80,080.57, while the Nifty 50 fell 211.15 points (0.85%) to 24,500.90, marking one of the largest single-day declines in recent sessions.",
-                "age": "9 hours ago"
+                "title": "Cautious Sentiment Amid Global Headwinds, Key Triggers This Week",
+                "summary": "Despite expectations of marginally higher openings, investors remain guarded amid mixed Asian cues and a weaker US close post-inflation data; attention now turns to US-India tariff developments, upcoming auto sales and GST Council decisions, foreign fund flows, domestic/global macro releases and crude oil movements.",
+                "age": "3 hours ago"
             },
             {
-                "title": "Bearish Technical Indicators Dominate Charts",
-                "summary": "Technical charts are signalling continued weakness: the Sensex formed a bearish daily candle and shows a lower top formation intraday. The Nifty breached its 100-day moving average and extended its negative bias, suggesting further downside unless relief measures or negotiations are announced.",
-                "age": "9 hours ago"
-            },
-            {
-                "title": "Top Stock Picks to Watch Today",
-                "summary": "Marketsmith India recommends buying Jindal Stainless at ₹806 with a target price of ₹930 and a stop loss at ₹750. The stock trades above key moving averages with positive momentum, though investors should note its high ESG risk rating, cyclical volatility and trade-related headwinds.",
-                "age": "11 hours ago"
-            },
-            {
-                "title": "Key Drivers Behind the Recent Market Crash",
-                "summary": "Four main factors drove Thursday’s 706-point plunge in the Sensex: newly imposed US tariffs on Indian exports, foreign fund outflows, weak global cues and bearish technical setups. The rout erased ₹4.67 lakh crore in BSE market value, highlighting the depth of investor concerns.",
+                "title": "Consumption and Domestic Growth Sectors in Focus",
+                "summary": "Analysts anticipate a mixed market bias but see domestic-demand and growth-oriented segments—such as FMCG, consumer durables, discretionary, cement and infrastructure—well positioned to benefit from recent GST rate cuts, steady consumption and heightened government spending.",
                 "age": "1 day ago"
+            },
+            {
+                "title": "Boost from Q2 GDP Surprise and Tariffs Ruling",
+                "summary": "Benchmarks received an additional lift from better-than-expected June-quarter GDP data and a US court ruling labeling many of President Trump’s tariffs illegal (though in effect until mid-October), providing fresh impetus to early session gains.",
+                "age": "3 hours ago"
+            },
+            {
+                "title": "Stocks and Corporate Actions to Watch Today",
+                "summary": "Ahead of Monday’s open, traders are eyeing Q1 earnings from Highway Infrastructure and Brightcom Group, alongside corporate actions—ex-dividend and ex-split trades for names like Alivus Life Sciences, Kanpur Plastipack, Triveni Turbine and Pavna Industries—that could spark stock-specific moves.",
+                "age": "2 hours ago"
             }
         ],
         "sources": [
-            "https://www.livemint.com/market/stock-market-news/indian-stock-market-10-key-things-that-changed-for-market-overnight-gift-nifty-wall-street-rally-us-gdp-to-iip-data-11756400383976.html",
-            "https://www.livemint.com/market/stock-market-news/best-stock-recommendations-for-today-29-august-marketsmith-india-nifty-sensex-jindal-stainless-vishal-mega-mart-11756387604058.html",
-            "https://m.economictimes.com/markets/stocks/news/why-stock-market-is-down-today-key-factors-behind-the-650-point-sensex-crash-nifty-below-24550/amp_articleshow/123555258.cms",
-            "https://www.livemint.com/market/stock-market-news/nifty-50-sensex-today-what-to-expect-from-indian-stock-market-in-trade-on-august-29-amid-trump-tariff-worries-11756400123066.html"
+            "https://www.livemint.com/market/stock-market-news/auto-sales-data-to-gst-council-meeting-top-five-triggers-for-the-indian-stock-market-this-week-11756609098825.html",
+            "https://economictimes.indiatimes.com/markets/stocks/live-blog/bse-sensex-today-live-nifty-stock-market-updates-01-september-2025/liveblog/123623991.cms",
+            "https://www.livemint.com/market/stock-market-news/indian-stock-market-10-things-that-changed-for-market-over-weekend-gift-nifty-modi-xi-meet-trump-tariffs-to-gdp-data-11756689807183.html",
+            "https://timesofindia.indiatimes.com/business/india-business/stock-market-today-nifty50-bse-sensex-september-01-2025-dalal-street-indian-equities-global-markets-donald-trump-tariffs/articleshow/123624999.cms",
+            "https://businesstoday.in/amp/markets/stocks/story/top-stocks-in-news-paytm-adani-power-bhel-auro-pharma-beml-nazara-tech-ncc-heg-491844-2025-09-01"
         ]
     },
     "latest_news": {
         "articles": [
             {
-                "title": "Share Market Live Today – Indian Stock Market News | Angel One",
-                "snippet": "Find the latest trends, news, updates, and analysis of the share market today. Access various live market data to stay ahead of the crowd in the stock market.",
-                "url": "https://www.angelone.in/share-market-today",
+                "title": "Stock market today: Nifty50 opens above 24,500; BSE Sensex up over 300 points - The Times of India",
+                "snippet": "India Business News: Stock market today: Nifty50 and BSE Sensex, the Indian equity benchmark indices, opened in green on Monday. While Nifty50 was above 24,500, BSE Sensex",
+                "url": "https://timesofindia.indiatimes.com/business/india-business/stock-market-today-nifty50-bse-sensex-september-01-2025-dalal-street-indian-equities-global-markets-donald-trump-tariffs/articleshow/123624999.cms",
+                "age": "1 hour ago"
+            },
+            {
+                "title": "Top stocks in news: Paytm, Adani Power, BHEL, Auro Pharma, BEML, Nazara Tech, NCC, HEG - BusinessToday",
+                "snippet": "Disclaimer: Business Today provides stock market news for informational purposes only and should not be construed as investment advice. Readers are encouraged to consult with a qualified financial advisor before making any investment decisions. Indian benchmark indices settled lower on Friday ...",
+                "url": "https://businesstoday.in/amp/markets/stocks/story/top-stocks-in-news-paytm-adani-power-bhel-auro-pharma-beml-nazara-tech-ncc-heg-491844-2025-09-01",
+                "age": "2 hours ago"
+            },
+            {
+                "title": "Sensex Today | Stock Market LIVE Updates: Sensex climbs over 300 pts, Nifty above 24,500; Infosys, Power Grid rise 2% each - The Economic Times",
+                "snippet": "Sensex Today | Stock Market LIVE Updates: Indian benchmark indices Sensex and Nifty traded higher on Monday, buoyed by better-than-expected June-quarter GDP data and a U.S. court ruling that deemed most of President Donald Trump’s tariffs illegal but left them in place until mid-October.",
+                "url": "https://economictimes.indiatimes.com/markets/stocks/live-blog/bse-sensex-today-live-nifty-stock-market-updates-01-september-2025/liveblog/123623991.cms",
                 "age": "3 hours ago"
-            },
-            {
-                "title": "Top stocks to buy today: Stock recommendations for August 29, 2025 - check list - The Times of India",
-                "snippet": "Weekly MACD remains in a strong ... on the stock market and other asset classes given by experts are their own. These opinions do not represent the views of The Times of India) Select The Times of India as your preferred source on Google Search. Stay informed with the latest business news, updates on ...",
-                "url": "https://timesofindia.indiatimes.com/business/india-business/top-stock-recommendations-for-august-29-2025-godawari-power-and-ispat-limited-apollo-micro-systems-stocks-to-buy-today/articleshow/123575247.cms",
-                "age": "8 hours ago"
-            },
-            {
-                "title": "Nifty 50, Sensex today: What to expect from Indian stock market in trade on August 29 amid Trump tariff worries | Stock Market News",
-                "snippet": "Catch all the Business News , Market News , Breaking News Events and Latest News Updates on Live Mint. Download The Mint News App to get Daily Market Updates. Business NewsMarketsStock MarketsNifty 50, Sensex today: What to expect from Indian stock market in trade on August 29 amid Trump tariff ...",
-                "url": "https://www.livemint.com/market/stock-market-news/nifty-50-sensex-today-what-to-expect-from-indian-stock-market-in-trade-on-august-29-amid-trump-tariff-worries-11756400123066.html",
-                "age": "9 hours ago"
             }
         ]
     },
     "sector_analysis": {
-        "topPerformers": [
+        "top_performing_sectors": [
+            {
+                "sector": "FMCG",
+                "explanation": "Gained traction from anticipated GST rate cuts and robust domestic consumption demand."
+            },
             {
                 "sector": "Consumer Durables",
-                "explanation": "Outperformed on expectations of festive demand and benefits from recent GST rationalisation."
+                "explanation": "Benefited from strong retail spending and supportive tax policies that boosted consumer demand."
             },
             {
-                "sector": "Capital Goods",
-                "explanation": "Gained as investors sought defensive plays amid overall market weakness."
-            },
-            {
-                "sector": "Media",
-                "explanation": "Rose on sector‐specific buying interest despite broad‐based profit booking elsewhere."
+                "sector": "Infrastructure",
+                "explanation": "Rallied on expectations of increased government spending and large‐scale public works projects."
             }
         ],
-        "underperformers": [
+        "underperforming_sectors": [
             {
-                "sector": "Auto",
-                "explanation": "Underperformed due to profit booking after recent gains."
+                "sector": "Midcaps",
+                "explanation": "Under pressure from foreign fund outflows and tariff‐induced market correction fears, shedding around 0.41%."
             },
             {
-                "sector": "Information Technology",
-                "explanation": "Saw selling pressure amid risk‐off sentiment and concerns over tariffs."
+                "sector": "Smallcaps",
+                "explanation": "Lagged behind amid broader market weakness and liquidity concerns, losing approximately 0.29%."
             },
             {
-                "sector": "Metals",
-                "explanation": "Declined as investors booked profits and avoided cyclicals in a cautious mood."
+                "sector": "Automobiles",
+                "explanation": "Weakened by mixed auto sales data and uncertainty over potential US tariff implications."
             }
         ]
     },
     "standouts_analysis": {
-        "gainers": [
-            {
-                "stock": "Titan Company",
-                "reason": "Bucked the broader market downturn as the only Nifty Consumer Durables gainer amid tariff‐related selling."
-            },
-            {
-                "stock": "Coal India",
-                "reason": "Benefited from defensive buying in the resources space as markets sold off on new US import tariffs."
-            },
-            {
-                "stock": "L&T",
-                "reason": "Attracted selective buying in the industrials segment despite the overall slide in benchmark indices."
-            }
-        ],
-        "losers": [
-            {
-                "stock": "Shriram Finance",
-                "reason": "Suffered a sharp decline as financials were hit by investor jitters over the new 25% US import tariffs."
-            },
-            {
-                "stock": "HCL Technologies",
-                "reason": "Slumped along with a 1% fall in the IT sector on renewed caution around tariff headwinds."
-            },
-            {
-                "stock": "Infosys",
-                "reason": "Dropped in line with broad‐based IT weakness as the sector reacted to the same tariff‐related concerns."
-            }
-        ]
+        "gainers": [],
+        "losers": [],
+        "note": "The provided excerpts did not name any individual stocks as top daily gainers or losers."
     },
     "market_drivers": {
-        "summary": "Today’s market downturn was primarily driven by fresh U.S. tariffs of 25% on Indian exports, which dampened exporter sentiment and triggered foreign institutional outflows against a backdrop of weak global cues after mixed Asian trading and record closes on Wall Street. Domestic technicals reinforced the bearish tone as the Nifty slipped below its key moving averages, while company-specific news—such as a discounted stake sale by an IndiGo co-founder weighing on InterGlobe Aviation and a rally in Ola Electric after its Gen-3 scooters secured certification—added to the volatility. Hopes for near-term policy support from upcoming GST reforms and other government measures offered only limited relief, leaving headline indices under sustained pressure."
+        "summary": "Indian markets traded cautiously amid mixed global cues as Asian peers dipped on renewed US tariff concerns and US futures held near flat ahead of key employment data, while sentiment awaited clarity on potential GST reforms from this week’s Council meeting. Domestically, a robust 7.8% Q1 GDP print lent support, and auto stocks found a bid on strong August sales, even as textiles and equipment makers remained under pressure from reciprocal 25% US duties. Institutional flows stayed divergent, with FIIs turning net sellers to the tune of Rs 8,312 crore, offset by DII purchases of Rs 11,487 crore, underscoring a sentiment-driven session in the absence of fresh positive triggers."
     }
 }
