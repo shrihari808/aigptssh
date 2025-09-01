@@ -140,28 +140,41 @@ class NewsRagScoringService:
         print(f"DEBUG: Calculating relevance for {len(all_chunks)} content chunks from {len(sources)} sources...")
         query_chunk_pairs = [[query, chunk['text']] for chunk in all_chunks]
         relevance_scores = await asyncio.to_thread(self.cross_encoder_model.predict, query_chunk_pairs)
-
-        # 3. Calculate other scores and the final combined score for each chunk
-        print(f"DEBUG: Calculating multi-factor scores (sentiment, time, impact)...")
         for chunk, rel_score in zip(all_chunks, relevance_scores):
+            chunk['relevance_score'] = float(rel_score)
+
+        # 3. Perform BATCH sentiment analysis to remove the bottleneck
+        print(f"DEBUG: Calculating sentiment scores for {len(all_chunks)} chunks in a single batch...")
+        if self.sentiment_analyzer and all_chunks:
+            texts_for_sentiment = [chunk['text'][:512] for chunk in all_chunks]
+            # Run the pipeline in a separate thread to avoid blocking the event loop
+            sentiment_results = await asyncio.to_thread(
+                self.sentiment_analyzer, texts_for_sentiment, batch_size=32
+            )
+            # Map results back to chunks
+            for chunk, sentiment_result in zip(all_chunks, sentiment_results):
+                chunk['sentiment_score'] = self._calculate_sentiment_score_from_result(sentiment_result, query)
+        else:
+            for chunk in all_chunks:
+                chunk['sentiment_score'] = 0.5 # Default neutral score
+
+        # 4. Calculate other fast scores and the final combined score for each chunk
+        print(f"DEBUG: Calculating remaining multi-factor scores (time, impact)...")
+        for chunk in all_chunks:
             metadata = chunk.get("metadata", {})
             text = chunk.get("text", "")
             
-            # Assign relevance score
-            chunk['relevance_score'] = float(rel_score)
-            
-            # Calculate other scores using existing helper functions
-            chunk['sentiment_score'] = self._calculate_sentiment_score(text, query)
+            # Calculate remaining fast scores
             chunk['time_decay_score'] = self._calculate_time_decay_score(
                 metadata.get("publication_date") or str(metadata.get("date", "")),
                 query
             )
             chunk['impact_score'] = self._calculate_impact_score(text, metadata.get("link"))
 
-            # Calculate the final weighted score (you can adjust weights in config.py)
+            # Calculate the final weighted score using all computed components
             chunk['final_combined_score'] = (
-                W_RELEVANCE * chunk['relevance_score'] +
-                W_SENTIMENT * chunk['sentiment_score'] +
+                W_RELEVANCE * chunk.get('relevance_score', 0.0) +
+                W_SENTIMENT * chunk.get('sentiment_score', 0.5) +
                 W_TIME_DECAY * chunk['time_decay_score'] +
                 W_IMPACT * chunk['impact_score']
             )
@@ -384,6 +397,36 @@ class NewsRagScoringService:
         except Exception as e:
             print(f"WARNING: Failed to calculate sentiment score: {e}")
             return 0.5
+
+    def _calculate_sentiment_score_from_result(self, result: dict, query: str) -> float:
+        """Calculates the final score from a pre-computed sentiment result."""
+        if not result:
+            return 0.5
+
+        sentiment, confidence = result.get('label'), result.get('score', 0)
+        
+        query_lower = query.lower()
+        seeking_risks = any(word in query_lower for word in [
+            'risk', 'problem', 'issue', 'concern', 'decline', 'fall', 'loss', 
+            'negative', 'bad', 'warning', 'alert'
+        ])
+        seeking_opportunities = any(word in query_lower for word in [
+            'growth', 'profit', 'gain', 'opportunity', 'rise', 'increase',
+            'positive', 'good', 'bullish', 'surge'
+        ])
+        
+        if seeking_risks:
+            return 0.5 + (confidence * 0.5) if sentiment == 'negative' else 0.5 - (confidence * 0.3)
+        elif seeking_opportunities:
+            return 0.5 + (confidence * 0.5) if sentiment == 'positive' else 0.5 - (confidence * 0.3)
+        else:
+            # Neutral query - slightly favor positive sentiment in financial context
+            if sentiment == 'positive':
+                return 0.6 + (confidence * 0.3)
+            elif sentiment == 'negative':
+                return 0.4 - (confidence * 0.2)
+            else:
+                return 0.5
 
     def _calculate_time_decay_score(self, publication_date_str: str, query: str) -> float:
         """Query-aware time decay with different decay rates for different content types."""
