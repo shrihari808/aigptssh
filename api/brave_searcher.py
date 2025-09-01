@@ -343,7 +343,7 @@ class BraveNews:
             if len(all_extracted_content) >= max_sources or not has_more:
                 break
 
-            await asyncio.sleep(1)
+            await asyncio.sleep(1.1)
 
         api_time = time.time() - start_time
         print(f"DEBUG: Broad Search phase completed in {api_time:.2f}s, collected {len(all_extracted_content)} potential sources")
