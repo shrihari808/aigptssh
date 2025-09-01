@@ -1,44 +1,44 @@
 {
-    "last_updated_utc": "2025-09-01T12:46:06.511192+00:00",
+    "last_updated_utc": "2025-09-01T13:29:15.849777+00:00",
     "market_summary": {
         "summary_points": [
             {
-                "title": "Benchmarks Rally as GDP Beats Estimates and Court Curbs Tariffs",
-                "summary": "Indian benchmarks opened sharply higher on Monday, driven by surprisingly strong 7.8% growth in the June quarter and a split U.S. appeals court ruling that declared most of President Trump’s tariffs illegal—albeit effective until mid-October. The BSE Sensex jumped over 330 points to 80,143.59, and the Nifty 50 climbed 84.45 points to 24,511.30, as investors balanced optimism over domestic resilience with lingering global trade tensions.",
-                "age": "6 hours ago"
+                "title": "Cautious Start Amid Mixed Global Cues",
+                "summary": "Indian benchmark indices Sensex and Nifty 50 are poised for a marginally higher open, with Gift Nifty signaling a positive bias. However, investors remain cautious amid mixed moves in Asian markets, a softer finish on Wall Street and ongoing scrutiny of India–China relations.",
+                "age": "11 hours"
             },
             {
-                "title": "Trump’s Tariffs Keep Sentiment Under Pressure",
-                "summary": "Despite supportive domestic data, the Indian market faced headwinds for a third consecutive session last week as uncertainty over U.S. trade policy persisted. Concerns over 50% levies on Indian exports and the ongoing saga of tariff negotiations have dampened risk appetite, with both the Sensex and Nifty posting weekly declines amid worries over potential fallout on corporate earnings and growth.",
-                "age": "11 hours ago"
+                "title": "Three-Day Losing Streak Extends Technical Weakness",
+                "summary": "The domestic market extended its losing run to three sessions, with Nifty 50 slipping below the 24,500 mark. Weekly charts for Sensex reveal a long bearish candle and a lower‐top formation, underscoring a negative technical outlook.",
+                "age": "11 hours"
             },
             {
-                "title": "Top Market Triggers: Tariffs, Auto Sales, GST, and Beyond",
-                "summary": "Investors are eyeing a packed calendar of catalysts this week, including updates on U.S. tariffs on India, August auto sales figures, the outcomes of the latest GST Council meeting, foreign fund flows, key global and domestic macroeconomic data releases, and the trajectory of crude oil prices—all of which could dictate the next directional move for equities.",
-                "age": "1 day ago"
+                "title": "US Tariff Uncertainty Looms Over Markets",
+                "summary": "Concerns over President Trump’s tariffs persist, weighing on sentiment. A recent U.S. appeals court decision declaring most Trump-era tariffs unlawful—but allowing them to remain in effect until mid-October—adds further ambiguity to India’s trade outlook.",
+                "age": "3 hours"
             },
             {
-                "title": "Consumption Stocks Set to Benefit from GST Cuts",
-                "summary": "According to Geojit’s Vinod Nair, consumption-driven and domestic growth–oriented sectors such as FMCG, durables, discretionary, cement, and infrastructure are well positioned to capitalize on recent GST rate cuts, steady demand, and increased government spending, even as broader market sentiment remains mixed.",
-                "age": "1 day ago"
+                "title": "GDP Outperformance Fuels Early-September Rally",
+                "summary": "Stronger-than-expected June-quarter GDP growth of 7.8% provided a boost to market sentiment. Positive domestic economic data helped Sensex and Nifty achieve a firmer start to September after two consecutive monthly declines.",
+                "age": "7 hours"
             },
             {
-                "title": "Global Cues Mixed as Asian Markets Diverge",
-                "summary": "Asian equities opened with a mixed bias on Monday, reflecting uneven regional performance, while Wall Street ended lower on Friday as fresh U.S. inflation data and tariff developments undercut investor confidence—highlighting the delicate balance between local economic resilience and broader global headwinds.",
-                "age": "11 hours ago"
+                "title": "Key Triggers to Watch This Week",
+                "summary": "Investors will closely monitor developments on U.S. tariffs, auto sales numbers, the GST Council meeting outcome, foreign fund flows, forthcoming domestic and global macroeconomic data, and crude oil price movements.",
+                "age": "1 day"
             },
             {
-                "title": "Benchmarks Snap Three‐Day Losing Streak",
-                "summary": "The Sensex and Nifty bucked a three‐day slide on Monday, buoyed by robust GDP data and relief from a favorable court judgment on trade tariffs. The midcap and smallcap indices also saw modest gains as investors rotated back into risk assets following last week’s selloff.",
-                "age": "10 hours ago"
+                "title": "Domestic Demand Themes Offer Sectoral Opportunity",
+                "summary": "Consumption-driven and domestic growth-oriented sectors—including FMCG, durables, discretionary stocks, cement and infrastructure—are well-positioned to benefit from anticipated GST rate cuts, firm underlying demand and increased government spending.",
+                "age": "1 day"
             }
         ],
         "sources": [
-            "https://www.livemint.com/market/stock-market-news/indian-stock-market-10-things-that-changed-for-market-over-weekend-gift-nifty-modi-xi-meet-trump-tariffs-to-gdp-data-11756689807183.html",
-            "https://economictimes.indiatimes.com/markets/stocks/live-blog/bse-sensex-today-live-nifty-stock-market-updates-01-september-2025/liveblog/123623991.cms",
-            "https://www.livemint.com/market/stock-market-news/what-to-expect-from-indian-stock-market-in-september-amid-trumps-tariff-tension-11756712714326.html",
+            "https://www.livemint.com/market/stock-market-news/auto-sales-data-to-gst-council-meeting-top-five-triggers-for-the-indian-stock-market-this-week-11756609098825.html",
             "https://www.livemint.com/market/stock-market-news/indian-stock-market-nifty-50-reclaims-24-500-dead-cat-bounce-or-sustained-rally-likely-11756704539242.html",
-            "https://www.livemint.com/market/stock-market-news/auto-sales-data-to-gst-council-meeting-top-five-triggers-for-the-indian-stock-market-this-week-11756609098825.html"
+            "https://www.livemint.com/market/stock-market-news/what-to-expect-from-indian-stock-market-in-september-amid-trumps-tariff-tension-11756712714326.html",
+            "https://www.livemint.com/market/stock-market-news/nifty-50-sensex-today-what-to-expect-from-indian-stock-market-in-trade-on-september-1-amid-trump-tariffs-sco-summit-11756690873073.html",
+            "https://www.livemint.com/market/stock-market-news/indian-stock-market-10-things-that-changed-for-market-over-weekend-gift-nifty-modi-xi-meet-trump-tariffs-to-gdp-data-11756689807183.html"
         ]
     },
     "latest_news": {
@@ -47,7 +47,7 @@
                 "title": "Stock Market: कोई 10%... तो कोई 15% भागा, इन शेयरों ने दिखाया दम, शेयर बाजार में बम-बम - Stock Market rise like rocket Tata Mahindra Adani share zooms tutc - AajTak",
                 "snippet": "Share Market के दोनों इंडेक्स सेंसेक्स-निफ्टी सप्ताह के पहले दिन ग्रीन जोन में ओपन हुए और दिनभर तेजी के साथ कारोबार करने ...",
                 "url": "https://aajtak.in/business/news/story/stock-market-rise-like-rocket-tata-mahindra-adani-share-zooms-tutc-dskc-2322901-2025-09-01",
-                "age": "2 hours ago"
+                "age": "3 hours ago"
             },
             {
                 "title": "What to expect from Indian stock market in September amid Trump's tariff tension? | Stock Market News",
@@ -59,45 +59,45 @@
                 "title": "Indian stock market: Nifty 50 reclaims 24,500. Dead cat bounce or sustained rally likely? | Stock Market News",
                 "snippet": "Indian Stock MarketNifty 50Stock Market TodayGet Latest real-time updates · Catch all the Business News , Market News , Breaking News Events and Latest News Updates on Live Mint.",
                 "url": "https://www.livemint.com/market/stock-market-news/indian-stock-market-nifty-50-reclaims-24-500-dead-cat-bounce-or-sustained-rally-likely-11756704539242.html",
-                "age": "6 hours ago"
+                "age": "7 hours ago"
             }
         ]
     },
     "sector_analysis": {
-        "topPerformers": [
+        "top_performers": [
             {
                 "sector": "FMCG",
-                "summary": "Benefiting from GST rate cuts and resilient consumer demand, FMCG stocks have outperformed peers on steady domestic consumption."
+                "explanation": "With GST cuts and resilient domestic demand, the fast-moving consumer goods space is set to benefit from steady consumption trends."
             },
             {
-                "sector": "Consumer Discretionary",
-                "summary": "Buoyed by firm demand and higher retail spending, discretionary names have seen relative strength amid mixed broader market trends."
+                "sector": "Consumer Durables",
+                "explanation": "Lower tax rates and ongoing retail demand are boosting sales of consumer electronics and household appliances."
             },
             {
-                "sector": "Infrastructure",
-                "summary": "Supported by increased government spending and positive outlook from the GST Council meeting, infrastructure stocks have delivered strong returns."
+                "sector": "Discretionary",
+                "explanation": "Rising retail income and favorable government spending are supporting growth in discretionary spending categories."
             }
         ],
         "underperformers": [
             {
-                "sector": "Automobiles",
-                "summary": "Auto stocks, led by a marginal sales dip at Maruti Suzuki, underperformed amid cautious consumer sentiment and tariff concerns."
+                "sector": "Midcap stocks",
+                "explanation": "Heightened risk aversion amid tariff worries and liquidity concerns has led investors to trim midcap exposures more sharply."
             },
             {
-                "sector": "Midcaps",
-                "summary": "The BSE Midcap index lagged, falling 0.41% on continued foreign fund outflows and a tilt toward large-cap IPOs."
+                "sector": "Smallcap stocks",
+                "explanation": "Similar to midcaps, small-caps have borne the brunt of sell-offs as foreign and domestic funds de-risk portfolios."
             },
             {
-                "sector": "Smallcaps",
-                "summary": "Small-cap shares shed 0.29%, pressured by a liquidity drain into mega public offerings and limited institutional buying."
+                "sector": "Export-oriented sectors (IT, Auto)",
+                "explanation": "Fears over US tariffs and global trade tensions are weighing on export-dependent technology and automobile names."
             }
         ]
     },
     "standouts_analysis": {
-        "topGainers": [],
-        "topLosers": []
+        "gainers": [],
+        "losers": []
     },
     "market_drivers": {
-        "summary": "Today’s market action was shaped by a mix of global and domestic factors: Asian peers slid on renewed concerns over US reciprocal tariff rulings and softer US inflation‐linked data, while domestic indices remained cautious ahead of the GST Council meeting where accelerated tax reforms are expected to feature prominently. Institutional flows stayed subdued as investors awaited fresh catalysts, though sectoral shifts—selling pressure in metal and IT stocks—were partly cushioned by steady buying in FMCG and banking names. Currency traders tracked a modest rupee slide alongside a dip in crude futures on lower supply‐risk fears. Specific corporate news, including Bajaj Auto’s 5% jump in August sales driven by strong exports and Lloyds Metals commissioning its new sponge‐iron plant, offered sporadic pockets of optimism amid a broadly risk‐averse tone."
+        "summary": "Today’s Indian market slipped into a cautious mood as weak global cues – led by a US federal appeals court upholding Trump’s reciprocal tariffs, softer US inflation data and lower Asian bourses – weighed on sentiment in the absence of clear domestic triggers. Investors remained on the sidelines ahead of the GST Council meeting, where talks over potential rate rationalization and broader GST reforms are expected to set the next policy tone, while foreign institutional flows stayed subdued. Sectoral divergences were pronounced, with metal and IT names under pressure even as FMCG and banking stocks provided limited support, and farm‐linked sectors, including tractor makers buoyed by ICRA’s upbeat demand outlook, managed to hold ground. Technical indicators on Sensex and Nifty also signalled a negative bias, underscoring the need for clearer consolidation or fresh catalysts before participants step up risk exposure."
     }
 }

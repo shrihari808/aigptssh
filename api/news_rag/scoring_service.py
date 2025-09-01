@@ -143,22 +143,7 @@ class NewsRagScoringService:
         for chunk, rel_score in zip(all_chunks, relevance_scores):
             chunk['relevance_score'] = float(rel_score)
 
-        # 3. Perform BATCH sentiment analysis to remove the bottleneck
-        print(f"DEBUG: Calculating sentiment scores for {len(all_chunks)} chunks in a single batch...")
-        if self.sentiment_analyzer and all_chunks:
-            texts_for_sentiment = [chunk['text'][:512] for chunk in all_chunks]
-            # Run the pipeline in a separate thread to avoid blocking the event loop
-            sentiment_results = await asyncio.to_thread(
-                self.sentiment_analyzer, texts_for_sentiment, batch_size=32
-            )
-            # Map results back to chunks
-            for chunk, sentiment_result in zip(all_chunks, sentiment_results):
-                chunk['sentiment_score'] = self._calculate_sentiment_score_from_result(sentiment_result, query)
-        else:
-            for chunk in all_chunks:
-                chunk['sentiment_score'] = 0.5 # Default neutral score
-
-        # 4. Calculate other fast scores and the final combined score for each chunk
+        # 3. Calculate other fast scores and the final combined score for each chunk
         print(f"DEBUG: Calculating remaining multi-factor scores (time, impact)...")
         for chunk in all_chunks:
             metadata = chunk.get("metadata", {})
@@ -174,7 +159,6 @@ class NewsRagScoringService:
             # Calculate the final weighted score using all computed components
             chunk['final_combined_score'] = (
                 W_RELEVANCE * chunk.get('relevance_score', 0.0) +
-                W_SENTIMENT * chunk.get('sentiment_score', 0.5) +
                 W_TIME_DECAY * chunk['time_decay_score'] +
                 W_IMPACT * chunk['impact_score']
             )
@@ -186,10 +170,9 @@ class NewsRagScoringService:
         print(f"DEBUG: Top {min(5, len(reranked_chunks))} passages after reranking:")
         for i, passage in enumerate(reranked_chunks[:5]):
             print(f"  {i+1}. Score: {passage['final_combined_score']:.4f} | "
-                  f"Rel: {passage['relevance_score']:.2f}, Sent: {passage['sentiment_score']:.2f}, "
+                  f"Rel: {passage['relevance_score']:.2f}, "
                   f"Time: {passage['time_decay_score']:.2f}, Impact: {passage['impact_score']:.2f} | "
                   f"{passage.get('metadata', {}).get('link', 'No link')}")
-        # --- END OF DEBUG LOG ---
 
         return reranked_chunks[:top_n]
 
@@ -614,7 +597,6 @@ class NewsRagScoringService:
                 
                 # Calculate individual scores
                 relevance_score = self._calculate_relevance_score(question, text)
-                sentiment_score = self._calculate_sentiment_score(text, question)
                 time_decay_score = self._calculate_time_decay_score(
                     metadata.get("publication_date") or str(metadata.get("date", "")), 
                     question
@@ -624,7 +606,6 @@ class NewsRagScoringService:
                 # Calculate weighted final score
                 final_score = (
                     weights['w_relevance'] * relevance_score +
-                    weights['w_sentiment'] * sentiment_score +
                     weights['w_time_decay'] * time_decay_score +
                     weights['w_impact'] * impact_score
                 )
@@ -633,7 +614,6 @@ class NewsRagScoringService:
                 scored_passage = passage.copy()
                 scored_passage.update({
                     "relevance_score": relevance_score,
-                    "sentiment_score": sentiment_score,
                     "time_decay_score": time_decay_score,
                     "impact_score": impact_score,
                     "final_combined_score": final_score
@@ -663,7 +643,7 @@ class NewsRagScoringService:
         print(f"DEBUG: Top {min(5, len(reranked_passages))} passages after reranking:")
         for i, passage in enumerate(reranked_passages[:5]):
             print(f"  {i+1}. Score: {passage['final_combined_score']:.4f} | "
-                  f"Rel: {passage['relevance_score']:.2f}, Sent: {passage['sentiment_score']:.2f}, "
+                  f"Rel: {passage['relevance_score']:.2f}, "
                   f"Time: {passage['time_decay_score']:.2f}, Impact: {passage['impact_score']:.2f} | "
                   f"{passage.get('metadata', {}).get('link', 'No link')}")
         # --- END: ADD THIS DEBUGGING BLOCK ---
