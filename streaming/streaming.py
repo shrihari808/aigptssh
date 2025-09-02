@@ -362,7 +362,7 @@ def is_followup_question(query: str, chat_history: list[str]) -> bool:
 
 # --- Combined LLM Processing Function ---
 
-async def combined_preprocessing(query: str, chat_history: list[str], today: str) -> dict:
+async def combined_preprocessing(query: str, chat_history: list[str], today: str, country: str) -> dict:
     """
     Combined LLM call that validates the query and generates multiple, targeted sub-queries
     for comprehensive information retrieval.
@@ -374,18 +374,20 @@ async def combined_preprocessing(query: str, chat_history: list[str], today: str
 
     # The new prompt instructs the LLM to perform validation and generate sub-queries
     combined_prompt = """
-You are a financial markets expert AI. Your task is to analyze a user's query and break it down into 2-3 targeted, self-contained sub-queries for a financial news search engine. You must also validate if the query is related to the Indian stock market, business, or finance.
+You are a financial markets expert AI. Your task is to analyze a user's query and break it down into 2-3 targeted, self-contained sub-queries for a financial news search engine. You must also validate if the query is related to the financial market, business, or finance of the specified country.
 
 User Query: "{query}"
 Today's Date: {today}
+Country Code: {country}
 
 **Tasks:**
-1.  **VALIDATE:** Is the query about the Indian stock market, business, or finance?
-2.  **DECOMPOSE:** If valid, generate a list of 2 to 3 specific sub-queries that cover all aspects of the user's question. Each sub-query should be a standalone search term.
+1.  **VALIDATE:** Is the query about the financial market, business, or finance in the country with code {country}?
+2.  **DECOMPOSE:** If valid, generate a list of 2 to 3 specific sub-queries that cover all aspects of the user's question. Each sub-query should be a standalone search term and should be tailored to the country with code {country}.
 3.  **FORMAT:** Return a single JSON object.
 
-**Example 1:**
+**Example 1 (India):**
 User Query: "What is the impact of the new semiconductor PLI scheme on Tata Motors and the broader auto industry?"
+Country Code: "IN"
 {{
     "valid": 1,
     "sub_queries": [
@@ -395,19 +397,21 @@ User Query: "What is the impact of the new semiconductor PLI scheme on Tata Moto
     ]
 }}
 
-**Example 2:**
-User Query: "latest news on reliance"
+**Example 2 (United States):**
+User Query: "latest news on tech stocks"
+Country Code: "US"
 {{
     "valid": 1,
     "sub_queries": [
-        "Reliance Industries latest financial news",
-        "Reliance Jio recent announcements",
-        "Reliance Retail recent business developments"
+        "latest US tech stock market news",
+        "top performing tech stocks in NASDAQ today",
+        "analyst ratings on major US tech companies"
     ]
 }}
 
-**Example 3:**
+**Example 3 (Invalid):**
 User Query: "what is the best programming language"
+Country Code: "GB"
 {{
     "valid": 0,
     "sub_queries": []
@@ -418,7 +422,8 @@ User Query: "what is the best programming language"
     # For this task, we don't need chat history as we are generating new search queries
     input_data = {
         "query": query,
-        "today": today
+        "today": today,
+        "country": country,
     }
 
     prompt_template = PromptTemplate(
@@ -557,6 +562,7 @@ async def web_rag_mix(
     prompt_history_id: int = Query(...),
     user_id: int = Query(...),
     plan_id: int = Query(...),
+    country: str = Query("IN", description="Country code for the search"),
     db_pool: asyncpg.Pool = Depends(get_db_pool),
     api_key: str = Depends(api_key_auth)
 ):
@@ -576,10 +582,10 @@ async def web_rag_mix(
         # --- Preprocessing Step ---
         yield "& Generating search plan...\n".encode("utf-8")
         chat_history = await get_chat_history_optimized(str(session_id), db_pool, limit=3)
-        preprocessing_result = await combined_preprocessing(original_query, chat_history, today)
+        preprocessing_result = await combined_preprocessing(original_query, chat_history, today, country)
 
         if preprocessing_result.get("valid", 0) == 0:
-            yield "I am a financial markets search engine and can only answer questions related to Indian markets, business, and finance. Please ask a relevant question.".encode("utf-8")
+            yield "I am a financial markets search engine and can only answer questions related to {country} markets, business, and finance. Please ask a relevant question.".encode("utf-8")
             return
 
         sub_queries = preprocessing_result.get("sub_queries", [original_query])
@@ -602,7 +608,7 @@ async def web_rag_mix(
                 search_tasks = []
                 for i, sub_query in enumerate(sub_queries):
                     yield f"& Executing search {i+1} of {len(sub_queries)}...\n".encode("utf-8")
-                    task = brave_searcher.search_and_scrape(session, sub_query, max_sources=15) # Fetch up to 15 sources per query
+                    task = brave_searcher.search_and_scrape(session, sub_query, max_sources=5, country=country) # Fetch up to 15 sources per query
                     search_tasks.append(task)
                 
                 # Run all searches in parallel

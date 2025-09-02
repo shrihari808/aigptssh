@@ -213,7 +213,7 @@ class BraveNews:
         
         return extracted_data
 
-    async def _fetch_brave_page(self, session: aiohttp.ClientSession, query_term: str, page_num: int) -> tuple[dict, bool]:
+    async def _fetch_brave_page(self, session: aiohttp.ClientSession, query_term: str, page_num: int, country: str = "IN") -> tuple[dict, bool]:
         """
         Optimized Brave API call with better error handling and retry logic.
         """
@@ -222,9 +222,9 @@ class BraveNews:
         brave_params = {
             "q": query_term, 
             "count": 20, 
-            "country": "in",
+            "country": country,
             "result_filter": "web,news", 
-            "freshness": "pm",
+            "freshness": "",
             "offset": offset
         }
         brave_headers = {
@@ -334,7 +334,7 @@ class BraveNews:
                 print(f"DEBUG: Reached max_sources ({max_sources}). Stopping API calls.")
                 break
 
-            brave_results, has_more = await self._fetch_brave_page(session, query_term, current_page)
+            brave_results, has_more = await self._fetch_brave_page(session, query_term, current_page, country)
 
             if not brave_results:
                 break
