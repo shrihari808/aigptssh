@@ -319,7 +319,7 @@ class BraveNews:
             print(f"WARNING: Deduplication failed: {e}. Returning original items.")
             return processed_items
 
-    async def search_and_scrape(self, session: aiohttp.ClientSession, query_term: str, max_pages: int = MAX_PAGES, max_sources: int = 30) -> list[dict]:
+    async def search_and_scrape(self, session: aiohttp.ClientSession, query_term: str, max_pages: int = MAX_PAGES, max_sources: int = 30, country: str = "IN") -> list[dict]:
         """
         Accepts an active aiohttp session to prevent premature closing.
         """

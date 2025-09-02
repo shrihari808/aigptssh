@@ -381,7 +381,7 @@ Today's Date: {today}
 Country Code: {country}
 
 **Tasks:**
-1.  **VALIDATE:** Is the query about the financial market, business, or finance in the country with code {country}?
+1.  **VALIDATE:** Is the query about the financial market, business, or finance of the country with code {country}?
 2.  **DECOMPOSE:** If valid, generate a list of 2 to 3 specific sub-queries that cover all aspects of the user's question. Each sub-query should be a standalone search term and should be tailored to the country with code {country}.
 3.  **FORMAT:** Return a single JSON object.
 
@@ -410,7 +410,7 @@ Country Code: "US"
 }}
 
 **Example 3 (Invalid):**
-User Query: "what is the best programming language"
+User Query: "Should I buy Relience Industries stock?"
 Country Code: "GB"
 {{
     "valid": 0,
@@ -585,7 +585,7 @@ async def web_rag_mix(
         preprocessing_result = await combined_preprocessing(original_query, chat_history, today, country)
 
         if preprocessing_result.get("valid", 0) == 0:
-            yield "I am a financial markets search engine and can only answer questions related to {country} markets, business, and finance. Please ask a relevant question.".encode("utf-8")
+            yield f"I am a financial markets search engine and can only answer questions related to {country} markets, business, and finance. Please ask a relevant question.".encode("utf-8")
             return
 
         sub_queries = preprocessing_result.get("sub_queries", [original_query])
