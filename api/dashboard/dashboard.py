@@ -13,6 +13,13 @@ router = APIRouter()
 
 # --- Define Paths ---
 OUTPUT_DIR = os.path.dirname(os.path.abspath(__file__))
+OUTPUTS_DIR = os.path.join(OUTPUT_DIR, 'outputs')
+
+# --- ADD THIS SNIPPET ---
+# Create the outputs directory if it doesn't exist
+os.makedirs(OUTPUTS_DIR, exist_ok=True)
+# --- END OF SNIPPET ---
+
 
 # A simple mapping for country names
 COUNTRY_NAMES = {
@@ -36,7 +43,9 @@ async def get_dashboard_snapshot(
     """
     country_code = country.upper()
     country_name = get_country_name(country_code)
-    final_output_path = os.path.join(OUTPUT_DIR, f'dashboard_output_{country_code}.json')
+    # --- MODIFY THIS LINE ---
+    final_output_path = os.path.join(OUTPUTS_DIR, f'dashboard_output_{country_code}.json')
+    # --- END OF MODIFICATION ---
     
     # Check for a fresh, cached file
     if os.path.exists(final_output_path):

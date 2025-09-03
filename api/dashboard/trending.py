@@ -11,6 +11,12 @@ router = APIRouter()
 
 # --- Define Paths ---
 OUTPUT_DIR = os.path.dirname(os.path.abspath(__file__))
+# --- ADD THIS SNIPPET ---
+OUTPUTS_DIR = os.path.join(OUTPUT_DIR, 'outputs')
+
+# Create the outputs directory if it doesn't exist
+os.makedirs(OUTPUTS_DIR, exist_ok=True)
+# --- END OF SNIPPET ---
 
 @router.get("/dashboard/trending")
 async def get_trending_stocks(
@@ -22,7 +28,9 @@ async def get_trending_stocks(
     Otherwise, it scrapes for new data on-demand.
     """
     country_code = country.upper()
-    trending_output_path = os.path.join(OUTPUT_DIR, f'trending_stocks_{country_code}.json')
+    # --- MODIFY THIS LINE ---
+    trending_output_path = os.path.join(OUTPUTS_DIR, f'trending_stocks_{country_code}.json')
+    # --- END OF MODIFICATION ---
 
     if os.path.exists(trending_output_path):
         file_mod_time = os.path.getmtime(trending_output_path)

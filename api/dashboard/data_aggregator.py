@@ -14,8 +14,14 @@ import sys
 
 # --- Define Paths ---
 OUTPUT_DIR = os.path.dirname(os.path.abspath(__file__))
+# --- ADD THIS SNIPPET ---
+OUTPUTS_DIR = os.path.join(OUTPUT_DIR, 'outputs')
+# --- END OF SNIPPET ---
 DATA_JSON_PATH = os.path.join(OUTPUT_DIR, 'dashboard_data.json')
-FINAL_OUTPUT_PATH = os.path.join(OUTPUT_DIR, 'dashboard_output.json')
+# --- MODIFY THIS LINE ---
+FINAL_OUTPUT_PATH = os.path.join(OUTPUTS_DIR, 'dashboard_output.json')
+# --- END OF MODIFICATION ---
+
 
 def get_age_in_seconds(iso_timestamp):
     """Converts an ISO 8601 timestamp string to seconds since the epoch."""
@@ -207,7 +213,7 @@ async def aggregate_and_process_data(country_code="IN", country_name="India"):
     final_dashboard_content = await llm_generator.generate_dashboard_content()
 
     # Save the final output
-    final_output_path = os.path.join(OUTPUT_DIR, f'dashboard_output_{country_code}.json')
+    final_output_path = os.path.join(OUTPUTS_DIR, f'dashboard_output_{country_code}.json')
     save_data_to_json(final_dashboard_content, final_output_path)
     save_dashboard_history(final_dashboard_content)
 
@@ -225,7 +231,7 @@ async def generate_trending_stocks_data():
     # Add the last_updated_utc timestamp
     trending_stocks['last_updated_utc'] = datetime.now(timezone.utc).isoformat()
     
-    output_path = os.path.join(OUTPUT_DIR, 'trending_stocks.json')
+    output_path = os.path.join(OUTPUTS_DIR, 'trending_stocks.json')
     save_data_to_json(trending_stocks, output_path)
     print("\n--- Pipeline Complete: Trending stocks identified and saved. ---")
 
@@ -257,69 +263,3 @@ def save_data_to_json(data, output_path):
 if __name__ == '__main__':
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-
-    # async def test_stock_snapshot():
-    #     """
-    #     A main function to manually test the stock snapshot generation and save the outputs to JSON files.
-    #     """
-    #     test_stock = "Reliance Industries"
-    #     print(f"--- Manual Test: Generating snapshot for stock: {test_stock} ---")
-
-    #     stock_data_path = os.path.join(OUTPUT_DIR, 'stock_data.json')
-    #     stock_output_path = os.path.join(OUTPUT_DIR, 'stock_output.json')
-
-    #     processed_data = await aggregate_and_process_stock_data(test_stock)
-
-    #     if not processed_data:
-    #         print("--- Test Failed: No data was processed for the stock. ---")
-    #         return
-
-    #     save_data_to_json(processed_data, stock_data_path)
-    #     print(f"\n--- Intermediate processed data saved to {stock_data_path} ---")
-
-    #     # Use the PortfolioLLMGenerator as it's designed to handle this structure
-    #     llm_generator = PortfolioLLMGenerator(input_path=stock_data_path)
-    #     final_dashboard_content = llm_generator.generate_dashboard_content()
-
-    #     save_data_to_json(final_dashboard_content, stock_output_path)
-    #     print(f"--- Final generated dashboard output saved to {stock_output_path} ---")
-
-    #     print("\n--- Manual Test Completed Successfully ---")
-
-    # asyncio.run(test_stock_snapshot())
-
-    # Uncomment the following lines to run the portfolio snapshot test
-
-
-    # async def test_portfolio_snapshot():
-    #     """
-    #     A main function to manually test the portfolio snapshot generation and save the outputs to JSON files.
-    #     """
-    #     test_portfolio = ["Bharti Airtel", "Asian paints", "Tata motors", "HDFC Bank"]
-    #     print(f"--- Manual Test: Generating snapshot for portfolio: {test_portfolio} ---")
-
-    #     portfolio_data_path = os.path.join(OUTPUT_DIR, 'portfolio_data.json')
-    #     portfolio_output_path = os.path.join(OUTPUT_DIR, 'portfolio_output.json')
-
-    #     processed_data = await aggregate_and_process_portfolio_data(test_portfolio)
-
-    #     if not processed_data:
-    #         print("--- Test Failed: No data was processed for the portfolio. ---")
-    #         return
-
-    #     save_data_to_json(processed_data, portfolio_data_path)
-    #     print(f"\n--- Intermediate processed data saved to {portfolio_data_path} ---")
-
-    #     # Use the new PortfolioLLMGenerator for the test
-    #     llm_generator = PortfolioLLMGenerator(input_path=portfolio_data_path)
-    #     final_dashboard_content = llm_generator.generate_dashboard_content()
-
-    #     save_data_to_json(final_dashboard_content, portfolio_output_path)
-    #     print(f"--- Final generated dashboard output saved to {portfolio_output_path} ---")
-
-    #     print("\n--- Manual Test Completed Successfully ---")
-
-    # asyncio.run(test_portfolio_snapshot())
-
-
-    # asyncio.run(aggregate_and_process_data())
