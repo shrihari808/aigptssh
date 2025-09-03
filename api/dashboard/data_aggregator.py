@@ -174,7 +174,7 @@ async def aggregate_and_process_data(country_code="IN", country_name="India"):
     print(f"--- Starting Full Data Aggregation for {country_name} ---")
 
     brave_fetcher = BraveDashboard()
-    qualitative_data = brave_fetcher.get_dashboard_data(country_code, country_name)
+    qualitative_data = await brave_fetcher.get_dashboard_data(country_code, country_name)
     news_articles = qualitative_data.get("latest_news", [])
     scraped_articles = await scrape_urls(news_articles) if news_articles else []
 

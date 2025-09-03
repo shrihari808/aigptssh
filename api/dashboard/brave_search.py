@@ -174,9 +174,9 @@ class BraveDashboard:
             print(f"An error occurred during the API request: {e}")
             return None
             
-    def get_latest_news(self, query, country_code, target_count=10):
+    async def get_latest_news(self, query, country_code, target_count=10):
         print(f"Fetching up to {target_count} latest news articles from News API for country {country_code}...")
-        results = self._perform_search_async(query, count=target_count, freshness="pd", country=country_code)
+        results = await self._perform_search_async(query, count=target_count, freshness="pd", country=country_code)
         if not results or not results.get("results"):
             print("No news results found or API error.")
             return []
@@ -218,13 +218,13 @@ class BraveDashboard:
             asyncio.sleep(1)
         return {"latest_news": all_news}
 
-    def get_dashboard_data(self, country_code="IN", country_name="India"):
+    async def get_dashboard_data(self, country_code="IN", country_name="India"):
         """
         Fetches dashboard data for a specific country.
         """
         print(f"Starting data acquisition for {country_name} from Brave Search API...")
         queries = self.get_queries(country_name)
-        news = self.get_latest_news(queries["latest_news"], country_code)
+        news = await self.get_latest_news(queries["latest_news"], country_code)
         dashboard_data = {
             "latest_news": news,
         }

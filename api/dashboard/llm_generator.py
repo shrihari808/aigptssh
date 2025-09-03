@@ -66,7 +66,7 @@ class LLMGenerator:
         
         contexts = self.data.get("llm_contexts", {})
 
-        # 1. Market Summary
+        # --- Define all prompts and parsers ---
         summary_parser = JsonOutputParser()
         summary_prompt = ChatPromptTemplate.from_template(
             """Analyze the provided context about the Indian stock market. 
@@ -80,21 +80,7 @@ class LLMGenerator:
             """,
             partial_variables={"format_instructions": summary_parser.get_format_instructions()},
         )
-        summary_content, summary_sources = await self._generate_section(
-            "market_summary", contexts.get("indices_context"), summary_prompt, summary_parser
-        )
-        final_output["market_summary"] = {
-            "summary_points": summary_content.get("summary_points", []),
-            "sources": summary_sources
-        }
-
-        # 2. Latest News - Use pre-selected articles directly from data_aggregator
-        print("Using pre-selected latest news articles...")
-        latest_news_articles = self.data.get("latest_news_articles", [])
-        final_output["latest_news"] = {"articles": latest_news_articles}
-        print(f"Added {len(latest_news_articles)} pre-selected news articles to final output.")
-
-        # 3. Sector Analysis
+        
         sectors_parser = JsonOutputParser()
         sectors_prompt = ChatPromptTemplate.from_template(
             """Based on the context, identify and summarize the performance of key sectors.
@@ -107,12 +93,7 @@ class LLMGenerator:
             """,
             partial_variables={"format_instructions": sectors_parser.get_format_instructions()},
         )
-        sector_content, _ = await self._generate_section(
-            "sector_analysis", contexts.get("sectors_context"), sectors_prompt, sectors_parser
-        )
-        final_output["sector_analysis"] = sector_content
 
-        # 4. Standouts Analysis
         standouts_parser = JsonOutputParser()
         standouts_prompt = ChatPromptTemplate.from_template(
             """From the provided context, identify the top 2-3 standout stock gainers and top 2-3 standout stock losers for the day.
@@ -124,12 +105,7 @@ class LLMGenerator:
             """,
             partial_variables={"format_instructions": standouts_parser.get_format_instructions()},
         )
-        standouts_content, _ = await self._generate_section(
-            "standouts_analysis", contexts.get("standouts_context"), standouts_prompt, standouts_parser
-        )
-        final_output["standouts_analysis"] = standouts_content
 
-        # 5. Market Drivers
         drivers_parser = JsonOutputParser()
         drivers_prompt = ChatPromptTemplate.from_template(
             """Analyze the context to determine the key drivers behind today's market performance.
@@ -141,9 +117,29 @@ class LLMGenerator:
             """,
             partial_variables={"format_instructions": drivers_parser.get_format_instructions()},
         )
-        drivers_content, _ = await self._generate_section(
-            "market_drivers", contexts.get("market_drivers_context"), drivers_prompt, drivers_parser
-        )
+
+        # --- Create a list of tasks to run concurrently ---
+        tasks = [
+            self._generate_section("market_summary", contexts.get("indices_context"), summary_prompt, summary_parser),
+            self._generate_section("sector_analysis", contexts.get("sectors_context"), sectors_prompt, sectors_parser),
+            self._generate_section("standouts_analysis", contexts.get("standouts_context"), standouts_prompt, standouts_parser),
+            self._generate_section("market_drivers", contexts.get("market_drivers_context"), drivers_prompt, drivers_parser)
+        ]
+
+        # --- Run all LLM generation tasks in parallel ---
+        results = await asyncio.gather(*tasks)
+
+        # --- Unpack results ---
+        (summary_content, summary_sources), (sector_content, _), (standouts_content, _), (drivers_content, _) = results
+
+        # --- Populate final output ---
+        final_output["market_summary"] = {
+            "summary_points": summary_content.get("summary_points", []),
+            "sources": summary_sources
+        }
+        final_output["latest_news"] = {"articles": self.data.get("latest_news_articles", [])}
+        final_output["sector_analysis"] = sector_content
+        final_output["standouts_analysis"] = standouts_content
         final_output["market_drivers"] = drivers_content
 
         print("--- LLM Content Generation Complete ---")
