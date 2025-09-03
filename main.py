@@ -1,6 +1,7 @@
 # /aigptssh/main.py
 import os
 import sys
+import asyncio # ADD THIS IMPORT
 import asyncpg
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -17,6 +18,13 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(CURRENT_DIR)
 if PROJECT_ROOT not in sys.path:
     sys.path.append(PROJECT_ROOT)
+
+# --- ADD THIS SNIPPET ---
+# Set asyncio policy for Windows to prevent NotImplementedError
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+# --- END OF SNIPPET ---
+
 
 # --- Import the master API router ---
 from api.router import api_router
@@ -55,7 +63,7 @@ async def lifespan(app: FastAPI):
         print("ERROR: DATABASE_URL not set. Database pool not initialized.")
 
     scheduler.add_job(aggregate_and_process_data, 'interval', minutes=30)
-    scheduler.add_job(generate_trending_stocks_data, 'interval', minutes=40)
+    scheduler.add_job(generate_trending_stocks_data, 'interval', minutes=1)
     scheduler.start()
     yield # The application is now running
 

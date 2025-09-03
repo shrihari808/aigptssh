@@ -11,6 +11,7 @@ from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 from config import GPT4o_mini
 import aiohttp
+import sys # ADD THIS IMPORT
 
 # Load environment variables from .env file
 load_dotenv()
@@ -101,11 +102,82 @@ class BraveDashboard:
             print(f"LLM reason extraction failed for {stock_name}: {e}")
             return {"reason": "Could not summarize the reason.", "source_url": source_url}
 
-    async def scrape_trending_stocks(self):
+    async def scrape_trending_stocks(self, country_code="IN"):
         """
-        Asynchronously scrapes trending stocks from StockEdge using async playwright.
+        Asynchronously scrapes trending stocks based on the country code.
+        - For "IN", scrapes StockEdge.
+        - For "US", scrapes Business Insider.
         """
-        print("Scraping trending stocks from StockEdge...")
+        # --- ADD THIS SNIPPET ---
+        if sys.platform == "win32":
+            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        # --- END OF SNIPPET ---
+        if country_code == "IN":
+            return await self._scrape_trending_stocks_in()
+        elif country_code == "US":
+            return await self._scrape_trending_stocks_us()
+        else:
+            print(f"Trending stocks for country '{country_code}' not supported.")
+            return {"trending_stocks": []}
+
+    async def _scrape_trending_stocks_us(self):
+        """
+        Scrapes trending stocks for the US from Business Insider.
+        """
+        print("Scraping trending US stocks from Business Insider...")
+        url = "https://markets.businessinsider.com/index/market-movers/s&p_500"
+        trending_stocks = []
+
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            page = await browser.new_page()
+            try:
+                await page.goto(url, timeout=60000)
+                await page.wait_for_selector("h2.header-underline")
+
+                # --- Scrape Gainers ---
+                gainers_header = page.locator('h2:has-text("Top Gainers")')
+                gainers_table = gainers_header.locator('xpath=./following-sibling::div//table')
+                gainer_rows = await gainers_table.locator('tbody tr').all()
+                
+                for row in gainer_rows:
+                    name = await row.locator("td:nth-child(1) a").inner_text()
+                    percentage_change = await row.locator("td:nth-child(4) span").nth(1).inner_text()
+                    trending_stocks.append({
+                        "stock": name.strip(),
+                        "percentage_change": percentage_change.strip(),
+                        "reason": "N/A",
+                        "source": ""
+                    })
+
+                # --- Scrape Losers ---
+                losers_header = page.locator('h2:has-text("Top Losers")')
+                losers_table = losers_header.locator('xpath=./following-sibling::div//table')
+                loser_rows = await losers_table.locator('tbody tr').all()
+
+                for row in loser_rows:
+                    name = await row.locator("td:nth-child(1) a").inner_text()
+                    percentage_change = await row.locator("td:nth-child(4) span").nth(1).inner_text()
+                    trending_stocks.append({
+                        "stock": name.strip(),
+                        "percentage_change": percentage_change.strip(),
+                        "reason": "N/A",
+                        "source": ""
+                    })
+
+            except Exception as e:
+                print(f"Error scraping Business Insider: {e}")
+            finally:
+                await browser.close()
+
+        return {"trending_stocks": trending_stocks}
+
+
+    async def _scrape_trending_stocks_in(self):
+        """
+        Asynchronously scrapes trending stocks for India from StockEdge using async playwright.
+        """
+        print("Scraping trending IN stocks from StockEdge...")
         
         base_url = "https://web.stockedge.com/trending-stocks?filter-type=Major%20Stocks"
         urls = {
@@ -155,6 +227,7 @@ class BraveDashboard:
             await browser.close()
 
         return {"trending_stocks": trending_stocks}
+    # --- END OF MODIFICATION ---
 
     # The synchronous methods are kept for other parts of the app that might not be async yet.
     def _perform_search(self, query, count=20, freshness="pd", country="IN"):

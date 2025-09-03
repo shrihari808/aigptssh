@@ -11,12 +11,11 @@ router = APIRouter()
 
 # --- Define Paths ---
 OUTPUT_DIR = os.path.dirname(os.path.abspath(__file__))
-# --- ADD THIS SNIPPET ---
 OUTPUTS_DIR = os.path.join(OUTPUT_DIR, 'outputs')
 
 # Create the outputs directory if it doesn't exist
 os.makedirs(OUTPUTS_DIR, exist_ok=True)
-# --- END OF SNIPPET ---
+
 
 @router.get("/dashboard/trending")
 async def get_trending_stocks(
@@ -28,9 +27,7 @@ async def get_trending_stocks(
     Otherwise, it scrapes for new data on-demand.
     """
     country_code = country.upper()
-    # --- MODIFY THIS LINE ---
     trending_output_path = os.path.join(OUTPUTS_DIR, f'trending_stocks_{country_code}.json')
-    # --- END OF MODIFICATION ---
 
     if os.path.exists(trending_output_path):
         file_mod_time = os.path.getmtime(trending_output_path)
@@ -39,8 +36,9 @@ async def get_trending_stocks(
 
     # On-demand generation
     brave_fetcher = BraveDashboard()
-    # This method needs to be updated to accept a country code
+    # --- MODIFY THIS LINE ---
     trending_data = await brave_fetcher.scrape_trending_stocks(country_code) 
+    # --- END OF MODIFICATION ---
 
     with open(trending_output_path, 'w', encoding='utf-8') as f:
         json.dump(trending_data, f, indent=4, ensure_ascii=False)

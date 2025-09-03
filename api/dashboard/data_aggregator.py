@@ -14,13 +14,9 @@ import sys
 
 # --- Define Paths ---
 OUTPUT_DIR = os.path.dirname(os.path.abspath(__file__))
-# --- ADD THIS SNIPPET ---
 OUTPUTS_DIR = os.path.join(OUTPUT_DIR, 'outputs')
-# --- END OF SNIPPET ---
 DATA_JSON_PATH = os.path.join(OUTPUT_DIR, 'dashboard_data.json')
-# --- MODIFY THIS LINE ---
 FINAL_OUTPUT_PATH = os.path.join(OUTPUTS_DIR, 'dashboard_output.json')
-# --- END OF MODIFICATION ---
 
 
 def get_age_in_seconds(iso_timestamp):
@@ -220,20 +216,25 @@ async def aggregate_and_process_data(country_code="IN", country_name="India"):
     print(f"\n--- Pipeline Complete for {country_name}: Final dashboard output generated. ---")
     return final_dashboard_content
 
-async def generate_trending_stocks_data():
+# --- START OF MODIFICATION ---
+async def generate_trending_stocks_data(country_code: str = "IN"):
     """
     Fetches trending stocks and saves them to a JSON file.
+    This function will be called by the scheduler.
     """
-    print("--- Starting Trending Stocks Generation ---")
+    print(f"--- Starting Trending Stocks Generation for country: {country_code} ---")
     brave_fetcher = BraveDashboard()
-    trending_stocks = await brave_fetcher.scrape_trending_stocks()
+    
+    # Directly await the async function
+    trending_stocks = await brave_fetcher.scrape_trending_stocks(country_code)
     
     # Add the last_updated_utc timestamp
     trending_stocks['last_updated_utc'] = datetime.now(timezone.utc).isoformat()
     
-    output_path = os.path.join(OUTPUTS_DIR, 'trending_stocks.json')
+    output_path = os.path.join(OUTPUTS_DIR, f'trending_stocks_{country_code}.json')
     save_data_to_json(trending_stocks, output_path)
-    print("\n--- Pipeline Complete: Trending stocks identified and saved. ---")
+    print(f"\n--- Pipeline Complete: Trending stocks for {country_code} identified and saved. ---")
+# --- END OF MODIFICATION ---
 
 def get_human_readable_age_in_seconds(age_str):
     if not age_str or not isinstance(age_str, str):
@@ -253,6 +254,8 @@ def update_dashboard_data(existing_data, new_data):
 
 def save_data_to_json(data, output_path):
     try:
+        # Ensure the directory exists before writing the file
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
         print(f"Successfully saved data to {output_path}")
