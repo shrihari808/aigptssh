@@ -11,17 +11,13 @@ try:
 except Exception as e:
     print(f"ERROR: Could not load .env file in config.py: {e}")
 
+POPULAR_COUNTRIES = ["IN", "US"]
 REQUIRE_API_KEY = 1
 VALID_API_KEY = "example_api_key_12345"
 
 REDDIT_CLIENT_ID = os.getenv("REDDIT_CLIENT_ID")
 REDDIT_CLIENT_SECRET = os.getenv("REDDIT_CLIENT_SECRET")
 REDDIT_USER_AGENT = os.getenv("REDDIT_USER_AGENT")
-print("--- Loading Reddit Credentials ---")
-print(f"REDDIT_CLIENT_ID: {REDDIT_CLIENT_ID}")
-print(f"REDDIT_CLIENT_SECRET: {'[REDACTED]' if REDDIT_CLIENT_SECRET else 'None'}")
-print(f"REDDIT_USER_AGENT: {REDDIT_USER_AGENT}")
-print("---------------------------------")
 from pinecone import ServerlessSpec, Pinecone
 from langchain_pinecone import PineconeVectorStore
 import chromadb

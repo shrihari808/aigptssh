@@ -167,26 +167,26 @@ async def aggregate_and_process_portfolio_data(portfolio: list[str]):
     return processed_data
 
 
-async def aggregate_and_process_data():
+async def aggregate_and_process_data(country_code="IN", country_name="India"):
     """
-    Fetches, scrapes, processes, and updates the dashboard data.
+    Fetches, scrapes, processes, and updates the dashboard data for a specific country.
     """
-    print("--- Starting Full Data Aggregation and Processing Pipeline ---")
+    print(f"--- Starting Full Data Aggregation for {country_name} ---")
 
     brave_fetcher = BraveDashboard()
-    qualitative_data = brave_fetcher.get_dashboard_data()
+    qualitative_data = brave_fetcher.get_dashboard_data(country_code, country_name)
     news_articles = qualitative_data.get("latest_news", [])
     scraped_articles = await scrape_urls(news_articles) if news_articles else []
 
-    vector_store = DashboardVectorStore()
+    vector_store = DashboardVectorStore(collection_name=f"dashboard_news_{country_code.lower()}")
     vector_store.add_documents(scraped_articles)
     scoring_service = DashboardScoringService(vector_store=vector_store)
 
     context_queries = {
-        "indices_context": "What was the performance of key Indian market indices like the NIFTY 50 and Sensex today?",
-        "sectors_context": "Which sectors were the top performers and underperformers in the Indian stock market today?",
-        "standouts_context": "Who were the biggest standout stock gainers and losers in the Indian market today?",
-        "market_drivers_context": "What were the main reasons and key driving factors for today's market movement?"
+        "indices_context": f"What was the performance of key {country_name} market indices today?",
+        "sectors_context": f"Which sectors were the top performers and underperformers in the {country_name} stock market today?",
+        "standouts_context": f"Who were the biggest standout stock gainers and losers in the {country_name} market today?",
+        "market_drivers_context": f"What were the main reasons and key driving factors for today's market movement in {country_name}?"
     }
 
     llm_contexts = {key: scoring_service.get_enhanced_context(query, k=5) for key, query in context_queries.items()}
@@ -198,26 +198,20 @@ async def aggregate_and_process_data():
         "llm_contexts": llm_contexts,
         "latest_news_articles": latest_news_articles
     }
+    
+    # Save the intermediate data
+    data_json_path = os.path.join(OUTPUT_DIR, f'dashboard_data_{country_code}.json')
+    save_data_to_json(processed_data, data_json_path)
 
-    save_data_to_json(processed_data, DATA_JSON_PATH)
+    llm_generator = LLMGenerator(input_path=data_json_path)
+    final_dashboard_content = await llm_generator.generate_dashboard_content()
 
-    llm_generator = LLMGenerator(input_path=DATA_JSON_PATH)
-    new_dashboard_content = await llm_generator.generate_dashboard_content()
-
-    existing_dashboard_content = {}
-    if os.path.exists(FINAL_OUTPUT_PATH):
-        try:
-            with open(FINAL_OUTPUT_PATH, 'r', encoding='utf-8') as f:
-                existing_dashboard_content = json.load(f)
-        except json.JSONDecodeError:
-            print("Warning: Could not decode existing dashboard data. Starting fresh.")
-            existing_dashboard_content = {}
-
-    final_dashboard_content = new_dashboard_content
-    save_data_to_json(final_dashboard_content, FINAL_OUTPUT_PATH)
+    # Save the final output
+    final_output_path = os.path.join(OUTPUT_DIR, f'dashboard_output_{country_code}.json')
+    save_data_to_json(final_dashboard_content, final_output_path)
     save_dashboard_history(final_dashboard_content)
 
-    print("\n--- Pipeline Complete: Final dashboard output generated and saved. ---")
+    print(f"\n--- Pipeline Complete for {country_name}: Final dashboard output generated. ---")
     return final_dashboard_content
 
 async def generate_trending_stocks_data():

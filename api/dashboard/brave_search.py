@@ -23,11 +23,12 @@ class BraveDashboard:
     BASE_URL = "https://api.search.brave.com/res/v1/news/search"  # Switched to News API endpoint
     
     # Define specific queries for each data type
-    QUERIES = {
-        "latest_news": "latest indian stock market news",
-        "standout_gainers": "top stock market gainers in india today",
-        "standout_losers": "top stock market losers in india today"
-    }
+    def get_queries(self, country_name="India"):
+        return {
+            "latest_news": f"latest {country_name} stock market news",
+            "standout_gainers": f"top stock market gainers in {country_name} today",
+            "standout_losers": f"top stock market losers in {country_name} today"
+        }
 
     def __init__(self, api_key=None):
         self.api_key = api_key or os.getenv("BRAVE_API_KEY")
@@ -38,20 +39,20 @@ class BraveDashboard:
             "X-Subscription-Token": self.api_key
         }
 
-    async def _perform_search_async(self, query, count=20, freshness="pd"):
+    async def _perform_search_async(self, query, country="IN", count=20, freshness="pd"):
         """
         Performs an asynchronous search request to the Brave API using aiohttp.
         """
         params = {
             "q": query, 
             "count": count, 
-            "country": "IN", 
+            "country": country, 
             "text_decorations": "false",
             "freshness": freshness
         }
             
         try:
-            url = self.BASE_URL if "news" in query else "https://api.search.brave.com/res/v1/web/search"
+            url = self.BASE_URL if "news" in query else "https://api.search.brave.com/res/v1/news/search"
             async with aiohttp.ClientSession(headers=self.headers) as session:
                 async with session.get(url, params=params) as response:
                     response.raise_for_status()
@@ -156,11 +157,11 @@ class BraveDashboard:
         return {"trending_stocks": trending_stocks}
 
     # The synchronous methods are kept for other parts of the app that might not be async yet.
-    def _perform_search(self, query, count=20, freshness="pd"):
+    def _perform_search(self, query, count=20, freshness="pd", country="IN"):
         params = {
             "q": query, 
             "count": count, 
-            "country": "IN", 
+            "country": country, 
             "text_decorations": False,
             "freshness": freshness
         }
@@ -173,9 +174,9 @@ class BraveDashboard:
             print(f"An error occurred during the API request: {e}")
             return None
             
-    def get_latest_news(self, target_count=50):
-        print(f"Fetching up to {target_count} latest news articles from News API...")
-        results = self._perform_search(self.QUERIES["latest_news"], count=target_count, freshness="pd")
+    def get_latest_news(self, query, country_code, target_count=10):
+        print(f"Fetching up to {target_count} latest news articles from News API for country {country_code}...")
+        results = self._perform_search_async(query, count=target_count, freshness="pd", country=country_code)
         if not results or not results.get("results"):
             print("No news results found or API error.")
             return []
@@ -192,7 +193,7 @@ class BraveDashboard:
                     "page_age": item.get("page_age"),
                     "age": item.get("age")
                 })
-        print(f"Successfully fetched {len(news_items)} unique news articles.")
+        print(f"Successfully fetched {len(news_items)} unique news articles for {country_code}.")
         return news_items
 
     def get_portfolio_data(self, portfolio: list[str]):
@@ -217,11 +218,15 @@ class BraveDashboard:
             asyncio.sleep(1)
         return {"latest_news": all_news}
 
-    def get_dashboard_data(self):
-        print("Starting data acquisition from Brave Search API...")
-        news = self.get_latest_news()
+    def get_dashboard_data(self, country_code="IN", country_name="India"):
+        """
+        Fetches dashboard data for a specific country.
+        """
+        print(f"Starting data acquisition for {country_name} from Brave Search API...")
+        queries = self.get_queries(country_name)
+        news = self.get_latest_news(queries["latest_news"], country_code)
         dashboard_data = {
             "latest_news": news,
         }
-        print("Brave Search API data acquisition complete.")
+        print(f"Brave Search API data acquisition for {country_name} complete.")
         return dashboard_data
