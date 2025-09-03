@@ -1,129 +1,135 @@
 {
-    "last_updated_utc": "2025-09-02T11:28:16.912350+00:00",
+    "last_updated_utc": "2025-09-02T19:09:39.078954+00:00",
     "market_summary": {
         "summary_points": [
             {
-                "title": "Muted Market Open Expected",
-                "summary": "Indian benchmarks Sensex and Nifty are poised for a subdued opening amid mixed global cues and Gift Nifty trends, with Gift Nifty trading around 24,761.50 – a premium of nearly 14 points from Nifty futures’ previous close – signaling limited initial volatility.",
+                "title": "Mixed Openings on Global Cues",
+                "summary": "Indian benchmark indices are set for a muted start, with Sensex and Nifty 50 likely to open flat or marginally higher amid mixed global signals. Gift Nifty trends around the 24,761.50 level indicate a slight premium to Nifty futures, reflecting cautious investor sentiment at the open.",
+                "age": "17 hours ago"
+            },
+            {
+                "title": "Rebound Rally Snaps Losing Streak",
+                "summary": "After a three-session slump, Sensex and Nifty 50 surged by 554.84 points (0.70%) and 198.20 points (0.81%) respectively, closing at 80,364.49 and 24,625.05. Broad-based buying across sectors propelled this strong comeback, lifting markets back above key technical thresholds.",
+                "age": "16 hours ago"
+            },
+            {
+                "title": "Late-Session Profit Booking Trims Gains",
+                "summary": "Benchmarks surrendered morning gains to end in the red on profit‐booking in the fag‐end of the session, with Sensex easing by 207 points (0.26%) to 80,157.88 and Nifty dipping 45 points (0.18%) to 24,579.60. Weak global trends and cautious flows weighed on sentiment toward the close.",
                 "age": "9 hours ago"
             },
             {
-                "title": "Rebound Snaps Losing Streak",
-                "summary": "After three straight sessions of losses, the Sensex rallied 554.84 points (0.70%) to close at 80,364.49, and the Nifty gained 198.20 points (0.81%) to finish at 24,625.05, driven by broad-based sectoral buying that reflected renewed investor confidence.",
+                "title": "Mid and Small Caps Lead Market Outperformance",
+                "summary": "While heavyweight banks and auto names acted as drags on the main indices, midcap and smallcap segments outperformed, rising 0.27% and 0.64% respectively. Investors rotated into broader‐market plays seeking growth opportunities amid sectoral rebalancing.",
                 "age": "9 hours ago"
             },
             {
-                "title": "Positive Global Sentiment Post SCO Summit",
-                "summary": "Asian markets traded mostly higher following the SCO Summit in Tianjin, while US markets were closed for Labour Day, providing a supportive backdrop for Indian equities to open in green, even as tariff uncertainty continues to loom large.",
-                "age": "9 hours ago"
+                "title": "Geopolitical Trade Tensions Influence Outlook",
+                "summary": "Potential US tariffs, shifting India-US relations, and trade discussions at the SCO summit are injecting uncertainty into market sentiment. Experts caution that unpredictable global policies and continued FII outflows could cap upside momentum for Indian equities.",
+                "age": "15 hours ago"
             },
             {
-                "title": "Domestic GDP Growth Bolsters Stocks",
-                "summary": "Stronger-than-expected Q1 GDP growth of 7.8% lifted domestic sentiment, helping the Sensex open at 80,143.59 (up 333.94 points or 0.42%) and the Nifty at 24,511.30 (up 84.45 points or 0.35%), as investors cheered the robust economic expansion.",
+                "title": "Technical Charts Signal Cautious Upside",
+                "summary": "Market charts display mixed signals: intraday reversal patterns and bullish daily candles point to a near‐term pullback continuation, yet weekly charts bear long bearish formations. This technical divergence suggests limited upside and underscores the need for caution.",
                 "age": "1 day ago"
-            },
-            {
-                "title": "US Tariff Developments Create Uncertainty",
-                "summary": "A US appeals court ruled most of President Trump’s tariffs unlawful but allowed them to remain effective until mid-October, adding complexity to trade relations and raising concerns over potential 50% duties on Indian exports that could dampen corporate earnings.",
-                "age": "1 day ago"
-            },
-            {
-                "title": "Geopolitical Tensions and FII Outflows May Cap Gains",
-                "summary": "Analysts warn that deteriorating India-US relations, the threat of steep US tariffs and ongoing foreign institutional investor outflows may keep market moves range-bound, tempering the upside despite favourable domestic data.",
-                "age": "7 hours ago"
             }
         ],
         "sources": [
+            "https://www.livemint.com/market/stock-market-news/sensex-nifty-50-fall-on-fag-end-profit-booking-10-key-highlights-from-the-indian-stock-market-today-11756806932590.html",
             "https://timesofindia.indiatimes.com/business/india-business/stock-market-today-nifty50-bse-sensex-september-02-2025-dalal-street-indian-equities-global-markets-donald-trump-tariffs/articleshow/123646187.cms",
-            "https://www.livemint.com/market/stock-market-news/indian-stock-market-nifty-50-reclaims-24-500-dead-cat-bounce-or-sustained-rally-likely-11756704539242.html",
+            "https://www.livemint.com/market/stock-market-news/nifty-50-sensex-today-what-to-expect-from-indian-stock-market-in-trade-on-september-1-amid-trump-tariffs-sco-summit-11756690873073.html",
             "https://www.livemint.com/market/stock-market-news/indian-stock-market-8-things-that-changed-for-market-overnight-gift-nifty-sco-summit-2025-to-rbi-data-11756776835187.html",
-            "https://www.livemint.com/market/stock-market-news/nifty-50-sensex-today-what-to-expect-from-indian-stock-market-in-trade-on-september-2-11756745493739.html",
-            "https://economictimes.indiatimes.com/markets/stocks/live-blog/bse-sensex-today-live-nifty-stock-market-updates-01-september-2025/liveblog/123623991.cms?from=mdr"
+            "https://www.livemint.com/market/stock-market-news/nifty-50-sensex-today-what-to-expect-from-indian-stock-market-in-trade-on-september-2-11756745493739.html"
         ]
     },
     "latest_news": {
         "articles": [
             {
-                "title": "Stock market: Nifty likely to breach record high by December 2025, here's why - BusinessToday",
-                "snippet": "Disclaimer: Business Today provides stock market news for informational purposes only and should not be construed as investment advice. Readers are encouraged to consult with a qualified financial advisor before making any investment decisions. The Indian stock market, which has seen a major ...",
-                "url": "https://businesstoday.in/amp/markets/stocks/story/stock-market-nifty-likely-to-breach-record-high-by-december-2025-heres-why-492061-2025-09-02",
-                "age": "4 hours ago"
+                "title": "Stock market today: Dow, S&P 500, Nasdaq sink as Treasury yields jump amid tariff, Fed uncertainty",
+                "snippet": "Wall Street is prepping for a tense opening to September trading with tariff legal issues and concerns about the Fed's integrity on deck.",
+                "url": "https://finance.yahoo.com/news/live/stock-market-today-dow-sp-500-nasdaq-futures-sink-as-treasury-yields-jump-amid-tariff-fed-uncertainty-235520886.html",
+                "age": "24 minutes ago"
             },
             {
-                "title": "Stock market today: Nifty50 opens above 24,650; BSE Sensex up over 200 points - The Times of India",
-                "snippet": "India Business News: Stock market today: Nifty50 and BSE Sensex, the Indian equity benchmark indices, opened in green on Tuesday following a strong rally the previous day.",
-                "url": "https://timesofindia.indiatimes.com/business/india-business/stock-market-today-nifty50-bse-sensex-september-02-2025-dalal-street-indian-equities-global-markets-donald-trump-tariffs/articleshow/123646187.cms",
-                "age": "7 hours ago"
+                "title": "Stock Market: Stock Market Today | Stock Market Live News Update",
+                "snippet": "Share Market Today - Stock Market and Share Market Live Updates: Get all the latest share market and India stock market news and updates on Moneycontrol.com",
+                "url": "https://www.moneycontrol.com/stocksmarketsindia/",
+                "age": "5 hours ago"
             },
             {
-                "title": "Sensex, Nifty open higher ahead of GST Council meet as investors eye major tax cuts - India Today",
-                "snippet": "The S&P BSE Sensex gained around 200 points in early trade, while the NSE Nifty50 hovered above 24,600. Broader markets mirrored the upbeat sentiment, extending gains from the previous session.",
-                "url": "https://indiatoday.in/amp/business/market/story/sensex-rises-200-points-nifty-above-24600-reliance-gains-over-1-2780452-2025-09-02",
-                "age": "7 hours ago"
+                "title": "What's Next For Indian Stock Market Amid Tariff Turbulence? Star Investor Mark Mobius Says... | Business News - News18",
+                "snippet": "Mobius expressed his trust in the Indian market amid global uncertainties, including ongoing conflicts and new tariff challenges. He asserted that India’s rapid economic growth, stable development and substantial domestic market make it more attractive than any other country in the world. Stay updated with all the latest business news, including market trends, stock ...",
+                "url": "https://www.news18.com/business/whats-next-for-indian-stock-market-amid-tariff-turbulence-star-investor-mark-mobius-says-ws-dkl-9543087.html",
+                "age": "6 hours ago"
             }
         ]
     },
     "sector_analysis": {
-        "top_performing_sectors": [
-            {
-                "sector": "Auto",
-                "summary": "Nifty Auto led the rally with a 2.54% gain, powered by strong contributions from Mahindra & Mahindra and Tata Motors."
-            },
-            {
-                "sector": "Consumer Durables",
-                "summary": "Consumer Durables climbed 1.91% on robust buying in names like Trent, reflecting strength in discretionary spending."
-            },
-            {
-                "sector": "IT",
-                "summary": "The IT sector advanced 1.52%, led by a rally in Infosys, amid renewed investor interest in technology stocks."
-            }
-        ],
-        "underperforming_sectors": [
-            {
-                "sector": "Media",
-                "summary": "Nifty Media was the only sector in the red, sliding 0.07% as investors booked profits in advertising and broadcasting names."
-            },
+        "top_performers": [
             {
                 "sector": "FMCG",
-                "summary": "FMCG eked out just a 0.07% gain, reflecting muted sentiment in consumer staples despite overall market strength."
+                "performance": "+1.12%",
+                "explanation": "Defensive consumer‐staples names drew buying interest amid market volatility."
             },
             {
-                "sector": "Healthcare",
-                "summary": "Healthcare saw modest gains of 0.19%, underperforming broader indices as investor focus remained on cyclical and tech names."
+                "sector": "Media",
+                "performance": "+0.98%",
+                "explanation": "Better ad‐revenue expectations supported gains in media stocks."
+            },
+            {
+                "sector": "Metal",
+                "performance": "+0.85%",
+                "explanation": "Stabilising commodity prices and demand prospects lifted metal shares."
+            }
+        ],
+        "underperformers": [
+            {
+                "sector": "Nifty Private Bank",
+                "performance": "-0.70%",
+                "explanation": "Profit booking hit private‐lender stocks ahead of quarterly results."
+            },
+            {
+                "sector": "Financial Services",
+                "performance": "-0.66%",
+                "explanation": "Risk‐off sentiment weighed on broader financial‐services names."
+            },
+            {
+                "sector": "Nifty Bank",
+                "performance": "-0.63%",
+                "explanation": "Large banks saw end‐of‐session profit taking after recent gains."
             }
         ]
     },
     "standouts_analysis": {
         "gainers": [
             {
-                "stock": "Mahindra & Mahindra",
-                "reason": "Led the rally with a 2.98% jump, benefiting from strength in the auto sector."
+                "stock": "JK Tyre",
+                "reason": "One of the tyre stocks singled out for gains in the session, rising on broad market buying."
             },
             {
-                "stock": "Tata Motors",
-                "reason": "Rose 2.86% on continued auto sector outperformance."
+                "stock": "Reliance Industries",
+                "reason": "Cited as one of the strongest supports on the Nifty amid weak global cues and end‐of‐day swings."
             },
             {
-                "stock": "Trent",
-                "reason": "Climbed 2.65% as part of broad-based buying across sectors."
+                "stock": "NTPC",
+                "reason": "Mentioned among the top stocks providing support to benchmarks on the day."
             }
         ],
         "losers": [
             {
-                "stock": "Sun Pharma",
-                "reason": "Dropped 2.05%, marking the biggest decline of the day."
+                "stock": "ICICI Bank",
+                "reason": "Flagged as a top drag on the Nifty, weighed by expiry‐related volatility and profit booking."
             },
             {
-                "stock": "ITC",
-                "reason": "Fell 0.92%, with no specific catalyst mentioned in the report."
+                "stock": "HDFC Bank",
+                "reason": "Also among the biggest drags on the index, hit by session‐end profit taking."
             },
             {
-                "stock": "Titan",
-                "reason": "Declined 0.34%, with no clear reason cited in the text."
+                "stock": "Mahindra & Mahindra",
+                "reason": "Listed as a heavy-weight that underperformed amid fag-end profit booking."
             }
         ]
     },
     "market_drivers": {
-        "summary": "Indian equities opened higher as investors grew optimistic ahead of the two-day GST Council meeting, where a significant tax rate overhaul is expected to spur consumption demand; at the same time, relief rallies in major auto and IT counters and a 1% uptick in Reliance Industries drove sectoral breadth. However, lingering concerns over escalating U.S. tariffs and trade tensions kept foreign institutional outflows in check, with currency fluctuations under the microscope. Healthy domestic institutional flows helped offset some FII selling, enabling the Sensex to climb roughly 200 points and the Nifty to hold above 24,600."
+        "summary": "Indian markets extended their rally on Tuesday, with the Sensex up over 200 points and the Nifty reclaiming the 24,600-plus mark, driven by optimism around imminent GST rationalisation and robust Q1 GDP growth. Heavyweight Reliance Industries led sectoral gains, while auto and IT stocks outperformed, buoyed by hopes of a US Fed rate cut and stable currency flows. Healthy domestic institutional inflows offset recent FII selling triggered by US tariff tensions, as traders awaited the GST Council’s decisions to cement consumption demand amid shifting global geopolitics and mounting export headwinds."
     }
 }

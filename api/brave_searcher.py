@@ -57,8 +57,6 @@ BLACKLISTED_DOMAINS = {
     'facebook.com',
     'instagram.com',
     'indmoney.com',
-    # 'business-standard.com',
-    # 'reuters.com',
     'en.wikipedia.org',
     'wikipedia.org'
 }

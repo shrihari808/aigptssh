@@ -751,12 +751,12 @@ async def cmots_only(
     """Optimized CMOTS RAG endpoint."""
     pass
 
-async def validate_query_only(query: str) -> dict:
+async def validate_query_only(query: str, country: str) -> dict:
     """
     Performs a simple validation check on the user's query without reformulation.
     """
     prompt_template_str = """
-    You are a financial query validator. Your task is to determine if the user's query is related to the Indian stock market, finance, economics, companies, or related news.
+    You are a financial query validator. Your task is to determine if the user's query is related to the {country} stock market, finance, economics, companies, or related news.
 
     User Query: "{query}"
 
@@ -773,7 +773,7 @@ async def validate_query_only(query: str) -> dict:
         "valid": 0
     }}
     """
-    input_data = {"query": query}
+    input_data = {"query": query, "country": country}
 
     prompt_template = PromptTemplate(template=prompt_template_str, input_variables=["query"])
     chain = prompt_template | GPT4o_mini | JsonOutputParser()
@@ -836,17 +836,19 @@ async def red_rag_bing(
     prompt_history_id: int = Query(...),
     user_id: int = Query(...),
     plan_id: int = Query(...),
+    country: str = Query("IN", description="Country code for the search"),
     db_pool: asyncpg.Pool = Depends(get_db_pool),
     api_key: str = Depends(api_key_auth)
 ):
     """
     Handles Reddit-based RAG requests with a full pipeline:
     Search -> Scrape -> Chunk & Embed -> Retrieve -> Rerank -> Synthesize.
+    The response format is aligned with the web_rag endpoint.
     """
 
     original_query = request.query.strip()
 
-    validation_result = await validate_query_only(original_query)
+    validation_result = await validate_query_only(original_query, country)
     valid = validation_result.get("valid", 0)
     validation_tokens = validation_result.get("tokens_used", 0)
 
@@ -858,48 +860,51 @@ async def red_rag_bing(
             return
 
         final_links = []
+        top_passages = []
 
         try:
             # Step 1: Search for Reddit posts
-            yield "& Searching for relevant Reddit discussions...\n".encode("utf-8")
+            yield "& Generating search plan...\n".encode("utf-8")
+            yield "& Executing search 1 of 1...\n".encode("utf-8")
             brave_api_key = os.getenv('BRAVE_API_KEY')
             search_results = await fetch_search_red(original_query, brave_api_key)
 
             if not search_results:
                 yield "\nCould not find any relevant Reddit discussions for your query.".encode("utf-8")
                 return
-
+            
+            yield "& Consolidating sources...\n".encode("utf-8")
             articles, df, links = await process_search_red(search_results)
 
             if not articles:
                 yield "\nCould not find any relevant Reddit discussions for your query.".encode("utf-8")
                 return
 
-            yield f"& Searching Sources ... | {len(articles)} articles\n".encode("utf-8")
+            yield f"& Searching sources ... | {len(articles)} unique articles\n".encode("utf-8")
             for article in articles:
                 yield f"{json.dumps({'title': article.get('title'), 'url': article.get('url')})}\n".encode("utf-8")
-
 
             top_articles = articles[:5] # Limit to top 5 articles for scraping
             final_links = [article['url'] for article in top_articles]
 
             yield "& Gathering data ...\n".encode("utf-8")
 
-            # Step 2: Scrape top Reddit posts
+            # Step 2: Scrape top Reddit posts concurrently
             scraper = RedditScraper()
-            scraped_data = [await scraper.scrape_post(article) for article in top_articles]
+            # Create a list of scraping tasks (coroutines)
+            scraping_tasks = [scraper.scrape_post(article) for article in top_articles]
+            # Run all scraping tasks concurrently and gather the results
+            scraped_data = await asyncio.gather(*scraping_tasks)
 
             if not any(scraped_data):
                 yield "\nFound Reddit discussions, but could not scrape their content.".encode("utf-8")
                 return
 
-            # --- MODIFICATION START ---
-            # Run the synchronous, CPU-bound function in a separate thread
+            # Step 3: Chunk, Embed, and Retrieve
             retriever = await asyncio.to_thread(
                 create_reddit_vector_store_from_scraped_data,
                 scraped_data
             )
-            # --- MODIFICATION END ---
 
             if not retriever:
                 yield "\nFailed to process Reddit content for analysis.".encode("utf-8")
@@ -935,10 +940,14 @@ async def red_rag_bing(
             yield "\nAn error occurred while processing the Reddit discussions.".encode("utf-8")
             return
 
+        today = datetime.now().strftime("%Y-%m-%d")
+
         # Step 6: Synthesize Answer
         res_prompt = """
-        You are a financial information assistant specializing in Reddit discussions and community insights.
-        Using the provided Reddit articles and chat history, respond to the user's inquiries with detailed analysis.
+        You are a financial information assistant specializing in Reddit discussions and community insights. Today's date is {today}, make sure your answers use today as reference
+        Using the provided Reddit articles, respond to the user's inquiries with detailed analysis.
+        Include a disclaimer {disclaimer} with "> **Disclaimer:**" tag ONLY IF asked for financial advice or recommendations.
+        **CRITICAL INSTRUCTION:** The "&sources" value must be a JSON array of objects at the beginning of your response. Each object should represent a source you will cite in the answer and have the format {{"id": "[citation number]","name": "name of the website" "title": "source title", "url": "source url"}}. Only include sources that you have cited. Cite your sources using [number] notation in the answer text wherever relevant. You can also use multiple citations like [1,2] if the information is supported by multiple sources.
 
         Focus on:
         - Community sentiment and discussions
@@ -965,8 +974,11 @@ async def red_rag_bing(
 
         final_response = ""
         try:
+            # Prepare sources for the final prompt, mimicking the web_rag format
+            source_docs = [passage['metadata'] for passage in top_passages]
+            
             with get_openai_callback() as cb:
-                async for chunk in ans_chain.astream({"context": final_context, "input": original_query}):
+                async for chunk in ans_chain.astream({"context": final_context, "input": original_query, "today": today, "disclaimer": DISCLAIMER_TEXT}):
                     content = chunk.content
                     if content:
                         final_response += content
