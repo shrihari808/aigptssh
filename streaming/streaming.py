@@ -948,6 +948,7 @@ async def red_rag_bing(
         Using the provided Reddit articles, respond to the user's inquiries with detailed analysis.
         Include a disclaimer {disclaimer} with "> **Disclaimer:**" tag ONLY IF asked for financial advice or recommendations.
         **CRITICAL INSTRUCTION:** The "&sources" value must be a JSON array of objects at the beginning of your response. Each object should represent a source you will cite in the answer and have the format {{"id": "[citation number]","name": "name of the website" "title": "source title", "url": "source url"}}. Only include sources that you have cited. Cite your sources using [number] notation in the answer text wherever relevant. You can also use multiple citations like [1,2] if the information is supported by multiple sources.
+        **CRITICAL INSTRUCTION:** Focus exclusively on INDIAN financial, startup, corporate, and stock market-related information. If the context does not contain any relevant information, respond with "Please refine your query to be more specific to financial markets, companies, or economics."
 
         Focus on:
         - Community sentiment and discussions
