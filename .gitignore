@@ -233,3 +233,4 @@ stock_output.json
 dashboard_output.json
 response.txt
 api/dashboard/outputs/
+.vscode/
