@@ -7,6 +7,8 @@ import aiohttp
 import trafilatura
 import requests
 import re
+import sys
+from playwright.async_api import async_playwright
 from urllib.parse import urlparse
 import asyncpg
 import pandas as pd
@@ -629,3 +631,36 @@ async def get_brave_results(query: str, max_pages: int = MAX_PAGES, max_sources:
     except Exception as e:
         print(f"ERROR in get_brave_results: {str(e)}")
         return None, None
+
+
+async def scrape_google_finance(ticker: str):
+    """
+    Asynchronously scrapes Google Finance for a given stock ticker to get the current price.
+    """
+    if not ticker:
+        return None
+
+    url = f"https://www.google.com/finance/quote/{ticker}:NSE"
+    print(f"Scraping Google Finance URL: {url}")
+
+    # This is a workaround for an issue with Playwright on some systems
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
+        try:
+            await page.goto(url, timeout=60000)
+            # This selector is for the main price element on the Google Finance page.
+            # It may need to be updated if Google changes its website layout.
+            price_selector = ".kf1m0"
+            await page.wait_for_selector(price_selector, timeout=10000)
+            price_element = await page.query_selector(price_selector)
+            price = await price_element.inner_text() if price_element else "N/A"
+            return {"price": price, "source": url}
+        except Exception as e:
+            print(f"Error scraping Google Finance for {ticker}: {e}")
+            return None
+        finally:
+            await browser.close()

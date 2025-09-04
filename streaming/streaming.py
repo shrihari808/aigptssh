@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from typing import Any
 import re
 import asyncpg
+from fuzzywuzzy import process
 from langchain.retrievers import MergerRetriever
 from langchain.docstore.document import Document
 from langchain_core.documents import Document
@@ -365,57 +366,50 @@ def is_followup_question(query: str, chat_history: list[str]) -> bool:
 
 async def combined_preprocessing(query: str, chat_history: list[str], today: str, country: str) -> dict:
     """
-    Combined LLM call that validates the query and generates multiple, targeted sub-queries
-    for comprehensive information retrieval.
+    Combined LLM call that validates the query, generates sub-queries,
+    and identifies if numerical stock data is required.
     """
-    # --- MODIFICATION START ---
-
-    # First, do robust date extraction (no LLM needed)
     extracted_date, cleaned_query = extract_date_robust(query, today)
 
-    # The new prompt instructs the LLM to perform validation and generate sub-queries
+    # UPDATED PROMPT
     combined_prompt = """
-You are a financial markets expert AI. Your task is to analyze a user's query and break it down into 2-3 targeted, self-contained sub-queries for a financial news search engine. You must also validate if the query is related to the financial market, business, or finance of the specified country.
+You are a financial markets expert AI. Your task is to analyze a user's query and break it down into targeted sub-queries for a financial news search engine. You must also validate if the query is related to the financial market and determine if it requires real-time numerical stock data.
 
 User Query: "{query}"
 Today's Date: {today}
 Country Code: {country}
 
 **Tasks:**
-1.  **VALIDATE:** Is the query about the financial market, business, or finance of the country with code {country}?
-2.  **DECOMPOSE:** If valid, generate a list of 2 to 3 specific sub-queries that cover all aspects of the user's question. Each sub-query should be a standalone search term and should be tailored to the country with code {country}.
-3.  **FORMAT:** Return a single JSON object.
+1.  **VALIDATE:** Is the query about the financial market, business, or finance of the specified country?
+2.  **NUMERICAL DATA:** Does the query ask for a stock price, market cap, or other specific numerical data for a company?
+3.  **EXTRACT COMPANY:** If numerical data is required, what is the name of the company?
+4.  **DECOMPOSE:** Generate a list of 2 to 3 specific sub-queries for news search.
+5.  **FORMAT:** Return a single JSON object.
 
-**Example 1 (India):**
-User Query: "What is the impact of the new semiconductor PLI scheme on Tata Motors and the broader auto industry?"
+**Example 1 (Numerical):**
+User Query: "What is the current stock price of Force Motors?"
 Country Code: "IN"
 {{
     "valid": 1,
+    "requires_numerical_data": 1,
+    "company_name": "Force Motors",
     "sub_queries": [
-        "details of India's new semiconductor PLI scheme",
-        "impact of semiconductor availability on Tata Motors",
-        "effect of PLI scheme on Indian auto industry supply chain"
+        "latest news on Force Motors",
+        "Force Motors stock performance analysis"
     ]
 }}
 
-**Example 2 (United States):**
-User Query: "latest news on tech stocks"
-Country Code: "US"
+**Example 2 (Non-Numerical):**
+User Query: "What is the impact of the new semiconductor PLI scheme on the auto industry?"
+Country Code: "IN"
 {{
     "valid": 1,
+    "requires_numerical_data": 0,
+    "company_name": null,
     "sub_queries": [
-        "latest US tech stock market news",
-        "top performing tech stocks in NASDAQ today",
-        "analyst ratings on major US tech companies"
+        "details of India's new semiconductor PLI scheme",
+        "impact of PLI scheme on Indian auto industry supply chain"
     ]
-}}
-
-**Example 3 (Invalid):**
-User Query: "Should I buy Relience Industries stock?"
-Country Code: "GB"
-{{
-    "valid": 0,
-    "sub_queries": []
 }}
 
 **Your Response (JSON only):**
@@ -459,6 +453,24 @@ Country Code: "GB"
             "extracted_date": extracted_date,
             "tokens_used": 0
         }
+
+def get_ticker_from_name(company_name: str) -> str:
+    """
+    Finds the NSE ticker for a given company name from the local CSV.
+    """
+    if not company_name:
+        return None
+    try:
+        # Assuming the CSV file is in a 'csvdata' directory relative to the project root
+        df = pd.read_csv("csvdata/6000stocks.csv")
+        company_names = df["Company Name"].tolist()
+        match = process.extractOne(company_name, company_names)
+        if match and match[1] >= 90:  # Using a high confidence threshold
+            idx = company_names.index(match[0])
+            return df.iloc[idx]["co_symbol"]
+    except Exception as e:
+        print(f"Error finding ticker for {company_name}: {e}")
+    return None
 
 # --- Database Functions (Optimized) ---
 
@@ -599,6 +611,20 @@ async def web_rag_mix(
         
         final_ranking_query = original_query
 
+        numerical_data_context = ""
+        if preprocessing_result.get("requires_numerical_data") == 1:
+            company_name = preprocessing_result.get("company_name")
+            if company_name:
+                yield "& Fetching real-time stock data...\n".encode("utf-8")
+                ticker = get_ticker_from_name(company_name)
+                if ticker:
+                    # Import the new function
+                    from api.brave_searcher import scrape_google_finance
+                    numerical_data = await scrape_google_finance(ticker)
+                    if numerical_data and numerical_data.get("price"):
+                        numerical_data_context = f"\\n\\n**Real-time Data for {company_name} ({ticker})**:\\n- Current Price: {numerical_data.get('price')}\\n- Source: {numerical_data.get('source')}\\n"
+                        print(f"DEBUG: Scraped numerical data: {numerical_data_context}")
+
         cached_passages = []
 
         if cached_passages:
@@ -685,6 +711,7 @@ async def web_rag_mix(
         yield "& Ranking results ...\n".encode("utf-8")
         
         final_context = await asyncio.to_thread(scoring_service.create_enhanced_context, final_passages)
+        final_context += numerical_data_context
         final_links = list(set([p["metadata"].get("link") for p in final_passages if p.get("metadata", {}).get("link")]))
         context_end_time = time.time()
         print(f"DEBUG: Context generation took {context_end_time - context_start_time:.2f} seconds.")
@@ -693,10 +720,30 @@ async def web_rag_mix(
         llm_start_time = time.time()
         yield "& Summarizing for you ...\n".encode("utf-8")
         
+        # ADD A DEFAULT VALUE FOR THE NEW VARIABLE
+        numerical_data_context = ""
+        if preprocessing_result.get("requires_numerical_data") == 1:
+            company_name = preprocessing_result.get("company_name")
+            if company_name:
+                yield "& Fetching real-time stock data...\n".encode("utf-8")
+                ticker = get_ticker_from_name(company_name)
+                if ticker:
+                    from api.brave_searcher import scrape_google_finance
+                    numerical_data = await scrape_google_finance(ticker)
+                    if numerical_data and numerical_data.get("price"):
+                        numerical_data_context = f"\n\n**Real-time Data for {company_name} ({ticker})**:\n- Current Price: {numerical_data.get('price')}\n- Source: {numerical_data.get('source')}\n"
+                        print(f"DEBUG: Scraped numerical data: {numerical_data_context}")
+
         # (The rest of the final LLM chain and response handling remains the same)
+        # MODIFY THE PROMPT TEMPLATE
         final_prompt = PromptTemplate.from_template(
             """
             You are a financial markets expert. Today's date is {today}, make sure your answers use today as reference. Provide a detailed, well-structured final answer using the comprehensive context provided.
+            If available, use the Real-time Numerical Data provided below to answer questions about specific stock prices or values.
+
+            **Real-time Numerical Data (if relevant):**
+            {numerical_data}
+
             Include a disclaimer {disclaimer} with "> **Disclaimer:**" tag ONLY IF asked for financial advice or recommendations.
             Use tables and bullet points where appropriate for clarity.
             Use markdown for readability.
@@ -704,6 +751,7 @@ async def web_rag_mix(
             
             **CRITICAL INSTRUCTION:** Focus exclusively on financial, startup, corporate, and stock market-related information.
             **CRITICAL INSTRUCTION:** The "&sources" value must be a JSON array of objects at the beginning of your response. Each object should represent a source you will cite in the answer and have the format {{"id": "[citation number]","name": "name of the website" "title": "source title", "url": "source url"}}. Only include sources that you have cited. Cite your sources using [number] notation in the answer text wherever relevant. You can also use multiple citations like [1,2] if the information is supported by multiple sources. DO NOT cite sources at the bottom.
+            
             Comprehensive Context:
             {context}
 
@@ -720,7 +768,16 @@ async def web_rag_mix(
         final_response_text = ""
         disclaimer = DISCLAIMER_TEXT
         with get_openai_callback() as cb:
-            async for chunk in final_chain.astream({"context": final_context, "history": chat_history, "input": original_query, "today": today, "blacklist": BLACKLISTED_DOMAINS, "disclaimer": disclaimer}):
+            # UPDATE THE ASTREAM CALL WITH THE NEW VARIABLE
+            async for chunk in final_chain.astream({
+                "context": final_context, 
+                "history": chat_history, 
+                "input": original_query, 
+                "today": today, 
+                "blacklist": BLACKLISTED_DOMAINS, 
+                "disclaimer": disclaimer,
+                "numerical_data": numerical_data_context
+            }):
                 if chunk.content:
                     final_response_text += chunk.content
                     yield chunk.content.encode("utf-8")
