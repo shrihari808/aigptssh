@@ -557,6 +557,7 @@ class InRequest(BaseModel):
 # In streaming/streaming.py
 use_caching = ENABLE_CACHING
 @web_rag.post("/web_rag")
+@web_rag.post("/web_rag")
 async def web_rag_mix(
     request: InRequest,
     session_id: int = Query(...),
@@ -580,10 +581,15 @@ async def web_rag_mix(
     brave_searcher = BraveNews(brave_api_key)
 
     async def tiered_stream_generator():
+        total_start_time = time.time() # Start total timer
+
         # --- Preprocessing Step ---
+        start_time = time.time()
         yield "& Generating search plan...\n".encode("utf-8")
         chat_history = await get_chat_history_optimized(str(session_id), db_pool, limit=3)
         preprocessing_result = await combined_preprocessing(original_query, chat_history, today, country)
+        end_time = time.time()
+        print(f"DEBUG: Preprocessing took {end_time - start_time:.2f} seconds.")
 
         if preprocessing_result.get("valid", 0) == 0:
             yield f"I am a financial markets search engine and can only answer questions related to {country} markets, business, and finance. Please ask a relevant question.".encode("utf-8")
@@ -591,33 +597,29 @@ async def web_rag_mix(
 
         sub_queries = preprocessing_result.get("sub_queries", [original_query])
         
-        # The primary query for ranking and context generation remains the user's original query
         final_ranking_query = original_query
 
-        # --- Caching logic remains the same, using the original query ---
         cached_passages = []
-        # (Your existing caching logic can go here)
-        # ...
 
         if cached_passages:
             final_passages = cached_passages
         else:
-            # --- MODIFICATION START: Multi-query search and aggregation ---
+            # --- Search, Scrape, and Rerank within a single session ---
             async with aiohttp.ClientSession(**brave_searcher.session_config) as session:
                 
-                # Create a list of search tasks to run concurrently
+                # --- Multi-query search and aggregation ---
+                search_start_time = time.time()
+                
                 search_tasks = []
                 for i, sub_query in enumerate(sub_queries):
                     yield f"& Executing search {i+1} of {len(sub_queries)}...\n".encode("utf-8")
-                    task = brave_searcher.search_and_scrape(session, sub_query, max_sources=5, country=country) # Fetch up to 15 sources per query
+                    task = brave_searcher.search_and_scrape(session, sub_query, max_sources=5, country=country) 
                     search_tasks.append(task)
                 
-                # Run all searches in parallel
                 search_results_lists = await asyncio.gather(*search_tasks)
                 
                 yield "& Consolidating sources...\n".encode("utf-8")
                 
-                # Aggregate and de-duplicate sources
                 unique_sources = {}
                 for source_list in search_results_lists:
                     if source_list:
@@ -636,49 +638,62 @@ async def web_rag_mix(
                             if domain not in BLACKLISTED_DOMAINS:
                                 non_blacklisted_sources.append(source)
                     except (AttributeError, TypeError):
-                        pass # Ignore sources with invalid links
+                        pass 
                 initial_sources = non_blacklisted_sources
 
                 if not initial_sources:
                     yield "\nCould not find any initial sources.".encode("utf-8")
                     return
-            # --- MODIFICATION END ---
+                search_end_time = time.time()
+                print(f"DEBUG: Brave search & aggregation took {search_end_time - search_start_time:.2f} seconds.")
 
                 yield f"& Searching sources ... | {len(initial_sources)} unique articles\n".encode("utf-8")
                 for source in initial_sources:
                     yield f"{json.dumps({'title': source.get('title'), 'url': source.get('link')})}\n".encode("utf-8")
 
+                # --- Scraping Step (using the same session) ---
+                scrape_start_time = time.time()
                 yield "& Gathering data ...\n".encode("utf-8")
                 
-                # Scrape the top N unique sources
                 sources_to_scrape = initial_sources[:10]
 
-                # We can reuse the existing aiohttp session for scraping
-                async with aiohttp.ClientSession(**brave_searcher.session_config) as session:
-                    scraped_sources = await brave_searcher.scrape_top_urls(session, sources_to_scrape)
+                # The same session from the 'with' block is used here
+                scraped_sources = await brave_searcher.scrape_top_urls(session, sources_to_scrape)
                 
+                scrape_end_time = time.time()
+                print(f"DEBUG: Scraping took {scrape_end_time - scrape_start_time:.2f} seconds.")
+
                 if not scraped_sources:
                     yield "\nCould not scrape content from sources.".encode("utf-8")
                     return
 
+                # --- Reranking Step ---
+                rerank_start_time = time.time()
                 yield "& Analyzing insights ...\n".encode("utf-8")
 
-                # The re-ranking step uses the original user query to find the most relevant chunks
                 final_passages = await scoring_service.rerank_content_chunks(final_ranking_query, scraped_sources, top_n=7)
                 
+                rerank_end_time = time.time()
+                print(f"DEBUG: Reranking took {rerank_end_time - rerank_start_time:.2f} seconds.")
+
                 if not final_passages:
                     yield "\nCould not extract sufficient detailed information.".encode("utf-8")
                     return
-                
-                # (Your existing caching logic to add passages can go here)
-                # ...
 
+        # --- Context Generation Step ---
+        context_start_time = time.time()
         yield "& Ranking results ...\n".encode("utf-8")
         
-        # --- The rest of the function remains the same ---
         final_context = await asyncio.to_thread(scoring_service.create_enhanced_context, final_passages)
         final_links = list(set([p["metadata"].get("link") for p in final_passages if p.get("metadata", {}).get("link")]))
+        context_end_time = time.time()
+        print(f"DEBUG: Context generation took {context_end_time - context_start_time:.2f} seconds.")
 
+        # --- Final LLM Generation Step ---
+        llm_start_time = time.time()
+        yield "& Summarizing for you ...\n".encode("utf-8")
+        
+        # (The rest of the final LLM chain and response handling remains the same)
         final_prompt = PromptTemplate.from_template(
             """
             You are a financial markets expert. Today's date is {today}, make sure your answers use today as reference. Provide a detailed, well-structured final answer using the comprehensive context provided.
@@ -688,7 +703,7 @@ async def web_rag_mix(
             Do not cite from {blacklist} domains.
             
             **CRITICAL INSTRUCTION:** Focus exclusively on financial, startup, corporate, and stock market-related information.
-            **CRITICAL INSTRUCTION:** The "&sources" value must be a JSON array of objects at the beginning of your response. Each object should represent a source you will cite in the answer and have the format {{"id": "[citation number]","name": "name of the website" "title": "source title", "url": "source url"}}. Only include sources that you have cited. Cite your sources using [number] notation in the answer text wherever relevant. You can also use multiple citations like [1,2] if the information is supported by multiple sources.
+            **CRITICAL INSTRUCTION:** The "&sources" value must be a JSON array of objects at the beginning of your response. Each object should represent a source you will cite in the answer and have the format {{"id": "[citation number]","name": "name of the website" "title": "source title", "url": "source url"}}. Only include sources that you have cited. Cite your sources using [number] notation in the answer text wherever relevant. You can also use multiple citations like [1,2] if the information is supported by multiple sources. DO NOT cite sources at the bottom.
             Comprehensive Context:
             {context}
 
@@ -702,8 +717,6 @@ async def web_rag_mix(
         )
         final_chain = final_prompt | llm_stream
 
-        yield "& Summarizing for you ...\n".encode("utf-8")
-        # disclaimer = 
         final_response_text = ""
         disclaimer = DISCLAIMER_TEXT
         with get_openai_callback() as cb:
@@ -712,7 +725,6 @@ async def web_rag_mix(
                     final_response_text += chunk.content
                     yield chunk.content.encode("utf-8")
             
-            # This part can be improved to use the `scraped_sources` dataframe
             if not cached_passages and 'scraped_sources' in locals():
                 df_to_insert = await asyncio.to_thread(brave_searcher._process_for_dataframe, scraped_sources)
                 if not df_to_insert.empty:
@@ -726,6 +738,13 @@ async def web_rag_mix(
                 history_db = PostgresChatMessageHistory(str(session_id), psql_url)
                 await asyncio.to_thread(history_db.add_user_message, original_query)
                 await asyncio.to_thread(history_db.add_ai_message, final_response_text)
+        
+        llm_end_time = time.time()
+        print(f"DEBUG: Final LLM generation took {llm_end_time - llm_start_time:.2f} seconds.")
+        
+        total_end_time = time.time()
+        print(f"DEBUG: Total response generation time: {total_end_time - total_start_time:.2f} seconds.")
+
         yield f"\n& Stream finished".encode("utf-8")
     
     return StreamingResponse(
