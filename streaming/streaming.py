@@ -741,7 +741,7 @@ async def web_rag_mix(
             You are a financial markets expert. Today's date is {today}, make sure your answers use today as reference. Provide a detailed, well-structured final answer using the comprehensive context provided.
             If available, use the Real-time Numerical Data provided below to answer questions about specific stock prices or values.
 
-            **Real-time Numerical Data (if relevant):**
+            **Real-time Numerical Data (if relevant):** -> Prioritize this data for stock price/value questions, otherwise ignore.
             {numerical_data}
 
             Include a disclaimer {disclaimer} with "> **Disclaimer:**" tag ONLY IF asked for financial advice or recommendations.

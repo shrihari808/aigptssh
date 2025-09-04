@@ -633,9 +633,49 @@ async def get_brave_results(query: str, max_pages: int = MAX_PAGES, max_sources:
         return None, None
 
 
+def _clean_and_convert_value(raw_text: str) -> float | None:
+    """
+    Cleans and converts a raw string from Google Finance into a float.
+    Handles Crore (Cr), Trillion (T), Billion (B), Million (M), and percentages.
+    """
+    if not raw_text or raw_text in ["N/A", "—"]:
+        return None
+    
+    text = raw_text.replace("₹", "").replace(",", "").strip()
+    
+    # Handle multipliers
+    multipliers = {
+        'T': 1e12,
+        'B': 1e9,
+        'M': 1e6,
+        'Cr': 1e7
+    }
+    
+    for suffix, multiplier in multipliers.items():
+        if text.endswith(suffix):
+            try:
+                value = float(text[:-len(suffix)]) * multiplier
+                return value
+            except ValueError:
+                return None
+
+    # Handle percentages
+    if text.endswith('%'):
+        try:
+            return float(text[:-1])
+        except ValueError:
+            return None
+            
+    # Handle plain numbers
+    try:
+        return float(text)
+    except ValueError:
+        return None
+
 async def scrape_google_finance(ticker: str):
     """
-    Asynchronously scrapes Google Finance for a given stock ticker to get the current price.
+    Asynchronously scrapes Google Finance for a given stock ticker to get a
+    comprehensive set of numerical data.
     """
     if not ticker:
         return None
@@ -643,24 +683,41 @@ async def scrape_google_finance(ticker: str):
     url = f"https://www.google.com/finance/quote/{ticker}:NSE"
     print(f"Scraping Google Finance URL: {url}")
 
-    # This is a workaround for an issue with Playwright on some systems
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+    # Map of human-readable names to their CSS selectors
+    selector_map = {
+        "price": ".kf1m0",
+        "previous_close": "div[data-attrid='Previous close'] > div > div",
+        "day_range": "div[data-attrid='Day range'] > div > div",
+        "year_range": "div[data-attrid='Year range'] > div > div",
+        "market_cap": "div[data-attrid='Market cap'] > div > div",
+        "volume": "div[data-attrid='Volume'] > div > div",
+        "pe_ratio": "div[data-attrid='P/E ratio'] > div > div",
+        "dividend_yield": "div[data-attrid='Dividend yield'] > div > div",
+    }
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
+        scraped_data = {"source": url}
         try:
             await page.goto(url, timeout=60000)
-            # This selector is for the main price element on the Google Finance page.
-            # It may need to be updated if Google changes its website layout.
-            price_selector = ".kf1m0"
-            await page.wait_for_selector(price_selector, timeout=10000)
-            price_element = await page.query_selector(price_selector)
-            price = await price_element.inner_text() if price_element else "N/A"
-            return {"price": price, "source": url}
+            
+            # Wait for the main price element to ensure the page is loaded
+            await page.wait_for_selector(selector_map["price"], timeout=10000)
+
+            # Scrape all defined data points
+            for name, selector in selector_map.items():
+                element = await page.query_selector(selector)
+                raw_value = await element.inner_text() if element else "N/A"
+                scraped_data[name] = _clean_and_convert_value(raw_value)
+            
+            return scraped_data
+
         except Exception as e:
             print(f"Error scraping Google Finance for {ticker}: {e}")
-            return None
+            return {"error": str(e), "source": url}
         finally:
             await browser.close()
