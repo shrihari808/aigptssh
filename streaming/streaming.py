@@ -366,14 +366,14 @@ def is_followup_question(query: str, chat_history: list[str]) -> bool:
 async def combined_preprocessing(query: str, chat_history: list[str], today: str, country: str) -> dict:
     """
     Combined LLM call that validates the query and generates multiple, targeted sub-queries
-    for comprehensive information retrieval.
+    for comprehensive information retrieval using Google's Gemini Flash model.
     """
     # --- MODIFICATION START ---
 
     # First, do robust date extraction (no LLM needed)
     extracted_date, cleaned_query = extract_date_robust(query, today)
 
-    # The new prompt instructs the LLM to perform validation and generate sub-queries
+    # The prompt instructs the LLM to perform validation and generate sub-queries
     combined_prompt = """
 You are a financial markets expert AI. Your task is to analyze a user's query and break it down into 2-3 targeted, self-contained sub-queries for a financial news search engine. You must also validate if the query is related to the financial market, business, or finance of the specified country.
 
@@ -420,7 +420,6 @@ Country Code: "GB"
 
 **Your Response (JSON only):**
 """
-    # For this task, we don't need chat history as we are generating new search queries
     input_data = {
         "query": query,
         "today": today,
@@ -432,33 +431,33 @@ Country Code: "GB"
         input_variables=list(input_data.keys())
     )
 
-    chain = prompt_template | GPT4o_mini | JsonOutputParser()
+    # Initialize the Gemini Flash model
+    gemini_flash = ChatGoogleGenerativeAI(model="models/gemini-2.5-flash-lite", convert_system_message_to_human=True)
+    chain = prompt_template | gemini_flash | JsonOutputParser()
 
     try:
-        with get_openai_callback() as cb:
-            result = await chain.ainvoke(input_data)
+        # Note: get_openai_callback is removed as it's specific to OpenAI models.
+        result = await chain.ainvoke(input_data)
 
         # Add our non-LLM data to the result
         result["extracted_date"] = extracted_date
-        result["tokens_used"] = cb.total_tokens
         
         # Ensure 'sub_queries' key exists
         if "sub_queries" not in result:
             result["sub_queries"] = [query] if result.get("valid") == 1 else []
 
-        print(f"DEBUG: Preprocessing complete. Generated {len(result.get('sub_queries', []))} sub-queries.")
-        print(f"DEBUG: Tokens used: {cb.total_tokens}")
+        print(f"DEBUG: Preprocessing with Gemini Flash complete. Generated {len(result.get('sub_queries', []))} sub-queries.")
         return result
 
     except Exception as e:
-        print(f"ERROR in combined_preprocessing: {e}")
+        print(f"ERROR in combined_preprocessing with Gemini Flash: {e}")
         # Fallback to use the original query
         return {
             "valid": 1,
             "sub_queries": [query],
             "extracted_date": extracted_date,
-            "tokens_used": 0
         }
+# --- MODIFICATION END ---
 
 # --- Database Functions (Optimized) ---
 
