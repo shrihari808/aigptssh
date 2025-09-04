@@ -715,6 +715,9 @@ async def web_rag_mix(
             """
         )
         final_chain = final_prompt | llm_stream
+        # Initialize the Gemini Flash model
+        # gemini_flash = ChatGoogleGenerativeAI(model="models/gemini-2.5-pro", convert_system_message_to_human=True)
+        # final_chain = final_prompt | gemini_flash
 
         final_response_text = ""
         disclaimer = DISCLAIMER_TEXT
