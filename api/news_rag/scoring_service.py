@@ -178,13 +178,11 @@ class NewsRagScoringService:
 
     def assess_context_sufficiency(self, query: str, retrieved_docs: list) -> float:
         """
-        FIXED: Assess if retrieved documents are sufficient to answer the query
-        with proper similarity score interpretation and realistic thresholds.
-        This version now handles both Cosine and L2 distance metrics.
+        SIMPLIFIED: Assess if retrieved documents are sufficient based on cosine similarity.
         
         Args:
             query (str): The user's query.
-            retrieved_docs (list): List of tuples (Document, distance_score)
+            retrieved_docs (list): List of tuples (Document, cosine_distance_score)
             
         Returns:
             float: Sufficiency score between 0 and 1
@@ -193,102 +191,31 @@ class NewsRagScoringService:
             print(f"DEBUG: Too few documents ({len(retrieved_docs)}), insufficient.")
             return 0.0
 
-        raw_scores = [score for doc, score in retrieved_docs]
-
-        # --- SNIPPET START ---
-        # Heuristic to determine the distance metric. High average scores are likely L2.
-        # Cosine distance for relevant documents is typically low (e.g., < 0.6).
-        avg_score = sum(raw_scores) / len(raw_scores)
-        if avg_score > 0.8:
-            print("DEBUG: High scores detected, assuming L2 distance. Converting with exp(-score).")
-            # Convert L2 distance to a 0-1 similarity score. exp(-distance) is a good choice.
-            similarity_scores = [np.exp(-score) for score in raw_scores]
-        else:
-            print("DEBUG: Low scores detected, assuming Cosine distance. Converting with 1 - score.")
-            # For cosine distance: similarity = 1 - distance
-            similarity_scores = [1 - score for score in raw_scores]
-        # --- SNIPPET END ---
+        # Pinecone returns cosine distance, convert to similarity
+        cosine_distances = [score for doc, score in retrieved_docs]
+        cosine_similarities = [1 - distance for distance in cosine_distances]
         
-        average_relevance = sum(similarity_scores) / len(similarity_scores)
+        average_similarity = sum(cosine_similarities) / len(cosine_similarities)
         
-        HIGH_RELEVANCE_THRESHOLD = 0.6
+        # Count highly relevant documents (similarity > 0.7 means distance < 0.3)
+        SIMILARITY_THRESHOLD = 0.7
+        highly_relevant_count = sum(1 for sim in cosine_similarities if sim > SIMILARITY_THRESHOLD)
         
-        # --- MODIFICATION START ---
-        # Check if the average relevance is below the threshold
-        if average_relevance < HIGH_RELEVANCE_THRESHOLD:
-            print("Insufficient context found: Average relevance of documents is below the threshold.")
-            return 0.0
-        # --- MODIFICATION END ---
-
-        highly_relevant_docs = sum(1 for score in similarity_scores if score > HIGH_RELEVANCE_THRESHOLD)
+        print(f"DEBUG: Cosine distances: {[f'{d:.3f}' for d in cosine_distances[:5]]}")
+        print(f"DEBUG: Cosine similarities: {[f'{s:.3f}' for s in cosine_similarities[:5]]}")
+        print(f"DEBUG: Average similarity: {average_similarity:.3f}")
+        print(f"DEBUG: Highly relevant docs (>{SIMILARITY_THRESHOLD}): {highly_relevant_count}")
         
-        print(f"DEBUG: Raw distance scores: {[f'{score:.3f}' for score in raw_scores[:5]]}")
-        print(f"DEBUG: Converted similarities: {[f'{score:.3f}' for score in similarity_scores[:5]]}")
-        print(f"DEBUG: Average relevance: {average_relevance:.3f}")
-        print(f"DEBUG: Docs above {HIGH_RELEVANCE_THRESHOLD} threshold: {highly_relevant_docs}")
-
-        # Check for recency requirements
-        recency_keywords = ['latest', 'recent', 'today', 'current', 'new', 'breaking']
-        wants_recent = any(keyword in query.lower() for keyword in recency_keywords)
+        # Simple scoring based on average similarity and count of relevant docs
+        base_score = min(0.8, average_similarity)  # Cap at 0.8
         
-        recency_penalty = 0.0
-        if wants_recent:
-            print("DEBUG: Query requests recent information")
-            recent_docs_found = 0
-            
-            for doc, score in retrieved_docs[:5]:  # Check top 5 most relevant
-                pub_date = doc.metadata.get("publication_date") or doc.metadata.get("date")
-                if not pub_date:
-                    continue
-                    
-                try:
-                    # Handle different date formats
-                    if str(pub_date).isdigit() and len(str(pub_date)) == 8:
-                        # YYYYMMDD format
-                        doc_date = datetime.strptime(str(pub_date), '%Y%m%d')
-                    else:
-                        # ISO format
-                        pub_date_str = str(pub_date).replace('Z', '').replace('+00:00', '')
-                        if 'T' in pub_date_str:
-                            doc_date = datetime.fromisoformat(pub_date_str)
-                        else:
-                            continue
-                    
-                    days_old = (datetime.now() - doc_date).days
-                    print(f"DEBUG: Document age: {days_old} days")
-                    
-                    if days_old <= 7:  # Within last week
-                        recent_docs_found += 1
-                        
-                except Exception as e:
-                    print(f"DEBUG: Date parsing error for '{pub_date}': {e}")
-                    continue
-            
-            print(f"DEBUG: Recent documents found: {recent_docs_found}")
-            
-            # Apply penalty if no recent docs found when requested
-            if recent_docs_found == 0:
-                recency_penalty = 0.3
-                print("DEBUG: Applying recency penalty: user wants recent info but none found")
+        # Bonus for having multiple relevant documents
+        relevance_bonus = min(0.2, highly_relevant_count * 0.05)  # Up to 0.2 bonus
         
-        # FIXED: Adjust scoring components and weights
-        relevance_component = min(0.7, average_relevance * 0.7)  # Cap at 0.7
+        final_score = base_score + relevance_bonus
         
-        # Confidence based on number of highly relevant docs
-        max_confidence_docs = 5  # Expect at most 5 highly relevant docs
-        confidence_component = min(0.3, (highly_relevant_docs / max_confidence_docs) * 0.3)
-        
-        # Calculate base score
-        base_score = relevance_component + confidence_component
-        
-        # Apply recency penalty
-        final_score = max(0.0, base_score - recency_penalty)
-        
-        print(f"DEBUG: Scoring breakdown:")
-        print(f"  - Relevance component: {relevance_component:.3f}")
-        print(f"  - Confidence component: {confidence_component:.3f}")
-        print(f"  - Recency penalty: {recency_penalty:.3f}")
-        print(f"  - Final sufficiency score: {final_score:.3f}")
+        print(f"DEBUG: Base score: {base_score:.3f}, Relevance bonus: {relevance_bonus:.3f}")
+        print(f"DEBUG: Final sufficiency score: {final_score:.3f}")
         
         return final_score
 

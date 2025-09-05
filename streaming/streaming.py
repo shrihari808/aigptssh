@@ -602,8 +602,17 @@ async def web_rag_mix(
 
         # --- CACHE-FIRST LOGIC ---
         yield "& Checking for existing insights...\n".encode("utf-8")
-        pinecone_results_with_scores = vs.similarity_search_with_score(original_query, k=15)
-        sufficiency_score = scoring_service.assess_context_sufficiency(original_query, pinecone_results_with_scores)
+        
+        try:
+            # Test Pinecone connection first
+            pinecone_results_with_scores = vs.similarity_search_with_score(original_query, k=15)
+            sufficiency_score = scoring_service.assess_context_sufficiency(original_query, pinecone_results_with_scores)
+        except Exception as e:
+            print(f"DEBUG: Pinecone connection failed: {e}")
+            print("DEBUG: Falling back to fresh search due to Pinecone connection issues.")
+            # Force fresh search when Pinecone fails
+            sufficiency_score = 0.0
+            pinecone_results_with_scores = []
 
         if sufficiency_score >= 0.4:
             print(f"DEBUG: Sufficient context found in Pinecone with score {sufficiency_score:.2f}.")
@@ -653,13 +662,15 @@ async def web_rag_mix(
                                 documents_to_add.append(Document(page_content=chunk_text, metadata=source))
                     
                     if documents_to_add:
-                        vs.add_documents(documents_to_add)
-                        print(f"DEBUG: Added {len(documents_to_add)} new chunks to Pinecone.")
+                        try:
+                            vs.add_documents(documents_to_add)
+                            print(f"DEBUG: Added {len(documents_to_add)} new chunks to Pinecone.")
+                        except Exception as e:
+                            print(f"WARNING: Failed to add documents to Pinecone: {e}")
 
                 final_passages = await scoring_service.rerank_content_chunks(final_ranking_query, scraped_sources, top_n=7)
                 
                 rerank_end_time = time.time()
-                print(f"DEBUG: Reranking took {rerank_end_time - rerank_start_time:.2f} seconds.")
 
         if not final_passages:
             yield "\nCould not extract sufficient information.".encode("utf-8")
