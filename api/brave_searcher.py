@@ -200,7 +200,10 @@ class BraveNews:
                 try:
                     datetime.fromisoformat(pub_date.replace('Z', '+00:00'))
                 except (ValueError, TypeError):
-                    pub_date = None
+                    # --- START OF MODIFICATION ---
+                    # Pinecone does not accept None/null. Fallback to an empty string.
+                    pub_date = ""
+                    # --- END OF MODIFICATION ---
 
             extracted_data.append({
                 "title": item.get("title", "").strip(),

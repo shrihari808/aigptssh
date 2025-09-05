@@ -20,6 +20,9 @@ import asyncpg
 from langchain.retrievers import MergerRetriever
 from langchain.docstore.document import Document
 from langchain_core.documents import Document
+from langchain_core.documents import Document
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_pinecone import PineconeVectorStore
 from datetime import datetime, timedelta
 from langchain_pinecone import Pinecone
 import google.generativeai as genai
@@ -556,7 +559,6 @@ class InRequest(BaseModel):
 # In streaming/streaming.py
 use_caching = ENABLE_CACHING
 @web_rag.post("/web_rag")
-@web_rag.post("/web_rag")
 async def web_rag_mix(
     request: InRequest,
     session_id: int = Query(...),
@@ -568,7 +570,7 @@ async def web_rag_mix(
     api_key: str = Depends(api_key_auth)
 ):
     """
-    Implements the full, multi-stage "search and re-rank" strategy using sub-queries.
+    Implements the full, multi-stage "search and re-rank" strategy with a cache-first approach.
     """
     original_query = request.query.strip()
     today = datetime.now().strftime("%Y-%m-%d")
@@ -580,7 +582,7 @@ async def web_rag_mix(
     brave_searcher = BraveNews(brave_api_key)
 
     async def tiered_stream_generator():
-        total_start_time = time.time() # Start total timer
+        total_start_time = time.time()
 
         # --- Preprocessing Step ---
         start_time = time.time()
@@ -595,94 +597,77 @@ async def web_rag_mix(
             return
 
         sub_queries = preprocessing_result.get("sub_queries", [original_query])
-        
         final_ranking_query = original_query
+        final_passages = []
 
-        cached_passages = []
+        # --- CACHE-FIRST LOGIC ---
+        yield "& Checking for existing insights...\n".encode("utf-8")
+        pinecone_results_with_scores = vs.similarity_search_with_score(original_query, k=15)
+        sufficiency_score = scoring_service.assess_context_sufficiency(original_query, pinecone_results_with_scores)
 
-        if cached_passages:
-            final_passages = cached_passages
+        if sufficiency_score >= 0.4:
+            print(f"DEBUG: Sufficient context found in Pinecone with score {sufficiency_score:.2f}.")
+            yield "& Found relevant information in cache...\n".encode("utf-8")
+            
+            passages_from_cache = [
+                {"text": doc.page_content, "metadata": doc.metadata} 
+                for doc, score in pinecone_results_with_scores
+            ]
+            final_passages = await scoring_service.score_and_rerank_passages(final_ranking_query, passages_from_cache)
+
         else:
-            # --- Search, Scrape, and Rerank within a single session ---
+            print(f"DEBUG: Insufficient context in Pinecone (score: {sufficiency_score:.2f}). Fetching new data.")
+            yield "& Information is outdated or insufficient, fetching new data...\n".encode("utf-8")
+            
             async with aiohttp.ClientSession(**brave_searcher.session_config) as session:
-                
-                # --- Multi-query search and aggregation ---
                 search_start_time = time.time()
-                
-                search_tasks = []
-                for i, sub_query in enumerate(sub_queries):
-                    yield f"& Executing search {i+1} of {len(sub_queries)}...\n".encode("utf-8")
-                    task = brave_searcher.search_and_scrape(session, sub_query, max_sources=5, country=country) 
-                    search_tasks.append(task)
-                
+                search_tasks = [brave_searcher.search_and_scrape(session, sub_query, max_sources=5, country=country) for sub_query in sub_queries]
                 search_results_lists = await asyncio.gather(*search_tasks)
                 
-                yield "& Consolidating sources...\n".encode("utf-8")
-                
-                unique_sources = {}
-                for source_list in search_results_lists:
-                    if source_list:
-                        for source in source_list:
-                            if source.get('link') and source['link'] not in unique_sources:
-                                unique_sources[source['link']] = source
-                
+                unique_sources = {source['link']: source for source_list in search_results_lists if source_list for source in source_list}
                 initial_sources = list(unique_sources.values())
                 
-                non_blacklisted_sources = []
-                for source in initial_sources:
-                    try:
-                        link = source.get('link')
-                        if link:
-                            domain = urlparse(link).netloc.replace('www.', '')
-                            if domain not in BLACKLISTED_DOMAINS:
-                                non_blacklisted_sources.append(source)
-                    except (AttributeError, TypeError):
-                        pass 
-                initial_sources = non_blacklisted_sources
+                non_blacklisted_sources = [
+                    source for source in initial_sources 
+                    if urlparse(source.get('link', '')).netloc.replace('www.', '') not in BLACKLISTED_DOMAINS
+                ]
 
-                if not initial_sources:
+                if not non_blacklisted_sources:
                     yield "\nCould not find any initial sources.".encode("utf-8")
                     return
-                search_end_time = time.time()
-                print(f"DEBUG: Brave search & aggregation took {search_end_time - search_start_time:.2f} seconds.")
 
-                yield f"& Searching sources ... | {len(initial_sources)} unique articles\n".encode("utf-8")
-                for source in initial_sources:
+                yield f"& Searching sources ... | {len(non_blacklisted_sources)} unique articles\n".encode("utf-8")
+                for source in non_blacklisted_sources:
                     yield f"{json.dumps({'title': source.get('title'), 'url': source.get('link')})}\n".encode("utf-8")
 
-                # --- Scraping Step (using the same session) ---
-                scrape_start_time = time.time()
-                yield "& Gathering data ...\n".encode("utf-8")
+                scraped_sources = await brave_searcher.scrape_top_urls(session, non_blacklisted_sources[:10])
                 
-                sources_to_scrape = initial_sources[:10]
-
-                # The same session from the 'with' block is used here
-                scraped_sources = await brave_searcher.scrape_top_urls(session, sources_to_scrape)
-                
-                scrape_end_time = time.time()
-                print(f"DEBUG: Scraping took {scrape_end_time - scrape_start_time:.2f} seconds.")
-
-                if not scraped_sources:
-                    yield "\nCould not scrape content from sources.".encode("utf-8")
-                    return
-
-                # --- Reranking Step ---
-                rerank_start_time = time.time()
-                yield "& Analyzing insights ...\n".encode("utf-8")
+                if scraped_sources:
+                    documents_to_add = []
+                    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+                    for source in scraped_sources:
+                        content = source.get('full_webpage_content')
+                        if content:
+                            chunks = text_splitter.split_text(content)
+                            for chunk_text in chunks:
+                                documents_to_add.append(Document(page_content=chunk_text, metadata=source))
+                    
+                    if documents_to_add:
+                        vs.add_documents(documents_to_add)
+                        print(f"DEBUG: Added {len(documents_to_add)} new chunks to Pinecone.")
 
                 final_passages = await scoring_service.rerank_content_chunks(final_ranking_query, scraped_sources, top_n=7)
                 
                 rerank_end_time = time.time()
                 print(f"DEBUG: Reranking took {rerank_end_time - rerank_start_time:.2f} seconds.")
 
-                if not final_passages:
-                    yield "\nCould not extract sufficient detailed information.".encode("utf-8")
-                    return
+        if not final_passages:
+            yield "\nCould not extract sufficient information.".encode("utf-8")
+            return
 
         # --- Context Generation Step ---
         context_start_time = time.time()
         yield "& Ranking results ...\n".encode("utf-8")
-        
         final_context = await asyncio.to_thread(scoring_service.create_enhanced_context, final_passages)
         final_links = list(set([p["metadata"].get("link") for p in final_passages if p.get("metadata", {}).get("link")]))
         context_end_time = time.time()
@@ -692,7 +677,6 @@ async def web_rag_mix(
         llm_start_time = time.time()
         yield "& Summarizing for you ...\n".encode("utf-8")
         
-        # (The rest of the final LLM chain and response handling remains the same)
         final_prompt = PromptTemplate.from_template(
             """
             You are a financial markets expert. Today's date is {today}, make sure your answers use today as reference. Provide a detailed, well-structured final answer using the comprehensive context provided.
@@ -727,11 +711,6 @@ async def web_rag_mix(
                     final_response_text += chunk.content
                     yield chunk.content.encode("utf-8")
             
-            if not cached_passages and 'scraped_sources' in locals():
-                df_to_insert = await asyncio.to_thread(brave_searcher._process_for_dataframe, scraped_sources)
-                if not df_to_insert.empty:
-                    asyncio.create_task(insert_post1(df_to_insert, db_pool))
-
             total_tokens = cb.total_tokens
             asyncio.create_task(insert_credit_usage(user_id, plan_id, total_tokens / 1000, db_pool))
             asyncio.create_task(store_into_db(session_id, prompt_history_id, {"links": final_links}, db_pool))
