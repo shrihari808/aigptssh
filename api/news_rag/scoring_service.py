@@ -178,7 +178,8 @@ class NewsRagScoringService:
 
     def assess_context_sufficiency(self, query: str, retrieved_docs: list) -> float:
         """
-        SIMPLIFIED: Assess if retrieved documents are sufficient based on cosine similarity.
+        MODIFIED: Assess if retrieved documents are sufficient based on cosine distance.
+        A lower distance score indicates higher relevance.
         
         Args:
             query (str): The user's query.
@@ -191,25 +192,24 @@ class NewsRagScoringService:
             print(f"DEBUG: Too few documents ({len(retrieved_docs)}), insufficient.")
             return 0.0
 
-        # Pinecone returns cosine distance, convert to similarity
         cosine_distances = [score for doc, score in retrieved_docs]
-        cosine_similarities = [1 - distance for distance in cosine_distances]
         
-        average_similarity = sum(cosine_similarities) / len(cosine_similarities)
+        # Calculate the average distance. Lower is better.
+        average_distance = sum(cosine_distances) / len(cosine_distances)
         
-        # Count highly relevant documents (similarity > 0.7 means distance < 0.3)
-        SIMILARITY_THRESHOLD = 0.7
-        highly_relevant_count = sum(1 for sim in cosine_similarities if sim > SIMILARITY_THRESHOLD)
+        # Count highly relevant documents (distance < 0.3 is a strong match)
+        DISTANCE_THRESHOLD = 0.6
+        highly_relevant_count = sum(1 for dist in cosine_distances if dist > DISTANCE_THRESHOLD)
         
         print(f"DEBUG: Cosine distances: {[f'{d:.3f}' for d in cosine_distances[:5]]}")
-        print(f"DEBUG: Cosine similarities: {[f'{s:.3f}' for s in cosine_similarities[:5]]}")
-        print(f"DEBUG: Average similarity: {average_similarity:.3f}")
-        print(f"DEBUG: Highly relevant docs (>{SIMILARITY_THRESHOLD}): {highly_relevant_count}")
+        print(f"DEBUG: Average distance: {average_distance:.3f}")
+        print(f"DEBUG: Highly relevant docs (>{DISTANCE_THRESHOLD}): {highly_relevant_count}")
         
-        # Simple scoring based on average similarity and count of relevant docs
-        base_score = min(0.8, average_similarity)  # Cap at 0.8
+        # The base score is inverted from the average distance (1 - distance).
+        # We cap the score at 0.8 to leave room for the bonus.
+        base_score = min(0.2, average_distance)
         
-        # Bonus for having multiple relevant documents
+        # Bonus for having multiple highly relevant documents
         relevance_bonus = min(0.2, highly_relevant_count * 0.05)  # Up to 0.2 bonus
         
         final_score = base_score + relevance_bonus
