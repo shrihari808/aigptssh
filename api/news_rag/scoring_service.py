@@ -198,7 +198,7 @@ class NewsRagScoringService:
         average_distance = sum(cosine_distances) / len(cosine_distances)
         
         # Count highly relevant documents (distance < 0.3 is a strong match)
-        DISTANCE_THRESHOLD = 0.6
+        DISTANCE_THRESHOLD = 0.7
         highly_relevant_count = sum(1 for dist in cosine_distances if dist > DISTANCE_THRESHOLD)
         
         print(f"DEBUG: Cosine distances: {[f'{d:.3f}' for d in cosine_distances[:5]]}")

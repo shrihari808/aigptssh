@@ -717,11 +717,31 @@ async def web_rag_mix(
         final_response_text = ""
         disclaimer = DISCLAIMER_TEXT
         with get_openai_callback() as cb:
-            async for chunk in final_chain.astream({"context": final_context, "history": chat_history, "input": original_query, "today": today, "blacklist": BLACKLISTED_DOMAINS, "disclaimer": disclaimer}):
+            # Capture the input for token counting before streaming
+            prompt_input = {
+                "context": final_context,
+                "history": chat_history,
+                "input": original_query,
+                "today": today,
+                "blacklist": list(BLACKLISTED_DOMAINS),  # FIX: Convert set to list
+                "disclaimer": disclaimer
+            }
+            # Calculate input tokens
+            input_tokens = count_tokens(json.dumps(prompt_input)) # A simple way to count tokens for the whole input dict
+
+            async for chunk in final_chain.astream(prompt_input):
                 if chunk.content:
                     final_response_text += chunk.content
                     yield chunk.content.encode("utf-8")
             
+            # After streaming is complete, calculate output tokens and log everything
+            output_tokens = count_tokens(final_response_text)
+            print(f"DEBUG: Final LLM Call Token Usage:")
+            print(f"DEBUG:   - Input Tokens: {input_tokens}")
+            print(f"DEBUG:   - Output Tokens: {output_tokens}")
+            print(f"DEBUG:   - Total Tokens from callback: {cb.total_tokens}")
+
+
             total_tokens = cb.total_tokens
             asyncio.create_task(insert_credit_usage(user_id, plan_id, total_tokens / 1000, db_pool))
             asyncio.create_task(store_into_db(session_id, prompt_history_id, {"links": final_links}, db_pool))
